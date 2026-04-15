@@ -1579,7 +1579,6 @@
   function getObjectiveCardsPerPage() {
     if (!runtime.layout) return 4;
     if (runtime.layout.mode === "desktop") return 4;
-    if (runtime.layout.mode === "mobile-landscape") return 2;
     return 1;
   }
 
@@ -2373,6 +2372,7 @@
       const titleLineHeight = runtime.layout.mode === "mobile-portrait" ? 16 : 18;
       const bodyLineHeight = runtime.layout.mode === "mobile-portrait" ? 14 : 16;
       const detailLineHeight = runtime.layout.mode === "mobile-portrait" ? 13 : 15;
+      const footerHeight = runtime.layout.mode === "desktop" ? 42 : 48;
       Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 16, fill, stroke, 1.1);
       const pillText = `${entry.result.points}/${entry.objective.points}`;
       const pillWidth = (() => {
@@ -2394,16 +2394,25 @@
         font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
 
-      Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + inset, cardRect.y + inset + 36, cardRect.w - inset * 2, bodyLineHeight, {
+      const descriptionY = cardRect.y + inset + 34;
+      const footerY = cardRect.y + cardRect.h - footerHeight;
+      Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + inset, descriptionY, cardRect.w - inset * 2, bodyLineHeight, {
         font: bodyFont,
         color: "rgba(82, 61, 44, 0.86)",
-        maxLines: runtime.layout.mode === "desktop" ? 3 : runtime.layout.mode === "mobile-landscape" ? 3 : 5
+        maxLines: runtime.layout.mode === "desktop" ? 3 : 5
       });
 
-      Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + inset, cardRect.y + cardRect.h - (runtime.layout.mode === "mobile-portrait" ? 30 : 34), cardRect.w - inset * 2, detailLineHeight, {
+      ctx.strokeStyle = "rgba(108,80,54,0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cardRect.x + inset, footerY - 8);
+      ctx.lineTo(cardRect.x + cardRect.w - inset, footerY - 8);
+      ctx.stroke();
+
+      Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + inset, footerY, cardRect.w - inset * 2, detailLineHeight, {
         font: detailFont,
         color: complete ? "#3f6b47" : "#7d5a37",
-        maxLines: runtime.layout.mode === "mobile-portrait" ? 3 : 2
+        maxLines: runtime.layout.mode === "mobile-portrait" ? 2 : 2
       });
     });
   }
