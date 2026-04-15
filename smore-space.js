@@ -1463,13 +1463,13 @@
   }
 
   function computeLayout(width, height) {
-    const pad = Core.clamp(Math.round(Math.min(width, height) * 0.018), 10, 22);
-    const gap = Core.clamp(Math.round(Math.min(width, height) * 0.014), 10, 18);
+    const pad = Core.clamp(Math.round(Math.min(width, height) * 0.014), 8, 18);
+    const gap = Core.clamp(Math.round(Math.min(width, height) * 0.01), 8, 14);
     const mode = getLayoutMode(width, height);
 
     if (mode === "desktop") {
-      const topBarHeight = 124;
-      const bottomBarHeight = 116;
+      const topBarHeight = 116;
+      const bottomBarHeight = 102;
       const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
       const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
       const content = {
@@ -1491,8 +1491,8 @@
     }
 
     if (mode === "mobile-landscape") {
-      const topBarHeight = 108;
-      const bottomBarHeight = 112;
+      const topBarHeight = 100;
+      const bottomBarHeight = 94;
       const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
       const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
       const content = {
@@ -1510,8 +1510,8 @@
       return { mode, pad, gap, width, height, topBar, bottomBar, boardPanel, infoPanel: { x: sidePanel.x, y: sidePanel.y, w: sidePanel.w, h: infoHeight }, sideTabs, sideBody };
     }
 
-    const topBarHeight = 118;
-    const bottomBarHeight = 132;
+    const topBarHeight = 110;
+    const bottomBarHeight = 104;
     const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
     const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
     const content = {
@@ -1526,15 +1526,15 @@
   }
 
   function getBoardGeometry(panelRect) {
-    const headerHeight = 40;
-    const inner = Core.insetRect(panelRect, 16);
+    const headerHeight = 34;
+    const inner = Core.insetRect(panelRect, 12);
     const rackVisible = game.phase === "setupLandscape";
-    const rackHeight = rackVisible ? Core.clamp(Math.round(panelRect.h * (runtime.layout.mode === "mobile-portrait" ? 0.28 : 0.24)), 112, 170) : 0;
+    const rackHeight = rackVisible ? Core.clamp(Math.round(panelRect.h * (runtime.layout.mode === "mobile-portrait" ? 0.24 : 0.22)), 104, 160) : 0;
     const boardArea = {
       x: inner.x,
       y: inner.y + headerHeight,
       w: inner.w,
-      h: inner.h - headerHeight - (rackVisible ? rackHeight + 12 : 0)
+      h: inner.h - headerHeight - (rackVisible ? rackHeight + 8 : 0)
     };
     const labelSize = runtime.layout.mode === "mobile-portrait" ? 18 : 22;
     const gap = Core.clamp(Math.floor(Math.min(boardArea.w / 80, boardArea.h / 40) * 6), 3, 8);
@@ -1549,7 +1549,7 @@
     const originX = boardArea.x + labelSize + Math.max(0, (availableWidth - boardWidth) / 2);
     const originY = boardArea.y + labelSize + Math.max(0, (availableHeight - boardHeight) / 2);
     const rackRect = rackVisible
-      ? { x: inner.x, y: panelRect.y + panelRect.h - rackHeight - 16, w: inner.w, h: rackHeight }
+      ? { x: inner.x, y: panelRect.y + panelRect.h - rackHeight - 12, w: inner.w, h: rackHeight }
       : null;
     return { headerHeight, labelSize, gap, cellSize, originX, originY, boardWidth, boardHeight, rackRect };
   }
@@ -1579,29 +1579,34 @@
   function getObjectiveCardsPerPage() {
     if (!runtime.layout) return 4;
     if (runtime.layout.mode === "desktop") return 4;
-    return 2;
+    if (runtime.layout.mode === "mobile-landscape") return 2;
+    return 1;
   }
 
   function drawPanel(rect, title, subtitle) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 24, "rgba(255, 249, 240, 0.96)", "rgba(108, 80, 54, 0.16)", 1.5);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 22, "rgba(255, 249, 240, 0.96)", "rgba(108, 80, 54, 0.16)", 1.4);
     ctx.fillStyle = "#3f2d20";
-    ctx.font = "700 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = runtime.layout.mode === "mobile-portrait"
+      ? "700 17px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "700 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(title, rect.x + 16, rect.y + 14);
+    ctx.fillText(title, rect.x + 12, rect.y + 10);
     if (subtitle) {
-      Core.drawWrappedText(ctx, subtitle, rect.x + rect.w - 16, rect.y + 16, Math.max(120, rect.w * 0.54), 14, {
-        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      Core.drawWrappedText(ctx, subtitle, rect.x + rect.w - 12, rect.y + 12, Math.max(110, rect.w * 0.54), 13, {
+        font: runtime.layout.mode === "mobile-portrait"
+          ? "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+          : "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
         align: "right",
         color: "rgba(82, 61, 44, 0.72)",
-        maxLines: 2
+        maxLines: runtime.layout.mode === "mobile-portrait" ? 2 : 2
       });
     }
     return {
-      x: rect.x + 14,
-      y: rect.y + 50,
-      w: rect.w - 28,
-      h: rect.h - 64
+      x: rect.x + 10,
+      y: rect.y + 42,
+      w: rect.w - 20,
+      h: rect.h - 52
     };
   }
 
@@ -1929,26 +1934,26 @@
 
   function renderBottomBar(rect) {
     const player = getPlayer();
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 24, "rgba(255, 248, 239, 0.97)", "rgba(108, 80, 54, 0.16)", 1.5);
-    const gap = 12;
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 22, "rgba(255, 248, 239, 0.97)", "rgba(108, 80, 54, 0.16)", 1.4);
+    const gap = 10;
     const summaryRect = runtime.layout.mode === "mobile-portrait"
-      ? { x: rect.x + 14, y: rect.y + 14, w: rect.w - 28, h: 52 }
-      : { x: rect.x + 14, y: rect.y + 14, w: rect.w * 0.54, h: rect.h - 28 };
+      ? { x: rect.x + 10, y: rect.y + 10, w: rect.w - 20, h: 40 }
+      : { x: rect.x + 10, y: rect.y + 10, w: rect.w * 0.54, h: rect.h - 20 };
     const buttonRect = runtime.layout.mode === "mobile-portrait"
-      ? { x: rect.x + 14, y: summaryRect.y + summaryRect.h + 10, w: rect.w - 28, h: rect.h - summaryRect.h - 24 }
-      : { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 16, w: rect.w - summaryRect.w - gap - 28, h: rect.h - 32 };
+      ? { x: rect.x + 10, y: summaryRect.y + summaryRect.h + 8, w: rect.w - 20, h: rect.h - summaryRect.h - 18 }
+      : { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 10, w: rect.w - summaryRect.w - gap - 20, h: rect.h - 20 };
 
-    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
     const summary = getBottomSummary();
     ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
-    ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(summary.title, summaryRect.x + 14, summaryRect.y + 10);
-    Core.drawWrappedText(ctx, summary.body, summaryRect.x + 14, summaryRect.y + 28, summaryRect.w - 28, 15, {
-      font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    ctx.fillText(summary.title, summaryRect.x + 10, summaryRect.y + 8);
+    Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 23, summaryRect.w - 20, 13, {
+      font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.86)",
-      maxLines: runtime.layout.mode === "mobile-portrait" ? 2 : 3
+      maxLines: runtime.layout.mode === "mobile-portrait" ? 1 : 2
     });
     drawActionGrid(buttonRect, getBottomActions(player));
   }
@@ -1961,14 +1966,14 @@
       { id: "objectives", label: "Goals" },
       { id: "score", label: "Score" }
     ];
-    const gap = 8;
-    const width = (rect.w - gap * (tabs.length - 1) - 16) / tabs.length;
+    const gap = 6;
+    const width = (rect.w - gap * (tabs.length - 1) - 12) / tabs.length;
     tabs.forEach((tab, index) => {
       drawButton({
-        x: rect.x + 8 + index * (width + gap),
-        y: rect.y + 7,
+        x: rect.x + 6 + index * (width + gap),
+        y: rect.y + 6,
         w: width,
-        h: rect.h - 14
+        h: rect.h - 12
       }, tab.label, () => {
         game.ui.mobileTab = tab.id;
       }, {
@@ -1982,11 +1987,11 @@
 
   function renderSegmentTabs(rect, tabs, activeId, onSelect, scopePrefix) {
     Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 18, "rgba(249, 242, 232, 0.96)", "rgba(108,80,54,0.14)", 1);
-    const gap = 6;
-    const width = (rect.w - gap * (tabs.length - 1) - 12) / tabs.length;
+    const gap = 4;
+    const width = (rect.w - gap * (tabs.length - 1) - 8) / tabs.length;
     tabs.forEach((tab, index) => {
       drawButton({
-        x: rect.x + 6 + index * (width + gap),
+        x: rect.x + 4 + index * (width + gap),
         y: rect.y + 4,
         w: width,
         h: rect.h - 8
@@ -2347,7 +2352,7 @@
     const results = buildObjectiveResultsForPlayer(player, objectives);
     const start = page * cardsPerPage;
     const visibleResults = results.slice(start, start + cardsPerPage);
-    const gap = 12;
+    const gap = runtime.layout.mode === "mobile-portrait" ? 8 : 12;
     const cardHeight = (rect.h - gap * Math.max(0, visibleResults.length - 1)) / Math.max(1, visibleResults.length);
 
     visibleResults.forEach((entry, index) => {
@@ -2355,7 +2360,20 @@
       const complete = entry.result.points >= entry.objective.points;
       const fill = complete ? "rgba(232, 246, 228, 0.98)" : "rgba(250, 242, 232, 0.98)";
       const stroke = complete ? "rgba(86, 132, 93, 0.48)" : "rgba(108,80,54,0.16)";
-      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, fill, stroke, 1.2);
+      const inset = runtime.layout.mode === "mobile-portrait" ? 10 : 14;
+      const titleFont = runtime.layout.mode === "mobile-portrait"
+        ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      const bodyFont = runtime.layout.mode === "mobile-portrait"
+        ? "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      const detailFont = runtime.layout.mode === "mobile-portrait"
+        ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      const titleLineHeight = runtime.layout.mode === "mobile-portrait" ? 16 : 18;
+      const bodyLineHeight = runtime.layout.mode === "mobile-portrait" ? 14 : 16;
+      const detailLineHeight = runtime.layout.mode === "mobile-portrait" ? 13 : 15;
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 16, fill, stroke, 1.1);
       const pillText = `${entry.result.points}/${entry.objective.points}`;
       const pillWidth = (() => {
         ctx.save();
@@ -2364,28 +2382,28 @@
         ctx.restore();
         return width;
       })();
-      const titleWidth = Math.max(120, cardRect.w - pillWidth - 42);
-      Core.drawWrappedText(ctx, entry.objective.name, cardRect.x + 14, cardRect.y + 12, titleWidth, 18, {
-        font: "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      const titleWidth = Math.max(116, cardRect.w - pillWidth - inset * 2 - 10);
+      Core.drawWrappedText(ctx, entry.objective.name, cardRect.x + inset, cardRect.y + inset, titleWidth, titleLineHeight, {
+        font: titleFont,
         color: "#452f1e",
         maxLines: 2
       });
-      drawPill(cardRect.x + cardRect.w - pillWidth - 14, cardRect.y + 12, pillText, complete ? "#5f8d65" : variant === "director" ? "#8e6a9f" : "#c6783c", "#fff9f3", {
+      drawPill(cardRect.x + cardRect.w - pillWidth - inset, cardRect.y + inset, pillText, complete ? "#5f8d65" : variant === "director" ? "#8e6a9f" : "#c6783c", "#fff9f3", {
         paddingX: 12,
-        height: 30,
+        height: runtime.layout.mode === "mobile-portrait" ? 26 : 30,
         font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
 
-      Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + 14, cardRect.y + 56, cardRect.w - 28, 16, {
-        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + inset, cardRect.y + inset + 36, cardRect.w - inset * 2, bodyLineHeight, {
+        font: bodyFont,
         color: "rgba(82, 61, 44, 0.86)",
-        maxLines: runtime.layout.mode === "desktop" ? 3 : 4
+        maxLines: runtime.layout.mode === "desktop" ? 3 : runtime.layout.mode === "mobile-landscape" ? 3 : 5
       });
 
-      Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + 14, cardRect.y + cardRect.h - 34, cardRect.w - 28, 15, {
-        font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + inset, cardRect.y + cardRect.h - (runtime.layout.mode === "mobile-portrait" ? 30 : 34), cardRect.w - inset * 2, detailLineHeight, {
+        font: detailFont,
         color: complete ? "#3f6b47" : "#7d5a37",
-        maxLines: 2
+        maxLines: runtime.layout.mode === "mobile-portrait" ? 3 : 2
       });
     });
   }
@@ -2395,7 +2413,7 @@
     const content = drawPanel(rect, "Objectives", "Shared seasonal goals and Camp Director goals score against the current player's board.");
     if (!player) return;
     const objectiveTab = game.ui.objectiveTab;
-    renderSegmentTabs({ x: content.x, y: content.y, w: content.w, h: 36 }, [
+    renderSegmentTabs({ x: content.x, y: content.y, w: content.w, h: 34 }, [
       { id: "shared", label: "Shared" },
       { id: "director", label: "Director", enabled: game.directorRevealed }
     ], objectiveTab, (value) => {
@@ -2408,34 +2426,34 @@
     const totalPages = Math.max(1, Math.ceil(objectives.length / cardsPerPage));
     game.ui.objectivePages[tabKey] = Core.clamp(game.ui.objectivePages[tabKey] || 0, 0, totalPages - 1);
 
-    const pagerY = content.y + 48;
+    const pagerY = content.y + 40;
     if (totalPages > 1) {
       const indicatorText = `Showing ${game.ui.objectivePages[tabKey] * cardsPerPage + 1}-${Math.min(objectives.length, (game.ui.objectivePages[tabKey] + 1) * cardsPerPage)} of ${objectives.length}`;
       ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
-      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(indicatorText, content.x + content.w / 2, pagerY + 15);
-      drawButton({ x: content.x, y: pagerY, w: 44, h: 30 }, "<", () => {
+      ctx.fillText(indicatorText, content.x + content.w / 2, pagerY + 13);
+      drawButton({ x: content.x, y: pagerY, w: 38, h: 26 }, "<", () => {
         game.ui.objectivePages[tabKey] = Math.max(0, game.ui.objectivePages[tabKey] - 1);
       }, {
         id: `objective-prev-${tabKey}`,
         enabled: game.ui.objectivePages[tabKey] > 0,
-        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
-      drawButton({ x: content.x + content.w - 44, y: pagerY, w: 44, h: 30 }, ">", () => {
+      drawButton({ x: content.x + content.w - 38, y: pagerY, w: 38, h: 26 }, ">", () => {
         game.ui.objectivePages[tabKey] = Math.min(totalPages - 1, game.ui.objectivePages[tabKey] + 1);
       }, {
         id: `objective-next-${tabKey}`,
         enabled: game.ui.objectivePages[tabKey] < totalPages - 1,
-        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     }
 
     renderObjectiveCards(
       player,
       objectives,
-      { x: content.x, y: content.y + 86, w: content.w, h: content.h - 86 },
+      { x: content.x, y: content.y + 72, w: content.w, h: content.h - 72 },
       tabKey === "director" ? "director" : "shared",
       game.ui.objectivePages[tabKey],
       cardsPerPage
