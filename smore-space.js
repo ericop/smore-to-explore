@@ -41,7 +41,7 @@
     { fill: "#8d5a36", accent: "#f4d2a8", text: "#fff8f0" },
     { fill: "#4f7d5a", accent: "#d4efcf", text: "#f8fff7" },
     { fill: "#4e769c", accent: "#d6e7f5", text: "#f8fcff" },
-    { fill: "#9b6d3d", accent: "#f6e1b3", text: "#fffaf2" },
+    { fill: "#a45369", accent: "#f3d5de", text: "#fff9fc" },
     { fill: "#7b5a8f", accent: "#e7d7f2", text: "#fffaff" }
   ];
 
