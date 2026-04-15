@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smore to Explore</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --cream-050: #fff8ef;
+      --cream-100: #f7ebd6;
+      --cream-200: #edd9b8;
+      --bark-700: #5f4633;
+      --bark-800: #4a3424;
+      --pine-700: #35563f;
+      --pine-800: #263f2e;
+      --sage-500: #86a66f;
+      --moss-400: #aec98d;
+      --sunset-400: #efb467;
+      --ember-500: #d66f42;
+      --water-400: #67a7c8;
+      --shadow: rgba(50, 33, 19, 0.18);
+      --panel-border: rgba(95, 70, 51, 0.16);
+      --panel-fill: rgba(255, 248, 239, 0.82);
+      --button-text: #fffdf7;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+      --radius-sm: 14px;
+      --ui-font: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+      --title-font: "Trebuchet MS", "Gill Sans", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(255, 206, 135, 0.42), transparent 26%),
+        radial-gradient(circle at 20% 0%, rgba(103, 167, 200, 0.2), transparent 22%),
+        linear-gradient(180deg, #fef6e9 0%, #f4e4ca 48%, #ead4b0 100%);
+      color: #2f261f;
+      font-family: var(--ui-font);
+    }
+
+    body.fullscreen-mode {
+      overflow: hidden;
+    }
+
+    body.fullscreen-mode .app-shell {
+      min-height: 100vh;
+      padding: 0.75rem;
+    }
+
+    .app-shell {
+      max-width: 1540px;
+      margin: 0 auto;
+      padding: 1rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .topbar,
+    .status-strip,
+    .sidebar-card,
+    .board-panel,
+    .market-panel,
+    .overlay-card {
+      background: var(--panel-fill);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 18px 40px var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar {
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      font-size: 0.82rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--pine-700);
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: var(--title-font);
+      font-size: clamp(2rem, 4vw, 3.25rem);
+      line-height: 1;
+      color: var(--bark-800);
+    }
+
+    .subtitle {
+      margin: 0.45rem 0 0;
+      max-width: 58ch;
+      color: rgba(47, 38, 31, 0.82);
+      font-size: 1rem;
+    }
+
+    .top-actions,
+    .board-actions,
+    .overlay-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .ui-button {
+      border: 0;
+      border-radius: 999px;
+      min-height: 46px;
+      padding: 0.75rem 1.15rem;
+      font: 700 0.98rem/1 var(--ui-font);
+      cursor: pointer;
+      color: var(--button-text);
+      background: linear-gradient(180deg, #5d8a64, #3b6843);
+      box-shadow: 0 10px 20px rgba(53, 86, 63, 0.24);
+      transition: transform 0.12s ease, filter 0.12s ease, opacity 0.12s ease;
+      touch-action: manipulation;
+    }
+
+    .ui-button:hover,
+    .ui-button:focus-visible {
+      filter: brightness(1.04);
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    .ui-button.secondary {
+      background: linear-gradient(180deg, #86735f, #5e4d3d);
+      box-shadow: 0 10px 20px rgba(95, 70, 51, 0.22);
+    }
+
+    .ui-button.warning {
+      background: linear-gradient(180deg, #efb467, #dd9153);
+      box-shadow: 0 10px 20px rgba(214, 111, 66, 0.22);
+    }
+
+    .ui-button.danger {
+      background: linear-gradient(180deg, #d98263, #bd6045);
+      box-shadow: 0 10px 20px rgba(189, 96, 69, 0.24);
+    }
+
+    .ui-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.54;
+      filter: saturate(0.7);
+      transform: none;
+      box-shadow: none;
+    }
+
+    .status-strip {
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.65rem;
+    }
+
+    .stat-chip {
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(95, 70, 51, 0.14);
+      padding: 0.7rem 0.9rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.18rem;
+      min-height: 74px;
+      justify-content: center;
+    }
+
+    .stat-label {
+      font-size: 0.76rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(47, 38, 31, 0.62);
+      font-weight: 700;
+    }
+
+    .stat-value {
+      font-size: 1.18rem;
+      font-weight: 800;
+      color: var(--bark-800);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 350px minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .sidebar {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .sidebar-card,
+    .board-panel,
+    .market-panel {
+      border-radius: var(--radius-lg);
+      padding: 1rem;
+    }
+
+    .sidebar-card h2,
+    .board-panel h2,
+    .market-panel h2,
+    .overlay-card h2 {
+      margin: 0;
+      color: var(--bark-800);
+      font-family: var(--title-font);
+      font-size: 1.35rem;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .section-head p,
+    .sidebar-card p {
+      margin: 0.35rem 0 0;
+      color: rgba(47, 38, 31, 0.72);
+      line-height: 1.45;
+    }
+
+    .selection-card,
+    .message-card,
+    .objective-card,
+    .history-card,
+    .market-tile,
+    .landscape-tile {
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(95, 70, 51, 0.12);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .selection-card,
+    .message-card,
+    .history-card {
+      padding: 0.9rem;
+    }
+
+    .selection-card {
+      display: grid;
+      gap: 0.45rem;
+    }
+
+    .tile-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(53, 86, 63, 0.12);
+      color: var(--pine-800);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .message-card[data-tone="error"] {
+      background: rgba(255, 236, 230, 0.92);
+      border-color: rgba(214, 111, 66, 0.32);
+    }
+
+    .message-card[data-tone="success"] {
+      background: rgba(235, 248, 236, 0.92);
+      border-color: rgba(74, 140, 88, 0.3);
+    }
+
+    .message-card[data-tone="info"] {
+      background: rgba(242, 248, 252, 0.9);
+      border-color: rgba(103, 167, 200, 0.28);
+    }
+
+    .message-title {
+      font-weight: 800;
+      margin-bottom: 0.28rem;
+      color: var(--bark-800);
+    }
+
+    .message-body {
+      color: rgba(47, 38, 31, 0.78);
+      line-height: 1.45;
+    }
+
+    .objective-list,
+    .history-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .objective-card {
+      padding: 0.9rem;
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .objective-card.current {
+      border-color: rgba(53, 86, 63, 0.28);
+      background: rgba(242, 249, 239, 0.92);
+    }
+
+    .objective-card.director {
+      border-color: rgba(214, 111, 66, 0.24);
+      background: rgba(255, 245, 236, 0.92);
+    }
+
+    .objective-name {
+      font-weight: 800;
+      color: var(--bark-800);
+    }
+
+    .objective-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      font-size: 0.82rem;
+    }
+
+    .objective-description,
+    .objective-progress,
+    .history-card p {
+      color: rgba(47, 38, 31, 0.78);
+      line-height: 1.42;
+    }
+
+    .board-panel {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .board-actions {
+      justify-content: space-between;
+    }
+
+    .board-actions-left,
+    .board-actions-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .canvas-frame {
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(53, 86, 63, 0.16);
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.55), transparent 25%),
+        linear-gradient(180deg, rgba(255, 248, 239, 0.96), rgba(241, 230, 208, 0.94));
+      padding: 0.8rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: calc(var(--radius-lg) - 6px);
+      touch-action: none;
+    }
+
+    .board-hint {
+      min-height: 50px;
+      padding: 0.85rem 1rem;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px dashed rgba(95, 70, 51, 0.24);
+      color: rgba(47, 38, 31, 0.8);
+      line-height: 1.45;
+    }
+
+    .board-hint strong {
+      color: var(--bark-800);
+    }
+
+    .rack-panel {
+      border-radius: var(--radius-lg);
+      padding: 0.95rem;
+      background: rgba(255, 252, 246, 0.72);
+      border: 1px solid rgba(95, 70, 51, 0.1);
+    }
+
+    .landscape-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .landscape-tile,
+    .market-tile {
+      padding: 0.9rem;
+      text-align: left;
+      cursor: pointer;
+      min-height: 88px;
+      display: grid;
+      gap: 0.3rem;
+      color: inherit;
+      font: inherit;
+    }
+
+    button.landscape-tile,
+    button.market-tile {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    button.landscape-tile:hover,
+    button.landscape-tile:focus-visible,
+    button.market-tile:hover,
+    button.market-tile:focus-visible {
+      outline: none;
+      border-color: rgba(53, 86, 63, 0.3);
+      box-shadow: 0 10px 20px rgba(53, 86, 63, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .landscape-tile.selected,
+    .market-tile.selected {
+      border-color: rgba(214, 111, 66, 0.42);
+      box-shadow: 0 12px 24px rgba(214, 111, 66, 0.15);
+      background: rgba(255, 247, 238, 0.94);
+    }
+
+    .tile-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .tile-name {
+      font-weight: 800;
+      color: var(--bark-800);
+    }
+
+    .tile-subtext {
+      color: rgba(47, 38, 31, 0.72);
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+
+    .market-panel {
+      overflow-x: auto;
+    }
+
+    .market-grid {
+      min-width: 900px;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(140px, 1fr));
+      gap: 0.8rem;
+    }
+
+    .market-column {
+      display: grid;
+      gap: 0.6rem;
+      align-content: start;
+    }
+
+    .column-header {
+      padding: 0.85rem 0.8rem;
+      border-radius: var(--radius-md);
+      font-weight: 800;
+      color: var(--button-text);
+      background: linear-gradient(180deg, #4f6f58, #35563f);
+    }
+
+    .column-header.amenity {
+      background: linear-gradient(180deg, #4f87a2, #34657d);
+    }
+
+    .market-tile {
+      min-height: 94px;
+    }
+
+    .market-tile:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .market-badge {
+      display: inline-flex;
+      padding: 0.22rem 0.48rem;
+      border-radius: 999px;
+      background: rgba(53, 86, 63, 0.1);
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--pine-800);
+      width: fit-content;
+    }
+
+    .history-card {
+      display: grid;
+      gap: 0.25rem;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(39, 27, 19, 0.48);
+      z-index: 10;
+    }
+
+    .overlay.open {
+      display: flex;
+    }
+
+    .overlay-card {
+      width: min(760px, 100%);
+      border-radius: 28px;
+      padding: 1.4rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .overlay-body {
+      display: grid;
+      gap: 0.75rem;
+      color: rgba(47, 38, 31, 0.82);
+      line-height: 1.5;
+    }
+
+    .overlay-score-list {
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .overlay-score-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.75rem 0.85rem;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(95, 70, 51, 0.12);
+    }
+
+    .overlay-score-item strong {
+      color: var(--bark-800);
+    }
+
+    .overlay-total {
+      padding: 0.9rem 1rem;
+      border-radius: var(--radius-md);
+      background: rgba(243, 249, 240, 0.92);
+      border: 1px solid rgba(53, 86, 63, 0.18);
+      font-weight: 800;
+      color: var(--pine-800);
+    }
+
+    @media (max-width: 1200px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        order: 2;
+      }
+
+      .board-panel {
+        order: 1;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .app-shell {
+        padding: 0.75rem;
+      }
+
+      .topbar,
+      .status-strip,
+      .sidebar-card,
+      .board-panel,
+      .market-panel {
+        border-radius: 20px;
+      }
+
+      .topbar,
+      .status-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .top-actions,
+      .board-actions,
+      .board-actions-left,
+      .board-actions-right {
+        width: 100%;
+      }
+
+      .top-actions .ui-button,
+      .board-actions .ui-button {
+        flex: 1 1 160px;
+      }
+
+      .status-strip {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .landscape-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .status-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .ui-button {
+        width: 100%;
+      }
+
+      .top-actions,
+      .board-actions-left,
+      .board-actions-right,
+      .overlay-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell" id="appShell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Cozy Campground Drafting Prototype</p>
+        <h1>Smore to Explore</h1>
+        <p class="subtitle">
+          Build an inviting summer campground by laying roads, drafting contractors, and chasing seasonal objectives over three rounds.
+        </p>
+      </div>
+      <div class="top-actions">
+        <button class="ui-button secondary" id="fullscreenButton" type="button">Fullscreen</button>
+        <button class="ui-button danger" id="restartButton" type="button">New Game</button>
+      </div>
+    </header>
+
+    <section class="status-strip">
+      <div class="stat-chip">
+        <span class="stat-label">Round</span>
+        <span class="stat-value" id="roundStat">Early Summer</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-label">Phase</span>
+        <span class="stat-value" id="phaseStat">Setup</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-label">Budget</span>
+        <span class="stat-value" id="moneyStat">$100,000</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-label">Score</span>
+        <span class="stat-value" id="scoreStat">0 pts</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-label">Builds This Round</span>
+        <span class="stat-value" id="roundBuildStat">0 tiles</span>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <aside class="sidebar">
+        <section class="sidebar-card">
+          <div class="section-head">
+            <div>
+              <h2>Selected Tile</h2>
+              <p id="selectionIntro">Choose a landscape tile to begin your campground skeleton.</p>
+            </div>
+          </div>
+          <div class="selection-card" id="selectionPanel"></div>
+        </section>
+
+        <section class="sidebar-card">
+          <div class="section-head">
+            <div>
+              <h2>Placement Guide</h2>
+              <p>Tap a board space to place the current tile. Invalid spaces explain why they fail.</p>
+            </div>
+          </div>
+          <div class="message-card" data-tone="info" id="messagePanel"></div>
+        </section>
+
+        <section class="sidebar-card">
+          <div class="section-head">
+            <div>
+              <h2>Objectives</h2>
+              <p id="objectivesSubtitle">Early Summer goals are active now. Camp Director goals arrive after the first scoring phase.</p>
+            </div>
+          </div>
+          <div class="objective-list" id="sharedObjectives"></div>
+          <div class="objective-list" id="directorObjectives"></div>
+        </section>
+
+        <section class="sidebar-card">
+          <div class="section-head">
+            <div>
+              <h2>Score Log</h2>
+              <p>Round summaries and scoring notes stay here for quick reference.</p>
+            </div>
+          </div>
+          <div class="history-list" id="historyPanel"></div>
+        </section>
+      </aside>
+
+      <section class="board-panel">
+        <div class="section-head">
+          <div>
+            <h2>Campground Board</h2>
+            <p>Landscape tiles form the foundation. Camp tiles stack on top once the contractor market opens.</p>
+          </div>
+        </div>
+
+        <div class="board-actions">
+          <div class="board-actions-left">
+            <button class="ui-button secondary" id="rotateLeftButton" type="button">Rotate Left</button>
+            <button class="ui-button secondary" id="rotateRightButton" type="button">Rotate Right</button>
+            <button class="ui-button secondary" id="clearSelectionButton" type="button">Clear Selection</button>
+          </div>
+          <div class="board-actions-right">
+            <button class="ui-button warning" id="endRoundButton" type="button">Score This Round</button>
+          </div>
+        </div>
+
+        <div class="canvas-frame" id="gameMount">
+          <canvas id="boardCanvas" width="960" height="620"></canvas>
+        </div>
+
+        <div class="board-hint" id="boardHint"></div>
+
+        <section class="rack-panel">
+          <div class="section-head">
+            <div>
+              <h2 id="landscapeRackTitle">Landscape Hand</h2>
+              <p id="landscapeRackSubtitle">Place all 10 starting tiles legally before you can buy camp tiles.</p>
+            </div>
+          </div>
+          <div class="landscape-grid" id="landscapeHand"></div>
+        </section>
+      </section>
+    </main>
+
+    <section class="market-panel">
+      <div class="section-head">
+        <div>
+          <h2>Contractor Market</h2>
+          <p id="marketSubtitle">Two amenity columns and four campsite columns stay face-up all game. Each hired contractor costs $10,000.</p>
+        </div>
+      </div>
+      <div class="market-grid" id="marketColumns"></div>
+    </section>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="overlay-card">
+      <div>
+        <h2 id="overlayTitle"></h2>
+      </div>
+      <div class="overlay-body" id="overlayBody"></div>
+      <div class="overlay-actions" id="overlayActions"></div>
+    </div>
+  </div>
+
+  <script defer src="./smore-core.js"></script>
+  <script defer src="./smore-objectives.js"></script>
+  <script defer src="./smore-space.js"></script>
+</body>
+</html>

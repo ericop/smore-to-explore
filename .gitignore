@@ -1,0 +1,17 @@
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vscode/
+.idea/
+
+*.log
+*.tmp
+*.bak
+*.swp
+
+.edge-profile/
+.edge-dom.txt
+smore-preview.png
+
+smoreToExplore/
