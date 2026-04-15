@@ -239,6 +239,10 @@
       mobileTab: "board",
       sideTab: "objectives",
       objectiveTab: "shared",
+      objectivePages: {
+        shared: 0,
+        director: 0
+      },
       marketPage: 0,
       selection: createSelection(),
       inspectedCell: null,
@@ -1464,7 +1468,7 @@
     const mode = getLayoutMode(width, height);
 
     if (mode === "desktop") {
-      const topBarHeight = 104;
+      const topBarHeight = 124;
       const bottomBarHeight = 116;
       const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
       const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
@@ -1487,7 +1491,7 @@
     }
 
     if (mode === "mobile-landscape") {
-      const topBarHeight = 92;
+      const topBarHeight = 108;
       const bottomBarHeight = 112;
       const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
       const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
@@ -1506,7 +1510,7 @@
       return { mode, pad, gap, width, height, topBar, bottomBar, boardPanel, infoPanel: { x: sidePanel.x, y: sidePanel.y, w: sidePanel.w, h: infoHeight }, sideTabs, sideBody };
     }
 
-    const topBarHeight = 108;
+    const topBarHeight = 118;
     const bottomBarHeight = 132;
     const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
     const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
@@ -1569,6 +1573,12 @@
     if (!runtime.layout) return 6;
     if (runtime.layout.mode === "desktop") return 6;
     if (runtime.layout.mode === "mobile-landscape") return 3;
+    return 2;
+  }
+
+  function getObjectiveCardsPerPage() {
+    if (!runtime.layout) return 4;
+    if (runtime.layout.mode === "desktop") return 4;
     return 2;
   }
 
@@ -1638,22 +1648,24 @@
     }
 
     ctx.fillStyle = palette.text;
-    ctx.font = options.font || "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = options.font || "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + yOffset);
+    ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + yOffset + (options.textYOffset ?? 0.5));
   }
 
-  function drawPill(x, y, text, fill, textColor) {
-    const paddingX = 12;
+  function drawPill(x, y, text, fill, textColor, options = {}) {
+    const paddingX = options.paddingX || 12;
+    const height = options.height || 24;
+    const radius = options.radius || Math.floor(height / 2);
     ctx.save();
-    ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = options.font || "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     const width = ctx.measureText(text).width + paddingX * 2;
-    Core.drawRoundedRect(ctx, x, y, width, 24, 12, fill, null, 0);
+    Core.drawRoundedRect(ctx, x, y, width, height, radius, fill, options.stroke || null, options.stroke ? 1 : 0);
     ctx.fillStyle = textColor;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, x + width / 2, y + 12);
+    ctx.fillText(text, x + width / 2, y + height / 2 + (options.textYOffset ?? 0.5));
     ctx.restore();
     return width;
   }
@@ -1682,18 +1694,27 @@
     ctx.fillStyle = "#3b2c20";
     ctx.font = runtime.layout.mode === "mobile-portrait"
       ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif"
-      : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      : "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText("Smore to Explore", rect.x + 18, rect.y + 14);
 
     const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
     const roundName = game.players.length ? getCurrentRound().name : "Campground Pass-and-Play";
-    const roundPillWidth = drawPill(rect.x + 18, rect.y + 50, roundName, "#e9dbc2", "#5f4731");
-    drawPill(rect.x + 18 + roundPillWidth + 8, rect.y + 50, getPhaseLabel(), phaseFill, "#fffaf6");
+    const pillY = rect.y + 54;
+    const roundPillWidth = drawPill(rect.x + 18, pillY, roundName, "#efe2ca", "#5f4731", {
+      height: 26,
+      paddingX: 13,
+      font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
+    drawPill(rect.x + 18 + roundPillWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+      height: 26,
+      paddingX: 13,
+      font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
 
-    const buttonWidth = runtime.layout.mode === "mobile-portrait" ? 76 : 92;
-    const buttonHeight = 34;
+    const buttonWidth = runtime.layout.mode === "mobile-portrait" ? 72 : 84;
+    const buttonHeight = runtime.layout.mode === "mobile-portrait" ? 32 : 30;
     const buttonGap = 8;
     drawButton(
       { x: rect.x + rect.w - buttonWidth * 2 - buttonGap - 18, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
@@ -1711,7 +1732,8 @@
       },
       {
         id: "top-fullscreen",
-        enabled: controller.state.fullscreenSupported
+        enabled: controller.state.fullscreenSupported,
+        font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
       }
     );
     drawButton(
@@ -1720,7 +1742,8 @@
       restartToStartScreen,
       {
         id: "top-restart",
-        variant: "danger"
+        variant: "danger",
+        font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
       }
     );
 
@@ -1728,20 +1751,22 @@
 
     const bannerRect = {
       x: rect.x + rect.w * 0.36,
-      y: rect.y + 12,
+      y: rect.y + 14,
       w: rect.w * 0.38,
-      h: rect.h - 48
+      h: runtime.layout.mode === "mobile-portrait" ? 54 : 58
     };
     Core.drawRoundedRect(ctx, bannerRect.x, bannerRect.y, bannerRect.w, bannerRect.h, 22, player.color.fill, "rgba(0,0,0,0.08)", 1.5);
     ctx.fillStyle = player.color.text;
-    ctx.font = "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = runtime.layout.mode === "mobile-portrait"
+      ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText(player.name, bannerRect.x + bannerRect.w / 2, bannerRect.y + 12);
-    ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, bannerRect.x + bannerRect.w / 2, bannerRect.y + 42);
+    ctx.fillText(player.name, bannerRect.x + bannerRect.w / 2, bannerRect.y + 8);
+    ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, bannerRect.x + bannerRect.w / 2, bannerRect.y + 33);
 
-    const chipY = rect.y + rect.h - 32;
+    const chipY = rect.y + rect.h - 30;
     const chipGap = 8;
     const chipWidth = (rect.w - 36 - chipGap * (game.players.length - 1)) / game.players.length;
     game.players.forEach((entry, index) => {
@@ -1948,25 +1973,29 @@
         game.ui.mobileTab = tab.id;
       }, {
         id: `portrait-tab-${tab.id}`,
-        selected: game.ui.mobileTab === tab.id
+        selected: game.ui.mobileTab === tab.id,
+        font: "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        textYOffset: 1
       });
     });
   }
 
   function renderSegmentTabs(rect, tabs, activeId, onSelect, scopePrefix) {
     Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 18, "rgba(249, 242, 232, 0.96)", "rgba(108,80,54,0.14)", 1);
-    const gap = 8;
+    const gap = 6;
     const width = (rect.w - gap * (tabs.length - 1) - 12) / tabs.length;
     tabs.forEach((tab, index) => {
       drawButton({
         x: rect.x + 6 + index * (width + gap),
-        y: rect.y + 5,
+        y: rect.y + 4,
         w: width,
-        h: rect.h - 10
+        h: rect.h - 8
       }, tab.label, tab.enabled === false ? null : () => onSelect(tab.id), {
         id: `${scopePrefix}-${tab.id}`,
         enabled: tab.enabled !== false,
-        selected: activeId === tab.id
+        selected: activeId === tab.id,
+        font: "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        textYOffset: 1
       });
     });
   }
@@ -2306,7 +2335,7 @@
     });
   }
 
-  function renderObjectiveCards(player, objectives, rect, variant) {
+  function renderObjectiveCards(player, objectives, rect, variant, page, cardsPerPage) {
     if (!objectives.length) {
       ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
       ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -2316,29 +2345,47 @@
       return;
     }
     const results = buildObjectiveResultsForPlayer(player, objectives);
-    const gap = 10;
-    const cardHeight = (rect.h - gap * (results.length - 1)) / results.length;
-    results.forEach((entry, index) => {
+    const start = page * cardsPerPage;
+    const visibleResults = results.slice(start, start + cardsPerPage);
+    const gap = 12;
+    const cardHeight = (rect.h - gap * Math.max(0, visibleResults.length - 1)) / Math.max(1, visibleResults.length);
+
+    visibleResults.forEach((entry, index) => {
       const cardRect = { x: rect.x, y: rect.y + index * (cardHeight + gap), w: rect.w, h: cardHeight };
       const complete = entry.result.points >= entry.objective.points;
       const fill = complete ? "rgba(232, 246, 228, 0.98)" : "rgba(250, 242, 232, 0.98)";
       const stroke = complete ? "rgba(86, 132, 93, 0.48)" : "rgba(108,80,54,0.16)";
       Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, fill, stroke, 1.2);
-      ctx.fillStyle = "#452f1e";
-      ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(entry.objective.name, cardRect.x + 12, cardRect.y + 10);
-      drawPill(cardRect.x + cardRect.w - 82, cardRect.y + 8, `${entry.result.points}/${entry.objective.points}`, complete ? "#5f8d65" : variant === "director" ? "#8e6a9f" : "#c6783c", "#fff9f3");
-      Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + 12, cardRect.y + 32, cardRect.w - 24, 14, {
-        font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.86)",
+      const pillText = `${entry.result.points}/${entry.objective.points}`;
+      const pillWidth = (() => {
+        ctx.save();
+        ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        const width = ctx.measureText(pillText).width + 24;
+        ctx.restore();
+        return width;
+      })();
+      const titleWidth = Math.max(120, cardRect.w - pillWidth - 42);
+      Core.drawWrappedText(ctx, entry.objective.name, cardRect.x + 14, cardRect.y + 12, titleWidth, 18, {
+        font: "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "#452f1e",
         maxLines: 2
       });
-      Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + 12, cardRect.y + cardRect.h - 28, cardRect.w - 24, 13, {
-        font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      drawPill(cardRect.x + cardRect.w - pillWidth - 14, cardRect.y + 12, pillText, complete ? "#5f8d65" : variant === "director" ? "#8e6a9f" : "#c6783c", "#fff9f3", {
+        paddingX: 12,
+        height: 30,
+        font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+
+      Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + 14, cardRect.y + 56, cardRect.w - 28, 16, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.86)",
+        maxLines: runtime.layout.mode === "desktop" ? 3 : 4
+      });
+
+      Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + 14, cardRect.y + cardRect.h - 34, cardRect.w - 28, 15, {
+        font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
         color: complete ? "#3f6b47" : "#7d5a37",
-        maxLines: 1
+        maxLines: 2
       });
     });
   }
@@ -2347,14 +2394,52 @@
     const player = getPlayer();
     const content = drawPanel(rect, "Objectives", "Shared seasonal goals and Camp Director goals score against the current player's board.");
     if (!player) return;
+    const objectiveTab = game.ui.objectiveTab;
     renderSegmentTabs({ x: content.x, y: content.y, w: content.w, h: 36 }, [
       { id: "shared", label: "Shared" },
       { id: "director", label: "Director", enabled: game.directorRevealed }
-    ], game.ui.objectiveTab, (value) => {
+    ], objectiveTab, (value) => {
       game.ui.objectiveTab = value;
+      game.ui.objectivePages[value] = 0;
     }, "objective-tab");
-    const objectives = game.ui.objectiveTab === "director" ? game.activeDirectorObjectives : game.activeRoundObjectives;
-    renderObjectiveCards(player, objectives, { x: content.x, y: content.y + 48, w: content.w, h: content.h - 48 }, game.ui.objectiveTab === "director" ? "director" : "shared");
+    const tabKey = game.ui.objectiveTab === "director" ? "director" : "shared";
+    const objectives = tabKey === "director" ? game.activeDirectorObjectives : game.activeRoundObjectives;
+    const cardsPerPage = getObjectiveCardsPerPage();
+    const totalPages = Math.max(1, Math.ceil(objectives.length / cardsPerPage));
+    game.ui.objectivePages[tabKey] = Core.clamp(game.ui.objectivePages[tabKey] || 0, 0, totalPages - 1);
+
+    const pagerY = content.y + 48;
+    if (totalPages > 1) {
+      const indicatorText = `Showing ${game.ui.objectivePages[tabKey] * cardsPerPage + 1}-${Math.min(objectives.length, (game.ui.objectivePages[tabKey] + 1) * cardsPerPage)} of ${objectives.length}`;
+      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(indicatorText, content.x + content.w / 2, pagerY + 15);
+      drawButton({ x: content.x, y: pagerY, w: 44, h: 30 }, "<", () => {
+        game.ui.objectivePages[tabKey] = Math.max(0, game.ui.objectivePages[tabKey] - 1);
+      }, {
+        id: `objective-prev-${tabKey}`,
+        enabled: game.ui.objectivePages[tabKey] > 0,
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      drawButton({ x: content.x + content.w - 44, y: pagerY, w: 44, h: 30 }, ">", () => {
+        game.ui.objectivePages[tabKey] = Math.min(totalPages - 1, game.ui.objectivePages[tabKey] + 1);
+      }, {
+        id: `objective-next-${tabKey}`,
+        enabled: game.ui.objectivePages[tabKey] < totalPages - 1,
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    }
+
+    renderObjectiveCards(
+      player,
+      objectives,
+      { x: content.x, y: content.y + 86, w: content.w, h: content.h - 86 },
+      tabKey === "director" ? "director" : "shared",
+      game.ui.objectivePages[tabKey],
+      cardsPerPage
+    );
   }
 
   function renderScorePanel(rect) {
@@ -2506,13 +2591,22 @@
   function renderHandoffOverlay(rect) {
     const player = getPlayer();
     ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + 24);
-    const badgeRect = { x: rect.x + rect.w / 2 - 110, y: rect.y + 68, w: 220, h: 48 };
-    Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 24, player.color.fill, "rgba(0,0,0,0.08)", 1.2);
-    ctx.fillStyle = player.color.text;
-    ctx.font = "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const badgeText = `${getCurrentRound().name} | ${getPhaseLabel()}`;
+    ctx.save();
+    ctx.font = runtime.layout.mode === "mobile-portrait"
+      ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const badgeWidth = Math.min(rect.w - 120, Math.max(250, ctx.measureText(badgeText).width + 48));
+    ctx.restore();
+    const badgeRect = { x: rect.x + (rect.w - badgeWidth) / 2, y: rect.y + 68, w: badgeWidth, h: 44 };
+    Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, "rgba(222, 162, 102, 0.20)", "rgba(177, 111, 54, 0.34)", 1.4);
+    ctx.fillStyle = "#6c4325";
+    ctx.font = runtime.layout.mode === "mobile-portrait"
+      ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`${getCurrentRound().name} | ${getPhaseLabel()}`, badgeRect.x + badgeRect.w / 2, badgeRect.y + badgeRect.h / 2);
+    ctx.fillText(badgeText, badgeRect.x + badgeRect.w / 2, badgeRect.y + badgeRect.h / 2 + 1);
 
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n\n"), rect.x + rect.w / 2, rect.y + 132, rect.w - 72, 18, {
       font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
@@ -2521,7 +2615,8 @@
       maxLines: 6
     });
 
-    drawButton({ x: rect.x + 86, y: rect.y + rect.h - 74, w: rect.w - 172, h: 42 }, "Ready", closeOverlay, {
+    const buttonWidth = Math.min(rect.w - 172, runtime.layout.mode === "mobile-portrait" ? 220 : 280);
+    drawButton({ x: rect.x + (rect.w - buttonWidth) / 2, y: rect.y + rect.h - 74, w: buttonWidth, h: 42 }, "Ready", closeOverlay, {
       id: "overlay-ready",
       scope: "overlay",
       variant: "primary"
