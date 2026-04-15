@@ -3,31 +3,23 @@
 
   const Core = window.SmoreCore;
   const ObjectiveFactory = window.SmoreObjectiveFactory;
+  const appShell = document.getElementById("appShell");
+  const canvas = document.getElementById("gameCanvas");
+  const fallbackMessage = document.getElementById("fallbackMessage");
 
-  if (!Core || !ObjectiveFactory) {
-    throw new Error("Smore to Explore needs smore-core.js and smore-objectives.js.");
+  if (!Core || !ObjectiveFactory || !canvas || !appShell) {
+    if (fallbackMessage) fallbackMessage.classList.add("visible");
+    throw new Error("Smore to Explore needs the core helpers, objective data, and the main canvas shell.");
   }
-
-  // =========================
-  // CONSTANTS + DOM
-  // =========================
 
   const BOARD_COLS = 8;
   const BOARD_ROWS = 5;
-  const CANVAS_WIDTH = 960;
-  const CANVAS_HEIGHT = 620;
-  const CELL_SIZE = 96;
-  const CELL_GAP = 8;
-  const BOARD_WIDTH = BOARD_COLS * CELL_SIZE + (BOARD_COLS - 1) * CELL_GAP;
-  const BOARD_HEIGHT = BOARD_ROWS * CELL_SIZE + (BOARD_ROWS - 1) * CELL_GAP;
-  const BOARD_ORIGIN_X = Math.floor((CANVAS_WIDTH - BOARD_WIDTH) / 2);
-  const BOARD_ORIGIN_Y = 78;
-
   const STARTING_BUDGET = 100000;
   const SEASON_BUDGET_GRANT = 50000;
   const CAMP_TILE_COST = 10000;
   const ACTIVE_SHARED_OBJECTIVE_COUNT = 4;
   const ACTIVE_DIRECTOR_OBJECTIVE_COUNT = 3;
+  const MAX_FEED_ITEMS = 6;
 
   const SIDES = ["north", "east", "south", "west"];
   const OPPOSITE = {
@@ -38,9 +30,17 @@
   };
 
   const ROUND_DEFS = [
-    { id: "early", name: "Early Summer", description: "Opening groups, scout trips, and the first campground push." },
-    { id: "mid", name: "Mid Summer", description: "Busy family season with more amenities and activity demand." },
-    { id: "late", name: "Late Summer", description: "Premium guests, polished layouts, and final scoring." }
+    { id: "early", name: "Early Summer", description: "Opening groups, scout trips, and first campground momentum." },
+    { id: "mid", name: "Mid Summer", description: "Family season, activity demand, and a busier road network." },
+    { id: "late", name: "Late Summer", description: "Premium stays, polished amenities, and final scoring." }
+  ];
+
+  const PLAYER_COLORS = [
+    { fill: "#8d5a36", accent: "#f4d2a8", text: "#fff8f0" },
+    { fill: "#4f7d5a", accent: "#d4efcf", text: "#f8fff7" },
+    { fill: "#4e769c", accent: "#d6e7f5", text: "#f8fcff" },
+    { fill: "#9b6d3d", accent: "#f6e1b3", text: "#fffaf2" },
+    { fill: "#7b5a8f", accent: "#e7d7f2", text: "#fffaff" }
   ];
 
   const MARKET_COLUMNS = [
@@ -51,59 +51,6 @@
     { id: "camp-3", label: "Premium Sites", category: "camp" },
     { id: "camp-4", label: "Specialty Sites", category: "camp" }
   ];
-
-  const elements = {
-    appShell: document.getElementById("appShell"),
-    roundStat: document.getElementById("roundStat"),
-    phaseStat: document.getElementById("phaseStat"),
-    moneyStat: document.getElementById("moneyStat"),
-    scoreStat: document.getElementById("scoreStat"),
-    roundBuildStat: document.getElementById("roundBuildStat"),
-    selectionIntro: document.getElementById("selectionIntro"),
-    selectionPanel: document.getElementById("selectionPanel"),
-    messagePanel: document.getElementById("messagePanel"),
-    objectivesSubtitle: document.getElementById("objectivesSubtitle"),
-    sharedObjectives: document.getElementById("sharedObjectives"),
-    directorObjectives: document.getElementById("directorObjectives"),
-    historyPanel: document.getElementById("historyPanel"),
-    boardCanvas: document.getElementById("boardCanvas"),
-    boardHint: document.getElementById("boardHint"),
-    landscapeRackTitle: document.getElementById("landscapeRackTitle"),
-    landscapeRackSubtitle: document.getElementById("landscapeRackSubtitle"),
-    landscapeHand: document.getElementById("landscapeHand"),
-    marketSubtitle: document.getElementById("marketSubtitle"),
-    marketColumns: document.getElementById("marketColumns"),
-    rotateLeftButton: document.getElementById("rotateLeftButton"),
-    rotateRightButton: document.getElementById("rotateRightButton"),
-    clearSelectionButton: document.getElementById("clearSelectionButton"),
-    endRoundButton: document.getElementById("endRoundButton"),
-    restartButton: document.getElementById("restartButton"),
-    fullscreenButton: document.getElementById("fullscreenButton"),
-    overlay: document.getElementById("overlay"),
-    overlayTitle: document.getElementById("overlayTitle"),
-    overlayBody: document.getElementById("overlayBody"),
-    overlayActions: document.getElementById("overlayActions")
-  };
-
-  const canvasController = Core.createCanvasController({
-    canvas: elements.boardCanvas,
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
-    onPointerMove: handleBoardPointerMove,
-    onPointerDown: handleBoardPointerDown,
-    onPointerLeave: handleBoardPointerLeave
-  });
-
-  const ctx = canvasController.context;
-
-  Core.setupFullscreen({
-    button: elements.fullscreenButton,
-    target: elements.appShell
-  });
-
-  // =========================
-  // TILE DEFINITIONS
-  // =========================
 
   const LANDSCAPE_TILE_DEFS = {
     entrance: {
@@ -258,9 +205,23 @@
   const AMENITY_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "amenity");
   const CAMP_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "camp");
 
-  // =========================
-  // STATE
-  // =========================
+  let runtime = {
+    now: 0,
+    layout: null,
+    targets: [],
+    hoveredTargetId: null
+  };
+
+  const controller = Core.createCanvasController({
+    canvas,
+    onResize: handleResize,
+    onPointerMove: handlePointerMove,
+    onPointerDown: handlePointerDown,
+    onPointerLeave: handlePointerLeave
+  });
+
+  const ctx = controller.context;
+  let game = createBootstrapState(2);
 
   function createBoard() {
     return Array.from({ length: BOARD_ROWS }, (_, row) =>
@@ -272,27 +233,78 @@
     return { source: null, typeId: null, rotation: 0, columnIndex: null, slotIndex: null };
   }
 
-  function createPlayerState(name) {
+  function createUiState(playerCount = 2) {
     return {
-      id: "player-1",
-      name,
+      configuredPlayerCount: playerCount,
+      mobileTab: "board",
+      sideTab: "objectives",
+      objectiveTab: "shared",
+      marketPage: 0,
+      selection: createSelection(),
+      inspectedCell: null,
+      hoveredCell: null,
+      lastAttempt: null
+    };
+  }
+
+  function createTurnState() {
+    return {
+      actionTaken: false,
+      actionType: null
+    };
+  }
+
+  function createPlayerState(index) {
+    return {
+      id: `player-${index + 1}`,
+      name: `Player ${index + 1}`,
+      color: PLAYER_COLORS[index % PLAYER_COLORS.length],
       board: createBoard(),
       money: STARTING_BUDGET,
       score: 0,
       roundCampPlacements: [0, 0, 0],
-      selection: createSelection(),
+      roundScores: [0, 0, 0],
+      directorScore: 0,
       landscapeInventory: cloneInventory(STARTING_LANDSCAPE_HAND),
+      landscapePlacementStack: [],
       scoreLog: [],
-      inspectedCell: null
+      passedThisRound: false
     };
   }
 
-  function createGameState() {
-    const state = {
-      players: [createPlayerState("Camp Director")],
-      activePlayerIndex: 0,
+  function createBootstrapState(playerCount) {
+    return {
+      phase: "pregame",
       roundIndex: 0,
-      phase: "setup",
+      players: [],
+      currentPlayerIndex: 0,
+      roundDecks: null,
+      activeRoundObjectives: [],
+      directorDeck: [],
+      activeDirectorObjectives: [],
+      directorRevealed: false,
+      market: createMarket(),
+      message: {
+        tone: "info",
+        title: "Pass-and-play ready",
+        body: "Choose a player count, then build separate campgrounds on one shared device."
+      },
+      feed: [],
+      overlay: {
+        kind: "start",
+        blocking: true
+      },
+      ui: createUiState(playerCount),
+      turn: createTurnState()
+    };
+  }
+
+  function createGameState(playerCount) {
+    const state = {
+      phase: "setupLandscape",
+      roundIndex: 0,
+      players: Array.from({ length: playerCount }, (_, index) => createPlayerState(index)),
+      currentPlayerIndex: 0,
       roundDecks: {
         early: Core.shuffle(ObjectiveFactory.createEarlySummerObjectives()),
         mid: Core.shuffle(ObjectiveFactory.createMidSummerObjectives()),
@@ -305,33 +317,27 @@
       market: createMarket(),
       message: {
         tone: "info",
-        title: "Starting Setup",
-        body: "Select the Entrance, rotate it so the gate faces the board edge, and begin your connected road network."
+        title: "Starting layout",
+        body: "Select the Entrance, rotate it to face the edge, and build one connected road network."
       },
-      history: [],
+      feed: [],
       overlay: null,
-      pointerCell: null,
-      lastAttempt: null,
-      finalScoringApplied: false
+      ui: createUiState(playerCount),
+      turn: createTurnState()
     };
 
     setActiveRoundObjectives(state, 0);
-    pushHistory(state, "info", "Campground setup", "The 10 starting landscape tiles are ready. Place every one legally before contractor hiring opens.");
+    pushFeed(state, "info", "Campground setup", "Each player places the 10 starting landscape tiles before contractor turns begin.");
+    openHandoffOverlay(state);
     return state;
   }
 
-  let game = createGameState();
-
-  // =========================
-  // BASIC HELPERS
-  // =========================
-
   function getPlayer() {
-    return game.players[game.activePlayerIndex];
+    return game.players[game.currentPlayerIndex] || null;
   }
 
-  function getCurrentRound() {
-    return ROUND_DEFS[game.roundIndex];
+  function getCurrentRound(gameState = game) {
+    return ROUND_DEFS[gameState.roundIndex];
   }
 
   function cloneInventory(list) {
@@ -371,26 +377,6 @@
     return `${String.fromCharCode(65 + col)}${row + 1}`;
   }
 
-  function getCellRect(row, col) {
-    return {
-      x: BOARD_ORIGIN_X + col * (CELL_SIZE + CELL_GAP),
-      y: BOARD_ORIGIN_Y + row * (CELL_SIZE + CELL_GAP),
-      w: CELL_SIZE,
-      h: CELL_SIZE
-    };
-  }
-
-  function getBoardCellFromPoint(point) {
-    const stride = CELL_SIZE + CELL_GAP;
-    const col = Math.floor((point.x - BOARD_ORIGIN_X) / stride);
-    const row = Math.floor((point.y - BOARD_ORIGIN_Y) / stride);
-    if (row < 0 || row >= BOARD_ROWS || col < 0 || col >= BOARD_COLS) return null;
-    const localX = point.x - (BOARD_ORIGIN_X + col * stride);
-    const localY = point.y - (BOARD_ORIGIN_Y + row * stride);
-    if (localX > CELL_SIZE || localY > CELL_SIZE) return null;
-    return { row, col };
-  }
-
   function getLandscapeDef(typeId) {
     return LANDSCAPE_TILE_DEFS[typeId];
   }
@@ -427,19 +413,35 @@
     if (entry.count <= 0) inventory.splice(inventory.indexOf(entry), 1);
   }
 
-  function clearSelection(player) {
-    player.selection = createSelection();
+  function incrementLandscapeInventory(inventory, typeId) {
+    const entry = inventory.find((item) => item.typeId === typeId);
+    if (entry) {
+      entry.count += 1;
+      return;
+    }
+    inventory.push({ typeId, count: 1 });
+    inventory.sort((a, b) => a.typeId.localeCompare(b.typeId));
   }
 
-  function sameCell(a, b) {
-    if (!a && !b) return true;
-    if (!a || !b) return false;
-    return a.row === b.row && a.col === b.col;
+  function clearSelection() {
+    game.ui.selection = createSelection();
   }
 
-  // =========================
-  // INVENTORY + MARKET
-  // =========================
+  function clearTurnUi() {
+    clearSelection();
+    game.ui.inspectedCell = null;
+    game.ui.hoveredCell = null;
+    game.ui.lastAttempt = null;
+  }
+
+  function setMessage(gameState, tone, title, body) {
+    gameState.message = { tone, title, body };
+  }
+
+  function pushFeed(gameState, tone, title, body) {
+    gameState.feed.unshift({ tone, title, body });
+    gameState.feed = gameState.feed.slice(0, MAX_FEED_ITEMS);
+  }
 
   function drawWeightedType(pool) {
     return Core.pickWeighted(pool, (entry) => entry.weight).typeId;
@@ -492,21 +494,8 @@
     if (gameState.directorRevealed) return;
     gameState.activeDirectorObjectives = gameState.directorDeck.slice(0, ACTIVE_DIRECTOR_OBJECTIVE_COUNT);
     gameState.directorRevealed = true;
-    pushHistory(gameState, "info", "Camp Director objectives revealed", "Long-range management goals are now active and will score at the end of Late Summer.");
+    pushFeed(gameState, "info", "Camp Director goals", "Director objectives are now active and will score after Late Summer.");
   }
-
-  function pushHistory(gameState, tone, title, body) {
-    gameState.history.unshift({ tone, title, body });
-    gameState.history = gameState.history.slice(0, 8);
-  }
-
-  function setMessage(gameState, tone, title, body) {
-    gameState.message = { tone, title, body };
-  }
-
-  // =========================
-  // ROAD + BOARD ANALYSIS
-  // =========================
 
   function countPlacedLandscapeTiles(board) {
     let total = 0;
@@ -746,10 +735,6 @@
     return best;
   }
 
-  // =========================
-  // VALIDATION + SCORING CONTEXT
-  // =========================
-
   function getLandscapePlacementReasons(gameState, player, row, col, typeId, rotation) {
     const reasons = [];
     const board = player.board;
@@ -763,16 +748,14 @@
     const occupiedNeighbors = getOrthogonalNeighbors(board, row, col).filter((neighbor) => neighbor.cell.landscapeTile);
     const roadConnections = [];
 
-    if (gameState.phase === "setup" && placedCount === 0 && typeId !== "entrance") {
+    if (gameState.phase === "setupLandscape" && gameState.roundIndex === 0 && placedCount === 0 && typeId !== "entrance") {
       reasons.push("The Entrance should start the opening layout.");
     }
-
     if (placedCount > 0 && occupiedNeighbors.length === 0) {
       reasons.push("New landscape tiles must touch the existing campground.");
     }
 
     let entranceFacesBorder = false;
-
     for (const side of SIDES) {
       const edge = edges[side];
       const next = getNeighborPosition(row, col, side);
@@ -788,21 +771,16 @@
         reasons.push("The Entrance gate must face the outside edge of the board.");
         continue;
       }
-
       if (!neighborCell.landscapeTile) continue;
 
       const neighborInfo = getLandscapeInfoFromTile(neighborCell.landscapeTile);
       const neighborEdge = neighborInfo.edges[OPPOSITE[side]];
-
       if (edge === "road" && neighborEdge !== "road") reasons.push("Road edges must meet matching road edges.");
       if (edge !== "road" && neighborEdge === "road") reasons.push("An open edge cannot crash into an existing road.");
       if (edge === "road" && neighborEdge === "road") roadConnections.push(side);
     }
 
-    if (typeId === "entrance" && !entranceFacesBorder) {
-      reasons.push("The Entrance tile must place its gate on the outer border.");
-    }
-
+    if (typeId === "entrance" && !entranceFacesBorder) reasons.push("The Entrance tile must place its gate on the outer border.");
     const hasRoadEdge = SIDES.some((side) => edges[side] === "road");
     if (placedCount > 0 && hasRoadEdge && typeId !== "entrance" && roadConnections.length === 0) {
       reasons.push("Road tiles should connect into the current road network as they are placed.");
@@ -842,7 +820,6 @@
     const practicalRoadAccess = landscapeInfo.roadEdgeCount >= 1 || hasAdjacentRoadCell(player.board, row, col);
 
     if (landscapeInfo.isEntrance || landscapeInfo.isOffice) reasons.push("The Entrance and Camp Office tiles stay reserved for road services.");
-
     if (["tent_electric", "group_site", "cabin", "pool", "bike_rental", "event_pavilion", "ice_cream_vending", "playground"].includes(typeId) && landscapeInfo.roadEdgeCount < 1) {
       reasons.push("This tile needs at least one road edge on the landscape below.");
     }
@@ -863,44 +840,6 @@
     }
 
     return Core.unique(reasons);
-  }
-
-  function scoreAdjacencyBonuses(board, row, col, typeId) {
-    const context = createEvaluationContext(game, getPlayer());
-    const cell = getCell(board, row, col);
-    if (!cell || !cell.landscapeTile) return { score: 0, lines: [] };
-    const source = { row, col, campTile: { typeId }, campDef: getCampDef(typeId), landscapeInfo: getLandscapeInfoFromTile(cell.landscapeTile) };
-    const lines = [];
-    let score = 0;
-
-    if (typeId === "pool") {
-      const nearby = context.countNearby(source, (other) => other.campDef.kind === "campsite" || other.campDef.kind === "lodging", 1);
-      if (nearby > 0) {
-        score += nearby;
-        lines.push(`Pool would serve ${nearby} nearby campsite${nearby === 1 ? "" : "s"}.`);
-      }
-    }
-    if (typeId === "firewood") {
-      const nearby = context.countNearby(source, (other) => other.campTile.typeId === "group_site" || other.campDef.tags.includes("tent"), 1);
-      if (nearby > 0) lines.push(`Firewood would support ${nearby} nearby tent or group camp tiles.`);
-    }
-    if (typeId === "playground") {
-      const family = context.countNearby(source, (other) => other.campTile.typeId === "group_site" || other.campDef.tags.includes("tent"), 2);
-      if (family > 0) lines.push(`Playground would sit near ${family} family-focused camp tiles.`);
-    }
-    if (typeId === "event_pavilion") {
-      const nearby = context.countNearby(source, () => true, 2);
-      if (nearby > 0) lines.push(`Event Pavilion would anchor ${nearby} nearby developed camp tiles.`);
-    }
-    if (typeId === "bike_rental") {
-      const roadSize = context.getRoadComponentSizeForCell(row, col);
-      if (roadSize > 0) lines.push(`Bike Rental would connect to a road corridor ${roadSize} tiles long.`);
-    }
-    if (typeId === "hiking_trail" && (source.landscapeInfo.hasForestTag || source.landscapeInfo.hasScenicTag || isBorderParcel(row, col))) {
-      lines.push("Trail placement gets a scenic bonus here.");
-    }
-
-    return { score, lines };
   }
 
   function getLargestCampCluster(board, campCells, predicate) {
@@ -960,8 +899,7 @@
 
     const campsiteCells = campCells.filter((cell) => cell.campDef.kind === "campsite" || cell.campDef.kind === "lodging");
     const premiumCells = campCells.filter((cell) => cell.campDef.tags.includes("premium"));
-
-    let developedQuadrants = new Set();
+    const developedQuadrants = new Set();
     let centerCampCount = 0;
     let centerRoadServedCampCount = 0;
     let roadServedCampCount = 0;
@@ -1050,454 +988,1016 @@
     return context;
   }
 
-  // =========================
-  // GAME ACTIONS
-  // =========================
+  function scoreAdjacencyBonuses(gameState, player, row, col, typeId) {
+    const context = createEvaluationContext(gameState, player);
+    const cell = getCell(player.board, row, col);
+    if (!cell || !cell.landscapeTile) return { score: 0, lines: [] };
+    const source = { row, col, campTile: { typeId }, campDef: getCampDef(typeId), landscapeInfo: getLandscapeInfoFromTile(cell.landscapeTile) };
+    const lines = [];
+    let score = 0;
+
+    if (typeId === "pool") {
+      const nearby = context.countNearby(source, (other) => other.campDef.kind === "campsite" || other.campDef.kind === "lodging", 1);
+      if (nearby > 0) {
+        score += nearby;
+        lines.push(`Pool would serve ${nearby} nearby campsite${nearby === 1 ? "" : "s"}.`);
+      }
+    }
+    if (typeId === "firewood") {
+      const nearby = context.countNearby(source, (other) => other.campTile.typeId === "group_site" || other.campDef.tags.includes("tent"), 1);
+      if (nearby > 0) lines.push(`Firewood would support ${nearby} nearby tent or group camp tiles.`);
+    }
+    if (typeId === "playground") {
+      const family = context.countNearby(source, (other) => other.campTile.typeId === "group_site" || other.campDef.tags.includes("tent"), 2);
+      if (family > 0) lines.push(`Playground would sit near ${family} family-focused camp tiles.`);
+    }
+    if (typeId === "event_pavilion") {
+      const nearby = context.countNearby(source, () => true, 2);
+      if (nearby > 0) lines.push(`Event Pavilion would anchor ${nearby} nearby developed camp tiles.`);
+    }
+    if (typeId === "bike_rental") {
+      const roadSize = context.getRoadComponentSizeForCell(row, col);
+      if (roadSize > 0) lines.push(`Bike Rental would connect to a road corridor ${roadSize} tiles long.`);
+    }
+    if (typeId === "hiking_trail" && (source.landscapeInfo.hasForestTag || source.landscapeInfo.hasScenicTag || isBorderParcel(row, col))) {
+      lines.push("Trail placement gets a scenic bonus here.");
+    }
+
+    return { score, lines };
+  }
+
+  function openHandoffOverlay(gameState) {
+    const player = gameState.players[gameState.currentPlayerIndex];
+    const round = getCurrentRound(gameState);
+    let lines = [];
+    if (gameState.phase === "setupLandscape" && gameState.roundIndex === 0) {
+      lines = [
+        `${player.name} is building the opening road skeleton.`,
+        "Place all 10 starting landscape tiles, keep the network connected, and fold the Camp Office into the road.",
+        "Hand the device over after pressing Ready."
+      ];
+    } else if (gameState.phase === "setupLandscape") {
+      lines = [
+        `${player.name} is placing the ${round.name} expansion tiles.`,
+        `Place all 8 new landscape tiles before the contractor market reopens for ${round.name}.`,
+        "Hand the device over after pressing Ready."
+      ];
+    } else if (gameState.phase === "build") {
+      lines = [
+        `${player.name} is taking a ${round.name} build turn.`,
+        "Buy one visible contractor tile, place it on your own board, then end your turn or pass for the round.",
+        "Hand the device over after pressing Ready."
+      ];
+    }
+
+    gameState.overlay = {
+      kind: "handoff",
+      blocking: true,
+      title: `${player.name}'s Turn`,
+      lines
+    };
+  }
+
+  function beginPlaySession(playerCount) {
+    game = createGameState(playerCount);
+  }
+
+  function restartToStartScreen() {
+    game = createBootstrapState(game.ui.configuredPlayerCount || 2);
+  }
+
+  function isCurrentLandscapePhaseComplete() {
+    const player = getPlayer();
+    if (!player) return false;
+    return countRemainingLandscapeTiles(player.landscapeInventory) === 0 && validateFinishedLandscapePhase(player).length === 0;
+  }
+
+  function markAttempt(row, col, reasons) {
+    game.ui.lastAttempt = {
+      row,
+      col,
+      reasons,
+      at: performance.now()
+    };
+  }
 
   function selectLandscapeTile(typeId) {
     const player = getPlayer();
-    const same = player.selection.source === "landscape" && player.selection.typeId === typeId;
-    player.selection = {
+    if (!player || game.phase !== "setupLandscape") return;
+    const same = game.ui.selection.source === "landscape" && game.ui.selection.typeId === typeId;
+    game.ui.selection = {
       source: "landscape",
       typeId,
-      rotation: same ? player.selection.rotation : 0,
+      rotation: same ? game.ui.selection.rotation : 0,
       columnIndex: null,
       slotIndex: null
     };
-    player.inspectedCell = null;
-    game.lastAttempt = null;
+    game.ui.inspectedCell = null;
+    game.ui.lastAttempt = null;
     setMessage(game, "info", "Landscape selected", `${getLandscapeDef(typeId).name} is ready. Rotate it, then tap a board parcel to place it.`);
-    renderApp();
   }
 
   function selectMarketTile(columnIndex, slotIndex) {
-    if (game.phase !== "build") {
-      setMessage(game, "info", "Contractors closed", "Finish the landscape phase before hiring from the contractor market.");
-      renderApp();
-      return;
-    }
-
     const player = getPlayer();
-    const same = player.selection.source === "market" && player.selection.columnIndex === columnIndex && player.selection.slotIndex === slotIndex;
-    player.selection = same
+    if (!player || game.phase !== "build" || game.turn.actionTaken) return;
+    const same = game.ui.selection.source === "market" && game.ui.selection.columnIndex === columnIndex && game.ui.selection.slotIndex === slotIndex;
+    game.ui.selection = same
       ? createSelection()
       : { source: "market", typeId: game.market.columns[columnIndex].slots[slotIndex].typeId, rotation: 0, columnIndex, slotIndex };
-    player.inspectedCell = null;
-    game.lastAttempt = null;
-    setMessage(game, "info", same ? "Selection cleared" : "Contractor selected", same ? "Choose another contractor or inspect the board." : `${getCampDef(player.selection.typeId).name} costs ${Core.formatMoney(CAMP_TILE_COST)}. Tap a valid parcel to buy and place it.`);
-    renderApp();
+    game.ui.inspectedCell = null;
+    game.ui.lastAttempt = null;
+    if (same) {
+      setMessage(game, "info", "Selection cleared", "Choose another contractor or inspect your board.");
+    } else {
+      const def = getCampDef(game.ui.selection.typeId);
+      setMessage(game, "info", "Contractor selected", `${def.name} costs ${Core.formatMoney(def.cost)}. Tap a valid parcel on your board to place it.`);
+      if (runtime.layout?.mode === "mobile-portrait") game.ui.mobileTab = "board";
+    }
   }
 
   function rotateSelectedLandscape(delta) {
+    if (game.ui.selection.source !== "landscape") return;
+    game.ui.selection.rotation = (game.ui.selection.rotation + delta + 4) % 4;
+    game.ui.lastAttempt = null;
+  }
+
+  function undoLandscapePlacement() {
     const player = getPlayer();
-    if (player.selection.source !== "landscape") {
-      setMessage(game, "info", "Rotation unavailable", "Rotate applies only to landscape tiles in your current hand.");
-      renderApp();
-      return;
-    }
-    player.selection.rotation = (player.selection.rotation + delta + 4) % 4;
-    renderApp();
+    if (!player || game.phase !== "setupLandscape" || !player.landscapePlacementStack.length) return;
+    const last = player.landscapePlacementStack.pop();
+    const cell = getCell(player.board, last.row, last.col);
+    if (!cell) return;
+    cell.landscapeTile = null;
+    incrementLandscapeInventory(player.landscapeInventory, last.tile.typeId);
+    game.turn = createTurnState();
+    clearSelection();
+    game.ui.inspectedCell = { row: last.row, col: last.col };
+    game.ui.lastAttempt = null;
+    setMessage(game, "info", "Landscape undone", `${getLandscapeDef(last.tile.typeId).name} was returned to the current hand.`);
   }
 
   function attemptLandscapePlacement(row, col) {
     const player = getPlayer();
-    const selection = player.selection;
-    if (selection.source !== "landscape") return;
-    const reasons = getLandscapePlacementReasons(game, player, row, col, selection.typeId, selection.rotation);
-    game.lastAttempt = { row, col, reasons };
+    if (!player || game.ui.selection.source !== "landscape" || game.phase !== "setupLandscape") return;
+    const reasons = getLandscapePlacementReasons(game, player, row, col, game.ui.selection.typeId, game.ui.selection.rotation);
+    markAttempt(row, col, reasons);
     if (reasons.length) {
       setMessage(game, "error", "Invalid landscape placement", reasons[0]);
-      renderApp();
       return;
     }
 
-    getCell(player.board, row, col).landscapeTile = { typeId: selection.typeId, rotation: selection.rotation };
-    decrementLandscapeInventory(player.landscapeInventory, selection.typeId);
-    player.inspectedCell = { row, col };
-    game.lastAttempt = null;
-    if (!player.landscapeInventory.some((entry) => entry.typeId === selection.typeId)) clearSelection(player);
-    setMessage(game, "success", "Landscape placed", `${getLandscapeDef(selection.typeId).name} added to the campground layout.`);
+    const tile = { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation };
+    getCell(player.board, row, col).landscapeTile = tile;
+    player.landscapePlacementStack.push({ row, col, tile: { ...tile } });
+    decrementLandscapeInventory(player.landscapeInventory, game.ui.selection.typeId);
+    game.ui.inspectedCell = { row, col };
+    game.ui.lastAttempt = null;
+    if (!player.landscapeInventory.some((entry) => entry.typeId === game.ui.selection.typeId)) clearSelection();
 
     if (countRemainingLandscapeTiles(player.landscapeInventory) === 0) {
       const errors = validateFinishedLandscapePhase(player);
       if (errors.length) {
-        setMessage(game, "error", "Layout still needs work", errors[0]);
-      } else if (game.phase === "setup") {
-        game.phase = "build";
-        refreshMarket(game);
-        setMessage(game, "success", "Early Summer begins", "The starting campground skeleton is complete. Hire contractors from the market and start building.");
-        pushHistory(game, "success", "Setup complete", "The starting landscape network is ready for Early Summer building.");
-      } else if (game.phase === "expansion") {
-        game.phase = "build";
-        refreshMarket(game);
-        setMessage(game, "success", `${getCurrentRound().name} building open`, "Expansion tiles are down. Contractor hiring is open again.");
-        pushHistory(game, "success", `${getCurrentRound().name} expansion complete`, "The seasonal landscape expansion is placed and build actions are open.");
+        setMessage(game, "error", "Layout still needs work", `${errors[0]} Undo the latest tile if you need to re-route the road network.`);
+        return;
       }
+      game.turn.actionTaken = true;
+      game.turn.actionType = "landscape-complete";
+      setMessage(game, "success", "Landscape phase complete", "This board is ready. Continue to the next player or the contractor market.");
+      pushFeed(game, "success", `${player.name} finished layout`, `${player.name} completed the ${game.roundIndex === 0 ? "starting campground skeleton" : `${getCurrentRound().name} expansion layout`}.`);
+      clearSelection();
+      return;
     }
 
-    renderApp();
+    setMessage(game, "success", "Landscape placed", `${getLandscapeDef(tile.typeId).name} added to ${player.name}'s campground.`);
   }
 
   function attemptCampPlacement(row, col) {
     const player = getPlayer();
-    const selection = player.selection;
-    if (selection.source !== "market") return;
-    const reasons = getCampTilePlacementReasons(game, player, row, col, selection.typeId);
-    game.lastAttempt = { row, col, reasons };
+    if (!player || game.phase !== "build" || game.ui.selection.source !== "market" || game.turn.actionTaken) return;
+    const reasons = getCampTilePlacementReasons(game, player, row, col, game.ui.selection.typeId);
+    markAttempt(row, col, reasons);
     if (reasons.length) {
       setMessage(game, "error", "Invalid camp placement", reasons[0]);
-      renderApp();
       return;
     }
 
+    const selection = { ...game.ui.selection };
     const cell = getCell(player.board, row, col);
     const campDef = getCampDef(selection.typeId);
     cell.campTile = { typeId: selection.typeId };
     player.money -= campDef.cost;
     player.roundCampPlacements[game.roundIndex] += 1;
-    player.inspectedCell = { row, col };
+    player.passedThisRound = false;
+    game.ui.inspectedCell = { row, col };
+    game.turn.actionTaken = true;
+    game.turn.actionType = "build";
 
-    const bonuses = scoreAdjacencyBonuses(player.board, row, col, selection.typeId);
+    const bonuses = scoreAdjacencyBonuses(game, player, row, col, selection.typeId);
     refillMarketSlot(game, selection.columnIndex, selection.slotIndex);
-    clearSelection(player);
-    game.lastAttempt = null;
+    clearSelection();
+    game.ui.lastAttempt = null;
 
     setMessage(game, "success", "Contractor placed", `${campDef.name} was built for ${Core.formatMoney(campDef.cost)}.${bonuses.lines.length ? ` ${bonuses.lines[0]}` : ""}`);
-    renderApp();
+    pushFeed(game, "success", `${player.name} built ${campDef.name}`, `${player.name} spent ${Core.formatMoney(campDef.cost)} during ${getCurrentRound().name}.`);
   }
 
-  function scoreCurrentRound() {
-    if (game.phase !== "build") return;
+  function passCurrentPlayerForRound() {
     const player = getPlayer();
-    const context = createEvaluationContext(game, player);
-    const round = getCurrentRound();
-    const results = game.activeRoundObjectives.map((objective) => ({ objective, result: objective.evaluate(context) }));
-    const roundPoints = Core.sum(results, (entry) => entry.result.points);
-    const completedCount = results.filter((entry) => entry.result.points > 0).length;
+    if (!player || game.phase !== "build" || game.turn.actionTaken) return;
+    player.passedThisRound = true;
+    clearSelection();
+    game.turn.actionTaken = true;
+    game.turn.actionType = "pass";
+    setMessage(game, "warning", "Player passed", `${player.name} is done building for ${getCurrentRound().name}.`);
+    pushFeed(game, "info", `${player.name} passed`, `${player.name} ended build turns for ${getCurrentRound().name}.`);
+  }
 
-    player.score += roundPoints;
-    player.scoreLog.push({ kind: "round", roundName: round.name, results, total: roundPoints });
-    pushHistory(game, roundPoints > 0 ? "success" : "info", `${round.name} scored`, `${roundPoints} points from ${completedCount} completed shared objective${completedCount === 1 ? "" : "s"}.`);
+  function continueLandscapeFlow() {
+    const player = getPlayer();
+    if (!player || !isCurrentLandscapePhaseComplete()) return;
+    clearTurnUi();
+    game.turn = createTurnState();
+    if (game.currentPlayerIndex < game.players.length - 1) {
+      game.currentPlayerIndex += 1;
+      openHandoffOverlay(game);
+      return;
+    }
+
+    game.phase = "build";
+    game.currentPlayerIndex = 0;
+    game.turn = createTurnState();
+    clearTurnUi();
+    game.players.forEach((entry) => {
+      entry.passedThisRound = false;
+    });
+    refreshMarket(game);
+    setMessage(game, "info", `${getCurrentRound().name} build`, "Select a contractor from the market, place it on your own board, then end your turn.");
+    pushFeed(game, "info", `${getCurrentRound().name} market opened`, "All players finished landscape placement and the shared contractor market is open.");
+    openHandoffOverlay(game);
+  }
+
+  function findNextActiveBuildPlayerIndex() {
+    if (!game.players.length) return -1;
+    for (let offset = 1; offset <= game.players.length; offset += 1) {
+      const nextIndex = (game.currentPlayerIndex + offset) % game.players.length;
+      if (!game.players[nextIndex].passedThisRound) return nextIndex;
+    }
+    return -1;
+  }
+
+  function canScoreCurrentRound() {
+    return game.phase === "build" && game.players.length > 0 && game.players.every((player) => player.passedThisRound);
+  }
+
+  function endBuildTurnOrScore() {
+    if (!game.turn.actionTaken || game.phase !== "build") return;
+    if (canScoreCurrentRound()) {
+      scoreRoundForAllPlayers();
+      return;
+    }
+
+    const currentIndex = game.currentPlayerIndex;
+    const nextIndex = findNextActiveBuildPlayerIndex();
+    game.turn = createTurnState();
+    clearTurnUi();
+
+    if (nextIndex === -1) {
+      scoreRoundForAllPlayers();
+      return;
+    }
+    game.currentPlayerIndex = nextIndex;
+    if (nextIndex === currentIndex) {
+      setMessage(game, "info", "Another turn", `${getPlayer().name} is the only player still building this round.`);
+      return;
+    }
+    openHandoffOverlay(game);
+  }
+
+  function buildObjectiveResultsForPlayer(player, objectives) {
+    const context = createEvaluationContext(game, player);
+    return objectives.map((objective) => ({
+      objective,
+      result: objective.evaluate(context)
+    }));
+  }
+
+  function scoreRoundForAllPlayers() {
+    const round = getCurrentRound();
+    game.phase = "scoreRound";
+
+    const playerSummaries = game.players.map((player) => {
+      const results = buildObjectiveResultsForPlayer(player, game.activeRoundObjectives);
+      const roundPoints = Core.sum(results, (entry) => entry.result.points);
+      const completedCount = results.filter((entry) => entry.result.points > 0).length;
+      player.score += roundPoints;
+      player.roundScores[game.roundIndex] = roundPoints;
+      player.scoreLog.push({ kind: "round", roundName: round.name, results, total: roundPoints });
+      return {
+        player,
+        results,
+        roundPoints,
+        completedCount
+      };
+    });
 
     if (game.roundIndex === 0) revealDirectorObjectives(game);
+    pushFeed(game, "success", `${round.name} scored`, `${playerSummaries.length} campground${playerSummaries.length === 1 ? "" : "s"} were scored for ${round.name}.`);
 
     if (game.roundIndex === ROUND_DEFS.length - 1) {
-      applyFinalScoring();
+      applyFinalScoring(playerSummaries);
       return;
     }
 
-    game.phase = "round-summary";
-    clearSelection(player);
+    const nextRound = ROUND_DEFS[game.roundIndex + 1];
+    const revealLine = game.roundIndex === 0 ? "Camp Director objectives are now active for the final two rounds." : `${nextRound.name} will begin with fresh expansion tiles and another $50,000 grant.`;
+
     game.overlay = {
       kind: "round-summary",
+      blocking: true,
       title: `${round.name} Summary`,
-      results,
-      total: roundPoints,
-      intro: [
-        `You finished ${round.name} with ${roundPoints} point${roundPoints === 1 ? "" : "s"}.`,
-        `Completed shared objectives: ${completedCount}/${results.length}.`,
-        game.roundIndex === 0
-          ? "Camp Director objectives are now active and will score at the end of the game."
-          : `${ROUND_DEFS[game.roundIndex + 1].name} begins with a fresh 8-tile landscape hand and a $50,000 contractor grant.`
+      lines: [
+        `${round.name} scoring is complete for all players.`,
+        revealLine
       ],
-      actions: [{ id: "advance-round", label: `Start ${ROUND_DEFS[game.roundIndex + 1].name}`, variant: "warning" }]
+      rows: playerSummaries.map((summary) => ({
+        player: summary.player,
+        left: `${summary.player.name}`,
+        right: `+${summary.roundPoints} pts`,
+        detail: `${summary.completedCount}/${summary.results.length} objectives completed | ${summary.player.score} total`
+      }))
     };
-    renderApp();
   }
 
-  function advanceRound() {
-    const player = getPlayer();
-    game.roundIndex += 1;
-    game.phase = "expansion";
-    game.pointerCell = null;
-    game.lastAttempt = null;
-    player.landscapeInventory = drawExpansionLandscapeInventory(game.roundIndex);
-    player.money += SEASON_BUDGET_GRANT;
-    player.inspectedCell = null;
-    clearSelection(player);
-    setActiveRoundObjectives(game, game.roundIndex);
-    refreshMarket(game);
-    setMessage(game, "info", `${getCurrentRound().name} expansion`, `You received ${Core.formatMoney(SEASON_BUDGET_GRANT)} and 8 new landscape tiles. Place every expansion tile before the contractor market reopens.`);
-    pushHistory(game, "info", `${getCurrentRound().name} grant`, `Received ${Core.formatMoney(SEASON_BUDGET_GRANT)} for seasonal expansion and refreshed contractor crews.`);
-    game.overlay = null;
-    renderApp();
-  }
+  function applyFinalScoring(roundSummaries) {
+    const directorSummaries = game.players.map((player) => {
+      const results = buildObjectiveResultsForPlayer(player, game.activeDirectorObjectives);
+      const directorPoints = Core.sum(results, (entry) => entry.result.points);
+      player.directorScore = directorPoints;
+      player.score += directorPoints;
+      player.scoreLog.push({ kind: "director", roundName: "Camp Director Goals", results, total: directorPoints });
+      return {
+        player,
+        results,
+        directorPoints
+      };
+    });
 
-  function applyFinalScoring() {
-    if (game.finalScoringApplied) return;
-    const player = getPlayer();
-    const context = createEvaluationContext(game, player);
-    const directorResults = game.activeDirectorObjectives.map((objective) => ({ objective, result: objective.evaluate(context) }));
-    const directorPoints = Core.sum(directorResults, (entry) => entry.result.points);
-    player.score += directorPoints;
-    player.scoreLog.push({ kind: "director", roundName: "Camp Director Objectives", results: directorResults, total: directorPoints });
-    pushHistory(game, "success", "Final scoring", `${directorPoints} points were added from Camp Director objectives.`);
-    game.finalScoringApplied = true;
-    game.phase = "final";
+    const standings = game.players
+      .slice()
+      .sort((a, b) => b.score - a.score)
+      .map((player, index) => ({
+        rank: index + 1,
+        player,
+        total: player.score,
+        money: player.money,
+        director: player.directorScore
+      }));
+
+    pushFeed(game, "success", "Final scoring", "Camp Director goals have been added and the final standings are ready.");
+    game.phase = "gameOver";
     game.overlay = {
       kind: "final",
-      title: "Final Scoring",
-      results: player.scoreLog.flatMap((entry) => entry.results.map((resultEntry) => ({ objective: resultEntry.objective, result: resultEntry.result, section: entry.roundName }))),
-      total: player.score,
-      intro: [
-        "Late Summer is complete and the campground is ready for its final review.",
-        `Final score: ${player.score} points.`,
-        `Money remaining: ${Core.formatMoney(player.money)}.`
+      blocking: true,
+      title: "Final Camp Director Review",
+      lines: [
+        `Winner: ${standings[0].player.name} with ${standings[0].total} points.`,
+        "Every board stayed separate, while the contractor market and seasonal objectives stayed shared."
       ],
-      actions: [{ id: "restart-game", label: "Start New Game", variant: "danger" }]
+      rows: standings.map((entry) => ({
+        player: entry.player,
+        left: `${entry.rank}. ${entry.player.name}`,
+        right: `${entry.total} pts`,
+        detail: `${Core.formatMoney(entry.money)} left | ${entry.director} director pts`
+      })),
+      roundRows: roundSummaries,
+      directorRows: directorSummaries
     };
-    renderApp();
   }
 
-  function restartGame() {
-    game = createGameState();
-    renderApp();
+  function startNextRound() {
+    game.roundIndex += 1;
+    game.phase = "setupLandscape";
+    setActiveRoundObjectives(game, game.roundIndex);
+    game.turn = createTurnState();
+    clearTurnUi();
+    game.currentPlayerIndex = 0;
+    game.players.forEach((player) => {
+      player.money += SEASON_BUDGET_GRANT;
+      player.landscapeInventory = drawExpansionLandscapeInventory(game.roundIndex);
+      player.landscapePlacementStack = [];
+      player.passedThisRound = false;
+    });
+    refreshMarket(game);
+    setMessage(game, "info", `${getCurrentRound().name} expansion`, `Every player received ${Core.formatMoney(SEASON_BUDGET_GRANT)} and 8 expansion landscape tiles.`);
+    pushFeed(game, "info", `${getCurrentRound().name} begins`, "Season expansion tiles were dealt and the next layout phase is ready.");
+    openHandoffOverlay(game);
   }
 
-  function handleBoardPointerMove(point) {
-    const nextCell = getBoardCellFromPoint(point);
-    if (sameCell(game.pointerCell, nextCell)) return;
-    game.pointerCell = nextCell;
-    renderBoard();
-    renderBoardHint();
+  function closeOverlay() {
+    game.overlay = null;
   }
 
-  function handleBoardPointerLeave() {
-    game.pointerCell = null;
-    renderBoard();
-    renderBoardHint();
+  function handleResize() {
+    runtime.layout = null;
   }
 
-  function handleBoardPointerDown(point) {
-    const boardCell = getBoardCellFromPoint(point);
-    if (!boardCell) return;
-    const player = getPlayer();
-    player.inspectedCell = boardCell;
-    if (player.selection.source === "landscape") {
-      attemptLandscapePlacement(boardCell.row, boardCell.col);
-      return;
+  function registerTarget(rect, onClick, options = {}) {
+    const target = {
+      id: options.id || `target-${runtime.targets.length}`,
+      rect,
+      onClick,
+      enabled: options.enabled !== false,
+      scope: options.scope || "main",
+      kind: options.kind || "button",
+      data: options.data || null
+    };
+    runtime.targets.push(target);
+    return target.id;
+  }
+
+  function findTargetAtPoint(point) {
+    const overlayOnly = !!game.overlay?.blocking;
+    for (let index = runtime.targets.length - 1; index >= 0; index -= 1) {
+      const target = runtime.targets[index];
+      if (!target.enabled) continue;
+      if (overlayOnly && target.scope !== "overlay") continue;
+      if (Core.pointInRect(point, target.rect)) return target;
     }
-    if (player.selection.source === "market") {
-      attemptCampPlacement(boardCell.row, boardCell.col);
-      return;
-    }
-    const cell = getCell(player.board, boardCell.row, boardCell.col);
-    if (!cell.landscapeTile) setMessage(game, "info", "Empty parcel", "No landscape tile has been placed here yet.");
-    else if (cell.campTile) setMessage(game, "info", "Developed parcel", `${getLandscapeDef(cell.landscapeTile.typeId).name} supports ${getCampDef(cell.campTile.typeId).name}.`);
-    else setMessage(game, "info", "Open parcel", `${getLandscapeDef(cell.landscapeTile.typeId).name} is open for camp development.`);
-    renderApp();
+    return null;
   }
 
-  function bindEvents() {
-    elements.rotateLeftButton.addEventListener("click", () => rotateSelectedLandscape(-1));
-    elements.rotateRightButton.addEventListener("click", () => rotateSelectedLandscape(1));
-    elements.clearSelectionButton.addEventListener("click", () => {
-      clearSelection(getPlayer());
-      game.lastAttempt = null;
-      setMessage(game, "info", "Selection cleared", "Choose a landscape tile, a contractor, or inspect the board.");
-      renderApp();
-    });
-    elements.endRoundButton.addEventListener("click", scoreCurrentRound);
-    elements.restartButton.addEventListener("click", restartGame);
-    elements.landscapeHand.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-landscape-type]");
-      if (button) selectLandscapeTile(button.dataset.landscapeType);
-    });
-    elements.marketColumns.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-market-column]");
-      if (button) selectMarketTile(Number(button.dataset.marketColumn), Number(button.dataset.marketSlot));
-    });
-    elements.overlayActions.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-overlay-action]");
-      if (!button) return;
-      if (button.dataset.overlayAction === "advance-round") advanceRound();
-      if (button.dataset.overlayAction === "restart-game") restartGame();
-    });
+  function handlePointerMove(point) {
+    const target = findTargetAtPoint(point);
+    runtime.hoveredTargetId = target?.id || null;
+    game.ui.hoveredCell = target?.kind === "board-cell" ? target.data : null;
   }
 
-  // =========================
-  // RENDERING
-  // =========================
+  function handlePointerDown(point) {
+    const target = findTargetAtPoint(point);
+    if (!target || !target.onClick) return;
+    target.onClick();
+  }
+
+  function handlePointerLeave() {
+    runtime.hoveredTargetId = null;
+    game.ui.hoveredCell = null;
+  }
 
   function getPhaseLabel() {
-    if (game.phase === "setup") return "Starting Layout";
-    if (game.phase === "expansion") return "Season Expansion";
+    if (game.phase === "pregame") return "Start Game";
+    if (game.phase === "setupLandscape" && game.roundIndex === 0) return "Starting Layout";
+    if (game.phase === "setupLandscape") return "Season Expansion";
     if (game.phase === "build") return "Buy + Place";
-    if (game.phase === "round-summary") return "Round Summary";
-    return "Final Scoring";
+    if (game.phase === "scoreRound") return "Round Scoring";
+    return "Final Review";
   }
 
-  function renderApp() {
-    renderStats();
-    renderSelectionPanel();
-    renderMessagePanel();
-    renderObjectives();
-    renderHistory();
-    renderLandscapeHand();
-    renderMarket();
-    renderButtons();
-    renderBoard();
-    renderBoardHint();
-    renderOverlay();
+  function getLayoutMode(width, height) {
+    if (width >= 1320 && height >= 860) return "desktop";
+    if (height >= width) return "mobile-portrait";
+    return "mobile-landscape";
   }
 
-  function renderStats() {
-    const player = getPlayer();
-    elements.roundStat.textContent = getCurrentRound().name;
-    elements.phaseStat.textContent = getPhaseLabel();
-    elements.moneyStat.textContent = Core.formatMoney(player.money);
-    elements.scoreStat.textContent = `${player.score} pts`;
-    elements.roundBuildStat.textContent = `${player.roundCampPlacements[game.roundIndex]} tile${player.roundCampPlacements[game.roundIndex] === 1 ? "" : "s"}`;
-    elements.objectivesSubtitle.textContent = game.directorRevealed
-      ? `${getCurrentRound().name} shared goals are active now. Camp Director goals will score at the end of the game.`
-      : `${getCurrentRound().name} shared goals are active now. Camp Director goals arrive after the first scoring phase.`;
-    if (game.phase === "build") elements.marketSubtitle.textContent = "Two amenity columns and four campsite columns stay face-up all game. Each hired contractor costs $10,000.";
-    else if (game.phase === "setup" || game.phase === "expansion") elements.marketSubtitle.textContent = "Contractors stay visible, but hiring is paused until every landscape tile in the current hand has been placed.";
-    else if (game.phase === "final") elements.marketSubtitle.textContent = "The season is over. Review the final score breakdown or start a new campground.";
-    else elements.marketSubtitle.textContent = "Round scoring is in progress. Continue when you're ready for the next season.";
-  }
+  function computeLayout(width, height) {
+    const pad = Core.clamp(Math.round(Math.min(width, height) * 0.018), 10, 22);
+    const gap = Core.clamp(Math.round(Math.min(width, height) * 0.014), 10, 18);
+    const mode = getLayoutMode(width, height);
 
-  function renderSelectionPanel() {
-    const player = getPlayer();
-    const selection = player.selection;
-    let html = "";
-    if (selection.source === "landscape") {
-      const def = getLandscapeDef(selection.typeId);
-      const remaining = player.landscapeInventory.find((entry) => entry.typeId === selection.typeId)?.count || 0;
-      elements.selectionIntro.textContent = "Landscape tiles rotate. Use the rotate buttons, then tap the board.";
-      html = `<span class="tile-pill">Landscape</span><div class="tile-title-row"><div class="tile-name">${def.name}</div><div class="tile-pill">${selection.rotation * 90}&deg;</div></div><div class="tile-subtext">${def.description}</div><div class="tile-subtext"><strong>Remaining:</strong> ${remaining}</div>`;
-    } else if (selection.source === "market") {
-      const def = getCampDef(selection.typeId);
-      elements.selectionIntro.textContent = "Camp tiles do not rotate. Tap a valid landscape parcel to buy and place the selected contractor.";
-      html = `<span class="tile-pill">${def.marketGroup === "amenity" ? "Amenity Contractor" : "Camp Contractor"}</span><div class="tile-title-row"><div class="tile-name">${def.name}</div><div class="tile-pill">${Core.formatMoney(def.cost)}</div></div><div class="tile-subtext">${def.description}</div><div class="tile-subtext"><strong>Placement:</strong> ${def.rulesText}</div>`;
-    } else if (player.inspectedCell) {
-      const cell = getCell(player.board, player.inspectedCell.row, player.inspectedCell.col);
-      elements.selectionIntro.textContent = "Tap any parcel to inspect what is already built there.";
-      if (!cell.landscapeTile) html = `<span class="tile-pill">Open Ground</span><div class="tile-title-row"><div class="tile-name">Empty Parcel</div></div><div class="tile-subtext">No landscape tile has been placed on this cell yet.</div>`;
-      else html = `<span class="tile-pill">Parcel Details</span><div class="tile-title-row"><div class="tile-name">${getLandscapeDef(cell.landscapeTile.typeId).name}</div></div><div class="tile-subtext"><strong>Landscape:</strong> ${getLandscapeDef(cell.landscapeTile.typeId).description}</div><div class="tile-subtext"><strong>Camp layer:</strong> ${cell.campTile ? getCampDef(cell.campTile.typeId).name : "No camp tile yet"}</div>`;
-    } else {
-      elements.selectionIntro.textContent = "Choose a landscape tile during setup, or a contractor during the build phase.";
-      html = `<span class="tile-pill">Ready</span><div class="tile-title-row"><div class="tile-name">No Tile Selected</div></div><div class="tile-subtext">The board supports two layers: landscape first, then one camp tile on top.</div><div class="tile-subtext">Large tap targets and explicit placement messages keep the prototype mobile-friendly from the start.</div>`;
+    if (mode === "desktop") {
+      const topBarHeight = 104;
+      const bottomBarHeight = 116;
+      const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
+      const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
+      const content = {
+        x: pad,
+        y: topBar.y + topBar.h + gap,
+        w: width - pad * 2,
+        h: bottomBar.y - (topBar.y + topBar.h + gap) - gap
+      };
+      const marketHeight = Core.clamp(Math.round(content.h * 0.42), 290, 380);
+      const topAreaHeight = content.h - marketHeight - gap;
+      const boardWidth = Math.round(content.w * 0.62);
+      const boardPanel = { x: content.x, y: content.y, w: boardWidth, h: topAreaHeight };
+      const sidePanel = { x: boardPanel.x + boardPanel.w + gap, y: content.y, w: content.w - boardWidth - gap, h: topAreaHeight };
+      const infoHeight = 156;
+      const sideTabs = { x: sidePanel.x, y: sidePanel.y + infoHeight + gap, w: sidePanel.w, h: 42 };
+      const sideBody = { x: sidePanel.x, y: sideTabs.y + sideTabs.h + gap, w: sidePanel.w, h: sidePanel.h - infoHeight - sideTabs.h - gap * 2 };
+      const marketPanel = { x: content.x, y: content.y + topAreaHeight + gap, w: content.w, h: marketHeight };
+      return { mode, pad, gap, width, height, topBar, bottomBar, boardPanel, infoPanel: { x: sidePanel.x, y: sidePanel.y, w: sidePanel.w, h: infoHeight }, sideTabs, sideBody, marketPanel };
     }
-    elements.selectionPanel.innerHTML = html;
+
+    if (mode === "mobile-landscape") {
+      const topBarHeight = 92;
+      const bottomBarHeight = 112;
+      const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
+      const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
+      const content = {
+        x: pad,
+        y: topBar.y + topBar.h + gap,
+        w: width - pad * 2,
+        h: bottomBar.y - (topBar.y + topBar.h + gap) - gap
+      };
+      const boardWidth = Math.round(content.w * 0.56);
+      const boardPanel = { x: content.x, y: content.y, w: boardWidth, h: content.h };
+      const sidePanel = { x: boardPanel.x + boardPanel.w + gap, y: content.y, w: content.w - boardWidth - gap, h: content.h };
+      const infoHeight = 108;
+      const sideTabs = { x: sidePanel.x, y: sidePanel.y + infoHeight + gap, w: sidePanel.w, h: 40 };
+      const sideBody = { x: sidePanel.x, y: sideTabs.y + sideTabs.h + gap, w: sidePanel.w, h: sidePanel.h - infoHeight - sideTabs.h - gap * 2 };
+      return { mode, pad, gap, width, height, topBar, bottomBar, boardPanel, infoPanel: { x: sidePanel.x, y: sidePanel.y, w: sidePanel.w, h: infoHeight }, sideTabs, sideBody };
+    }
+
+    const topBarHeight = 108;
+    const bottomBarHeight = 132;
+    const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
+    const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
+    const content = {
+      x: pad,
+      y: topBar.y + topBar.h + gap,
+      w: width - pad * 2,
+      h: bottomBar.y - (topBar.y + topBar.h + gap) - gap
+    };
+    const tabBar = { x: content.x, y: content.y, w: content.w, h: 46 };
+    const mainPanel = { x: content.x, y: tabBar.y + tabBar.h + gap, w: content.w, h: content.h - tabBar.h - gap };
+    return { mode, pad, gap, width, height, topBar, bottomBar, tabBar, mainPanel };
   }
 
-  function renderMessagePanel() {
-    elements.messagePanel.dataset.tone = game.message.tone;
-    elements.messagePanel.innerHTML = `<div class="message-title">${game.message.title}</div><div class="message-body">${game.message.body}</div>`;
+  function getBoardGeometry(panelRect) {
+    const headerHeight = 40;
+    const inner = Core.insetRect(panelRect, 16);
+    const rackVisible = game.phase === "setupLandscape";
+    const rackHeight = rackVisible ? Core.clamp(Math.round(panelRect.h * (runtime.layout.mode === "mobile-portrait" ? 0.28 : 0.24)), 112, 170) : 0;
+    const boardArea = {
+      x: inner.x,
+      y: inner.y + headerHeight,
+      w: inner.w,
+      h: inner.h - headerHeight - (rackVisible ? rackHeight + 12 : 0)
+    };
+    const labelSize = runtime.layout.mode === "mobile-portrait" ? 18 : 22;
+    const gap = Core.clamp(Math.floor(Math.min(boardArea.w / 80, boardArea.h / 40) * 6), 3, 8);
+    const availableWidth = boardArea.w - labelSize;
+    const availableHeight = boardArea.h - labelSize;
+    const cellSize = Math.floor(Math.min(
+      (availableWidth - gap * (BOARD_COLS - 1)) / BOARD_COLS,
+      (availableHeight - gap * (BOARD_ROWS - 1)) / BOARD_ROWS
+    ));
+    const boardWidth = cellSize * BOARD_COLS + gap * (BOARD_COLS - 1);
+    const boardHeight = cellSize * BOARD_ROWS + gap * (BOARD_ROWS - 1);
+    const originX = boardArea.x + labelSize + Math.max(0, (availableWidth - boardWidth) / 2);
+    const originY = boardArea.y + labelSize + Math.max(0, (availableHeight - boardHeight) / 2);
+    const rackRect = rackVisible
+      ? { x: inner.x, y: panelRect.y + panelRect.h - rackHeight - 16, w: inner.w, h: rackHeight }
+      : null;
+    return { headerHeight, labelSize, gap, cellSize, originX, originY, boardWidth, boardHeight, rackRect };
   }
 
-  function renderObjectiveCard(objective, result, variant) {
-    return `<div class="objective-card ${variant}"><div class="tile-title-row"><div class="objective-name">${objective.name}</div><div class="tile-pill">${objective.points} pts</div></div><div class="objective-description">${objective.description}</div><div class="objective-progress"><strong>Currently ${result.points}/${objective.points} pts</strong></div><div class="objective-progress">${result.detail}</div></div>`;
+  function getCellRect(geometry, row, col) {
+    return {
+      x: geometry.originX + col * (geometry.cellSize + geometry.gap),
+      y: geometry.originY + row * (geometry.cellSize + geometry.gap),
+      w: geometry.cellSize,
+      h: geometry.cellSize
+    };
   }
 
-  function renderObjectives() {
-    const context = createEvaluationContext(game, getPlayer());
-    elements.sharedObjectives.innerHTML = game.activeRoundObjectives.map((objective) => renderObjectiveCard(objective, objective.evaluate(context), "current")).join("");
-    elements.directorObjectives.innerHTML = game.directorRevealed
-      ? game.activeDirectorObjectives.map((objective) => renderObjectiveCard(objective, objective.evaluate(context), "director")).join("")
-      : '<div class="objective-card director"><div class="objective-name">Camp Director objectives are still hidden.</div><div class="objective-description">They reveal after the first round scoring summary.</div></div>';
+  function cleanupTransientState() {
+    if (game.ui.lastAttempt && performance.now() - game.ui.lastAttempt.at > 1400) {
+      game.ui.lastAttempt = null;
+    }
   }
 
-  function renderHistory() {
-    if (!game.history.length) {
-      elements.historyPanel.innerHTML = '<div class="history-card"><p>No scoring yet. Build the campground and end the round when you are ready.</p></div>';
+  function getVisibleMarketPageSize() {
+    if (!runtime.layout) return 6;
+    if (runtime.layout.mode === "desktop") return 6;
+    if (runtime.layout.mode === "mobile-landscape") return 3;
+    return 2;
+  }
+
+  function drawPanel(rect, title, subtitle) {
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 24, "rgba(255, 249, 240, 0.96)", "rgba(108, 80, 54, 0.16)", 1.5);
+    ctx.fillStyle = "#3f2d20";
+    ctx.font = "700 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(title, rect.x + 16, rect.y + 14);
+    if (subtitle) {
+      Core.drawWrappedText(ctx, subtitle, rect.x + rect.w - 16, rect.y + 16, Math.max(120, rect.w * 0.54), 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        align: "right",
+        color: "rgba(82, 61, 44, 0.72)",
+        maxLines: 2
+      });
+    }
+    return {
+      x: rect.x + 14,
+      y: rect.y + 50,
+      w: rect.w - 28,
+      h: rect.h - 64
+    };
+  }
+
+  function getButtonPalette(variant, enabled, selected) {
+    if (!enabled) {
+      return {
+        fill: "rgba(223, 214, 201, 0.9)",
+        stroke: "rgba(116, 98, 77, 0.14)",
+        text: "rgba(91, 74, 56, 0.52)"
+      };
+    }
+    if (selected) {
+      return {
+        fill: "#d38245",
+        stroke: "#a55723",
+        text: "#fff9f3"
+      };
+    }
+    if (variant === "primary") return { fill: "#ca6f36", stroke: "#995127", text: "#fff7f1" };
+    if (variant === "danger") return { fill: "#a95f55", stroke: "#7d3a34", text: "#fff7f6" };
+    if (variant === "success") return { fill: "#5f8d65", stroke: "#3e6544", text: "#f7fff8" };
+    if (variant === "warning") return { fill: "#d3a24d", stroke: "#9e7331", text: "#fff8ee" };
+    return {
+      fill: "rgba(247, 236, 220, 0.98)",
+      stroke: "rgba(108, 80, 54, 0.18)",
+      text: "#4a3524"
+    };
+  }
+
+  function drawButton(rect, label, onClick, options = {}) {
+    const enabled = options.enabled !== false;
+    const id = options.id || label;
+    const palette = getButtonPalette(options.variant, enabled, options.selected);
+    const hovered = runtime.hoveredTargetId === id;
+    const yOffset = hovered && enabled ? -1 : 0;
+
+    if (onClick) {
+      registerTarget(rect, onClick, { id, enabled, scope: options.scope || "main", kind: "button" });
+    }
+
+    Core.drawRoundedRect(ctx, rect.x, rect.y + yOffset, rect.w, rect.h, options.radius || 16, palette.fill, palette.stroke, hovered && enabled ? 2 : 1.5);
+    if (hovered && enabled) {
+      Core.drawRoundedRect(ctx, rect.x + 2, rect.y + yOffset + 2, rect.w - 4, rect.h - 4, (options.radius || 16) - 2, null, "rgba(255,255,255,0.28)", 1);
+    }
+
+    ctx.fillStyle = palette.text;
+    ctx.font = options.font || "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + yOffset);
+  }
+
+  function drawPill(x, y, text, fill, textColor) {
+    const paddingX = 12;
+    ctx.save();
+    ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const width = ctx.measureText(text).width + paddingX * 2;
+    Core.drawRoundedRect(ctx, x, y, width, 24, 12, fill, null, 0);
+    ctx.fillStyle = textColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x + width / 2, y + 12);
+    ctx.restore();
+    return width;
+  }
+
+  function renderBackground() {
+    const gradient = ctx.createLinearGradient(0, 0, 0, runtime.layout.height);
+    gradient.addColorStop(0, "#f7eedf");
+    gradient.addColorStop(0.48, "#efe2c5");
+    gradient.addColorStop(1, "#e2cca1");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
+
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.beginPath();
+    ctx.arc(runtime.layout.width * 0.18, runtime.layout.height * 0.08, runtime.layout.width * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(runtime.layout.width * 0.86, runtime.layout.height * 0.14, runtime.layout.width * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function renderTopBar(rect) {
+    const player = getPlayer();
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 26, "rgba(255, 250, 243, 0.97)", "rgba(108, 80, 54, 0.16)", 1.5);
+
+    ctx.fillStyle = "#3b2c20";
+    ctx.font = runtime.layout.mode === "mobile-portrait"
+      ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("Smore to Explore", rect.x + 18, rect.y + 14);
+
+    const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
+    const roundName = game.players.length ? getCurrentRound().name : "Campground Pass-and-Play";
+    const roundPillWidth = drawPill(rect.x + 18, rect.y + 50, roundName, "#e9dbc2", "#5f4731");
+    drawPill(rect.x + 18 + roundPillWidth + 8, rect.y + 50, getPhaseLabel(), phaseFill, "#fffaf6");
+
+    const buttonWidth = runtime.layout.mode === "mobile-portrait" ? 76 : 92;
+    const buttonHeight = 34;
+    const buttonGap = 8;
+    drawButton(
+      { x: rect.x + rect.w - buttonWidth * 2 - buttonGap - 18, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
+      controller.state.isFullscreen ? "Exit Full" : "Fullscreen",
+      async () => {
+        if (!controller.state.fullscreenSupported) {
+          setMessage(game, "warning", "Fullscreen unavailable", "This browser is managing fullscreen itself on the current device.");
+          return;
+        }
+        try {
+          await controller.toggleFullscreen(appShell);
+        } catch (_error) {
+          setMessage(game, "warning", "Fullscreen unavailable", "The browser refused fullscreen for this tap.");
+        }
+      },
+      {
+        id: "top-fullscreen",
+        enabled: controller.state.fullscreenSupported
+      }
+    );
+    drawButton(
+      { x: rect.x + rect.w - buttonWidth - 18, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
+      "Restart",
+      restartToStartScreen,
+      {
+        id: "top-restart",
+        variant: "danger"
+      }
+    );
+
+    if (!player) return;
+
+    const bannerRect = {
+      x: rect.x + rect.w * 0.36,
+      y: rect.y + 12,
+      w: rect.w * 0.38,
+      h: rect.h - 48
+    };
+    Core.drawRoundedRect(ctx, bannerRect.x, bannerRect.y, bannerRect.w, bannerRect.h, 22, player.color.fill, "rgba(0,0,0,0.08)", 1.5);
+    ctx.fillStyle = player.color.text;
+    ctx.font = "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(player.name, bannerRect.x + bannerRect.w / 2, bannerRect.y + 12);
+    ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, bannerRect.x + bannerRect.w / 2, bannerRect.y + 42);
+
+    const chipY = rect.y + rect.h - 32;
+    const chipGap = 8;
+    const chipWidth = (rect.w - 36 - chipGap * (game.players.length - 1)) / game.players.length;
+    game.players.forEach((entry, index) => {
+      const chipRect = {
+        x: rect.x + 18 + index * (chipWidth + chipGap),
+        y: chipY,
+        w: chipWidth,
+        h: 22
+      };
+      const fill = index === game.currentPlayerIndex ? entry.color.fill : "rgba(243, 232, 216, 0.92)";
+      const text = index === game.currentPlayerIndex ? entry.color.text : "#5b4330";
+      Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 11, fill, "rgba(108,80,54,0.14)", 1);
+      ctx.fillStyle = text;
+      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const statusSuffix = game.phase === "build" && entry.passedThisRound ? " | passed" : "";
+      ctx.fillText(`${entry.name}: ${entry.score} pts${statusSuffix}`, chipRect.x + chipRect.w / 2, chipRect.y + chipRect.h / 2);
+    });
+  }
+
+  function getBottomSummary() {
+    const player = getPlayer();
+    if (!player) return game.message;
+
+    if (game.ui.selection.source === "landscape") {
+      const def = getLandscapeDef(game.ui.selection.typeId);
+      if (game.ui.hoveredCell) {
+        const reasons = getLandscapePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
+        if (reasons.length) {
+          return {
+            tone: "error",
+            title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
+            body: reasons[0]
+          };
+        }
+        return {
+          tone: "success",
+          title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
+          body: `Valid placement at ${game.ui.selection.rotation * 90} degrees.`
+        };
+      }
+      const remaining = player.landscapeInventory.find((entry) => entry.typeId === def.id)?.count || 0;
+      return {
+        tone: "info",
+        title: `${def.name} selected`,
+        body: `Rotation: ${game.ui.selection.rotation * 90} degrees | Remaining in hand: ${remaining}.`
+      };
+    }
+
+    if (game.ui.selection.source === "market") {
+      const def = getCampDef(game.ui.selection.typeId);
+      if (game.ui.hoveredCell) {
+        const reasons = getCampTilePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, def.id);
+        if (reasons.length) {
+          return {
+            tone: "error",
+            title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
+            body: reasons[0]
+          };
+        }
+        const bonuses = scoreAdjacencyBonuses(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, def.id);
+        return {
+          tone: "success",
+          title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
+          body: bonuses.lines[0] || "Valid placement on this parcel."
+        };
+      }
+      return {
+        tone: "info",
+        title: `${def.name} selected`,
+        body: `${Core.formatMoney(def.cost)} | ${def.rulesText}`
+      };
+    }
+
+    if (game.turn.actionTaken && game.phase === "build") {
+      return canScoreCurrentRound()
+        ? { tone: "success", title: "Round ready to score", body: `All players have passed for ${getCurrentRound().name}. Score the round when you are ready.` }
+        : { tone: "success", title: "Turn complete", body: "End the turn to hand the device to the next player." };
+    }
+    if (game.turn.actionTaken && game.phase === "setupLandscape") {
+      return { tone: "success", title: "Layout complete", body: "Continue to the next player or open the contractor market." };
+    }
+    if (game.ui.inspectedCell) {
+      const cell = getCell(player.board, game.ui.inspectedCell.row, game.ui.inspectedCell.col);
+      if (!cell.landscapeTile) {
+        return {
+          tone: "info",
+          title: `Parcel ${formatBoardCellLabel(game.ui.inspectedCell.row, game.ui.inspectedCell.col)}`,
+          body: "This parcel is still empty. Add landscape first, then camp tiles later."
+        };
+      }
+      return {
+        tone: "info",
+        title: `Parcel ${formatBoardCellLabel(game.ui.inspectedCell.row, game.ui.inspectedCell.col)}`,
+        body: cell.campTile ? `${getLandscapeDef(cell.landscapeTile.typeId).name} with ${getCampDef(cell.campTile.typeId).name}.` : `${getLandscapeDef(cell.landscapeTile.typeId).name} is open for camp development.`
+      };
+    }
+    return game.message;
+  }
+
+  function getBottomActions(player) {
+    if (!player || game.overlay?.blocking) return [];
+    const actions = [];
+    if (game.phase === "setupLandscape") {
+      if (player.landscapePlacementStack.length) actions.push({ label: "Undo", onClick: undoLandscapePlacement });
+      if (game.ui.selection.source === "landscape") {
+        actions.push({ label: "Rotate Left", onClick: () => rotateSelectedLandscape(-1) });
+        actions.push({ label: "Rotate Right", onClick: () => rotateSelectedLandscape(1) });
+      }
+      if (game.ui.selection.source) actions.push({ label: "Clear", onClick: clearSelection });
+      if (isCurrentLandscapePhaseComplete()) actions.push({ label: "Continue", onClick: continueLandscapeFlow, variant: "primary" });
+      return actions;
+    }
+    if (game.phase === "build") {
+      if (game.ui.selection.source) actions.push({ label: "Clear", onClick: clearSelection });
+      if (!game.turn.actionTaken) actions.push({ label: "Pass Round", onClick: passCurrentPlayerForRound, variant: "warning" });
+      if (game.turn.actionTaken) {
+        actions.push({
+          label: canScoreCurrentRound() ? `Score ${getCurrentRound().name}` : "End Turn",
+          onClick: endBuildTurnOrScore,
+          variant: "primary"
+        });
+      }
+      return actions;
+    }
+    return actions;
+  }
+
+  function drawActionGrid(rect, actions) {
+    if (!actions.length) {
+      ctx.fillStyle = "rgba(82, 61, 44, 0.64)";
+      ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("No actions right now", rect.x + rect.w / 2, rect.y + rect.h / 2);
       return;
     }
-    elements.historyPanel.innerHTML = game.history.map((entry) => `<div class="history-card"><div class="tile-title-row"><div class="tile-name">${entry.title}</div><div class="tile-pill">${entry.tone}</div></div><p>${entry.body}</p></div>`).join("");
+    const isPortrait = runtime.layout.mode === "mobile-portrait";
+    const gap = 8;
+    const columns = isPortrait ? 2 : Math.min(actions.length, 4);
+    const rows = Math.ceil(actions.length / columns);
+    const buttonWidth = (rect.w - gap * (columns - 1)) / columns;
+    const buttonHeight = (rect.h - gap * (rows - 1)) / rows;
+
+    actions.forEach((action, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      drawButton({
+        x: rect.x + col * (buttonWidth + gap),
+        y: rect.y + row * (buttonHeight + gap),
+        w: buttonWidth,
+        h: buttonHeight
+      }, action.label, action.onClick, {
+        id: `bottom-${action.label}`,
+        variant: action.variant
+      });
+    });
   }
 
-  function renderLandscapeHand() {
+  function renderBottomBar(rect) {
     const player = getPlayer();
-    const canUseHand = game.phase === "setup" || game.phase === "expansion";
-    const remaining = countRemainingLandscapeTiles(player.landscapeInventory);
-    if (game.phase === "setup") {
-      elements.landscapeRackTitle.textContent = "Starting Landscape Tiles";
-      elements.landscapeRackSubtitle.textContent = "Place all 10 starting landscape tiles legally to begin Early Summer.";
-    } else if (game.phase === "expansion") {
-      elements.landscapeRackTitle.textContent = `${getCurrentRound().name} Expansion Tiles`;
-      elements.landscapeRackSubtitle.textContent = `Place all ${remaining} expansion landscape tiles before the contractor market reopens.`;
-    } else {
-      elements.landscapeRackTitle.textContent = "Landscape Hand";
-      elements.landscapeRackSubtitle.textContent = "No landscape placements are pending right now. Future rounds will grant 8 more landscape tiles.";
-    }
-    if (!player.landscapeInventory.length) {
-      elements.landscapeHand.innerHTML = '<div class="landscape-tile"><div class="tile-name">No landscape tiles in hand</div><div class="tile-subtext">The current round is ready for contractor drafting and camp placement.</div></div>';
-      return;
-    }
-    elements.landscapeHand.innerHTML = player.landscapeInventory.map((entry) => {
-      const def = getLandscapeDef(entry.typeId);
-      const selected = player.selection.source === "landscape" && player.selection.typeId === entry.typeId;
-      return `<button class="landscape-tile ${selected ? "selected" : ""}" type="button" data-landscape-type="${entry.typeId}" ${canUseHand ? "" : "disabled"}><div class="tile-title-row"><div class="tile-name">${def.name}</div><div class="tile-pill">x${entry.count}</div></div><div class="tile-subtext">${def.description}</div></button>`;
-    }).join("");
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 24, "rgba(255, 248, 239, 0.97)", "rgba(108, 80, 54, 0.16)", 1.5);
+    const gap = 12;
+    const summaryRect = runtime.layout.mode === "mobile-portrait"
+      ? { x: rect.x + 14, y: rect.y + 14, w: rect.w - 28, h: 52 }
+      : { x: rect.x + 14, y: rect.y + 14, w: rect.w * 0.54, h: rect.h - 28 };
+    const buttonRect = runtime.layout.mode === "mobile-portrait"
+      ? { x: rect.x + 14, y: summaryRect.y + summaryRect.h + 10, w: rect.w - 28, h: rect.h - summaryRect.h - 24 }
+      : { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 16, w: rect.w - summaryRect.w - gap - 28, h: rect.h - 32 };
+
+    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+    const summary = getBottomSummary();
+    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(summary.title, summaryRect.x + 14, summaryRect.y + 10);
+    Core.drawWrappedText(ctx, summary.body, summaryRect.x + 14, summaryRect.y + 28, summaryRect.w - 28, 15, {
+      font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.86)",
+      maxLines: runtime.layout.mode === "mobile-portrait" ? 2 : 3
+    });
+    drawActionGrid(buttonRect, getBottomActions(player));
   }
 
-  function renderMarket() {
-    const player = getPlayer();
-    const canHire = game.phase === "build";
-    elements.marketColumns.innerHTML = game.market.columns.map((column, columnIndex) => {
-      const headerClass = column.category === "amenity" ? "amenity" : "";
-      const slots = column.slots.map((slot, slotIndex) => {
-        const def = getCampDef(slot.typeId);
-        const selected = player.selection.source === "market" && player.selection.columnIndex === columnIndex && player.selection.slotIndex === slotIndex;
-        return `<button class="market-tile ${selected ? "selected" : ""}" type="button" data-market-column="${columnIndex}" data-market-slot="${slotIndex}" ${canHire ? "" : "disabled"}><div class="tile-title-row"><div class="tile-name">${def.name}</div><div class="market-badge">${column.category === "amenity" ? "Amenity" : "Camp"}</div></div><div class="tile-subtext">${def.rulesText}</div><div class="tile-subtext"><strong>Cost:</strong> ${Core.formatMoney(def.cost)}</div></button>`;
-      }).join("");
-      return `<div class="market-column"><div class="column-header ${headerClass}">${column.label}</div>${slots}</div>`;
-    }).join("");
+  function renderPortraitTabBar(rect) {
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, "rgba(255,249,240,0.95)", "rgba(108,80,54,0.16)", 1.2);
+    const tabs = [
+      { id: "board", label: "Board" },
+      { id: "market", label: "Market" },
+      { id: "objectives", label: "Goals" },
+      { id: "score", label: "Score" }
+    ];
+    const gap = 8;
+    const width = (rect.w - gap * (tabs.length - 1) - 16) / tabs.length;
+    tabs.forEach((tab, index) => {
+      drawButton({
+        x: rect.x + 8 + index * (width + gap),
+        y: rect.y + 7,
+        w: width,
+        h: rect.h - 14
+      }, tab.label, () => {
+        game.ui.mobileTab = tab.id;
+      }, {
+        id: `portrait-tab-${tab.id}`,
+        selected: game.ui.mobileTab === tab.id
+      });
+    });
   }
 
-  function renderButtons() {
-    const player = getPlayer();
-    elements.rotateLeftButton.disabled = player.selection.source !== "landscape";
-    elements.rotateRightButton.disabled = player.selection.source !== "landscape";
-    elements.clearSelectionButton.disabled = !player.selection.source;
-    elements.endRoundButton.disabled = game.phase !== "build";
-    elements.endRoundButton.textContent = game.phase === "build" ? `Score ${getCurrentRound().name}` : "Score This Round";
+  function renderSegmentTabs(rect, tabs, activeId, onSelect, scopePrefix) {
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 18, "rgba(249, 242, 232, 0.96)", "rgba(108,80,54,0.14)", 1);
+    const gap = 8;
+    const width = (rect.w - gap * (tabs.length - 1) - 12) / tabs.length;
+    tabs.forEach((tab, index) => {
+      drawButton({
+        x: rect.x + 6 + index * (width + gap),
+        y: rect.y + 5,
+        w: width,
+        h: rect.h - 10
+      }, tab.label, tab.enabled === false ? null : () => onSelect(tab.id), {
+        id: `${scopePrefix}-${tab.id}`,
+        enabled: tab.enabled !== false,
+        selected: activeId === tab.id
+      });
+    });
   }
 
-  function drawBoardLabels() {
-    ctx.fillStyle = "rgba(47, 38, 31, 0.7)";
-    ctx.font = "700 16px 'Trebuchet MS', sans-serif";
+  function drawBoardLabels(geometry) {
+    ctx.fillStyle = "rgba(70, 52, 37, 0.72)";
+    ctx.font = geometry.cellSize >= 54
+      ? "700 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (let col = 0; col < BOARD_COLS; col += 1) {
-      const rect = getCellRect(0, col);
-      ctx.fillText(String.fromCharCode(65 + col), rect.x + rect.w / 2, BOARD_ORIGIN_Y - 14);
+      const rect = getCellRect(geometry, 0, col);
+      ctx.fillText(String.fromCharCode(65 + col), rect.x + rect.w / 2, geometry.originY - geometry.labelSize * 0.55);
     }
     ctx.textAlign = "right";
     for (let row = 0; row < BOARD_ROWS; row += 1) {
-      const rect = getCellRect(row, 0);
-      ctx.fillText(String(row + 1), BOARD_ORIGIN_X - 12, rect.y + rect.h / 2);
+      const rect = getCellRect(geometry, row, 0);
+      ctx.fillText(String(row + 1), geometry.originX - 10, rect.y + rect.h / 2);
     }
-  }
-
-  function drawCornerLabel(rect, label) {
-    Core.drawRoundedRect(ctx, rect.x + 10, rect.y + 10, 54, 22, 11, "rgba(255, 255, 255, 0.72)", "rgba(95, 70, 51, 0.12)", 1);
-    ctx.fillStyle = "#5a4430";
-    ctx.font = "700 11px 'Trebuchet MS', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, rect.x + 37, rect.y + 21);
-  }
-
-  function drawBuildingBadge(rect, label, fill, text, stroke) {
-    Core.drawRoundedRect(ctx, rect.x + 18, rect.y + rect.h - 36, rect.w - 36, 24, 12, fill, stroke, 1.5);
-    ctx.fillStyle = text;
-    ctx.font = "700 13px 'Trebuchet MS', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h - 24);
   }
 
   function drawWaterEdges(rect, info) {
     const fill = "rgba(103, 167, 200, 0.92)";
-    const thickness = 14;
+    const thickness = Math.max(8, rect.w * 0.14);
     for (const side of SIDES) {
       if (info.edges[side] !== "water") continue;
-      if (side === "north") Core.drawRoundedRect(ctx, rect.x + 10, rect.y + 8, rect.w - 20, thickness, 8, fill);
-      if (side === "east") Core.drawRoundedRect(ctx, rect.x + rect.w - thickness - 8, rect.y + 10, thickness, rect.h - 20, 8, fill);
-      if (side === "south") Core.drawRoundedRect(ctx, rect.x + 10, rect.y + rect.h - thickness - 8, rect.w - 20, thickness, 8, fill);
-      if (side === "west") Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 10, thickness, rect.h - 20, 8, fill);
+      if (side === "north") Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, thickness, thickness / 2, fill);
+      if (side === "east") Core.drawRoundedRect(ctx, rect.x + rect.w - thickness - 6, rect.y + 6, thickness, rect.h - 12, thickness / 2, fill);
+      if (side === "south") Core.drawRoundedRect(ctx, rect.x + 6, rect.y + rect.h - thickness - 6, rect.w - 12, thickness, thickness / 2, fill);
+      if (side === "west") Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, thickness, rect.h - 12, thickness / 2, fill);
     }
   }
 
@@ -1505,7 +2005,7 @@
     const centerX = rect.x + rect.w / 2;
     const centerY = rect.y + rect.h / 2;
     ctx.strokeStyle = "#d6b07a";
-    ctx.lineWidth = 16;
+    ctx.lineWidth = Math.max(8, rect.w * 0.15);
     ctx.lineCap = "round";
     ctx.beginPath();
     let hasRoad = false;
@@ -1522,155 +2022,635 @@
     if (hasRoad) {
       ctx.fillStyle = "#c99e62";
       ctx.beginPath();
-      ctx.arc(centerX, centerY, 12, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, Math.max(7, rect.w * 0.12), 0, Math.PI * 2);
       ctx.fill();
     }
     for (const side of SIDES) {
       if (info.edges[side] !== "entrance") continue;
       ctx.strokeStyle = "#874721";
-      ctx.lineWidth = 6;
+      ctx.lineWidth = Math.max(3, rect.w * 0.06);
       ctx.beginPath();
+      const offset = Math.max(10, rect.w * 0.18);
+      const depth = Math.max(16, rect.w * 0.28);
       if (side === "north") {
-        ctx.moveTo(centerX - 16, rect.y + 14); ctx.lineTo(centerX - 16, rect.y + 30);
-        ctx.moveTo(centerX + 16, rect.y + 14); ctx.lineTo(centerX + 16, rect.y + 30);
+        ctx.moveTo(centerX - offset, rect.y + 10); ctx.lineTo(centerX - offset, rect.y + depth);
+        ctx.moveTo(centerX + offset, rect.y + 10); ctx.lineTo(centerX + offset, rect.y + depth);
       }
       if (side === "east") {
-        ctx.moveTo(rect.x + rect.w - 14, centerY - 16); ctx.lineTo(rect.x + rect.w - 30, centerY - 16);
-        ctx.moveTo(rect.x + rect.w - 14, centerY + 16); ctx.lineTo(rect.x + rect.w - 30, centerY + 16);
+        ctx.moveTo(rect.x + rect.w - 10, centerY - offset); ctx.lineTo(rect.x + rect.w - depth, centerY - offset);
+        ctx.moveTo(rect.x + rect.w - 10, centerY + offset); ctx.lineTo(rect.x + rect.w - depth, centerY + offset);
       }
       if (side === "south") {
-        ctx.moveTo(centerX - 16, rect.y + rect.h - 14); ctx.lineTo(centerX - 16, rect.y + rect.h - 30);
-        ctx.moveTo(centerX + 16, rect.y + rect.h - 14); ctx.lineTo(centerX + 16, rect.y + rect.h - 30);
+        ctx.moveTo(centerX - offset, rect.y + rect.h - 10); ctx.lineTo(centerX - offset, rect.y + rect.h - depth);
+        ctx.moveTo(centerX + offset, rect.y + rect.h - 10); ctx.lineTo(centerX + offset, rect.y + rect.h - depth);
       }
       if (side === "west") {
-        ctx.moveTo(rect.x + 14, centerY - 16); ctx.lineTo(rect.x + 30, centerY - 16);
-        ctx.moveTo(rect.x + 14, centerY + 16); ctx.lineTo(rect.x + 30, centerY + 16);
+        ctx.moveTo(rect.x + 10, centerY - offset); ctx.lineTo(rect.x + depth, centerY - offset);
+        ctx.moveTo(rect.x + 10, centerY + offset); ctx.lineTo(rect.x + depth, centerY + offset);
       }
       ctx.stroke();
     }
   }
 
-  function drawLandscapeTile(rect, tile) {
+  function drawCornerBadge(rect, text) {
+    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w * 0.42, 18, 9, "rgba(255,255,255,0.74)");
+    ctx.fillStyle = "#5a4430";
+    ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, rect.x + rect.w * 0.21, rect.y + 17);
+  }
+
+  function drawMiniBadge(rect, text, fill, textColor) {
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.18, rect.y + rect.h - 24, rect.w * 0.64, 18, 9, fill, "rgba(0,0,0,0.08)", 1);
+    ctx.fillStyle = textColor;
+    ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, rect.x + rect.w / 2, rect.y + rect.h - 15);
+  }
+
+  function drawLandscapeTileVisual(rect, tile) {
     const info = getLandscapeInfoFromTile(tile);
     const fill = info.hasForestTag ? "#9fba7d" : info.hasWaterEdge ? "#c4dee2" : "#c8dca3";
-    Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, 18, fill, "rgba(64, 58, 38, 0.12)", 1.5);
+    Core.drawRoundedRect(ctx, rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6, Math.max(8, rect.w * 0.18), fill, "rgba(64, 58, 38, 0.12)", 1.2);
     drawWaterEdges(rect, info);
     drawRoadEdges(rect, info);
-    if (info.isOffice) drawBuildingBadge(rect, "Office", "#fff0bf", "#7e5f2f", "#a8874e");
-    else if (info.isEntrance) drawBuildingBadge(rect, "Gate", "#ffe2be", "#8d5227", "#b96d3f");
-    else if (info.hasForestTag) drawCornerLabel(rect, "Forest");
-    else if (info.hasWaterEdge) drawCornerLabel(rect, "Lakeside");
+    if (rect.w >= 58) {
+      if (info.isOffice) drawMiniBadge(rect, "Office", "#fff0bf", "#7e5f2f");
+      else if (info.isEntrance) drawMiniBadge(rect, "Gate", "#ffe2be", "#8d5227");
+      else if (info.hasForestTag) drawCornerBadge(rect, "Forest");
+      else if (info.hasWaterEdge) drawCornerBadge(rect, "Lake");
+    }
   }
 
-  function drawCampTile(rect, campTile) {
+  function drawCampTileVisual(rect, campTile) {
     const def = getCampDef(campTile.typeId);
-    const stroke = def.tags.includes("premium") ? "rgba(255, 236, 175, 0.9)" : "rgba(64, 45, 31, 0.16)";
-    Core.drawRoundedRect(ctx, rect.x + 18, rect.y + 18, rect.w - 36, rect.h - 36, 18, def.color, stroke, 2.5);
-    Core.drawWrappedText(ctx, def.shortLabel, rect.x + rect.w / 2, rect.y + 28, rect.w - 56, 14, { font: "700 14px 'Trebuchet MS', sans-serif", align: "center", color: "#fffdf8" });
-    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-    ctx.font = "700 10px 'Trebuchet MS', sans-serif";
+    const stroke = def.tags.includes("premium") ? "rgba(255, 236, 175, 0.94)" : "rgba(64, 45, 31, 0.16)";
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.18, rect.y + rect.h * 0.18, rect.w * 0.64, rect.h * 0.64, Math.max(8, rect.w * 0.16), def.color, stroke, 2);
+    ctx.fillStyle = "#fffdf8";
+    ctx.font = rect.w >= 58 ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(def.marketGroup === "amenity" ? "Amenity" : "Camp", rect.x + rect.w / 2, rect.y + rect.h - 26);
+    ctx.textBaseline = "middle";
+    Core.drawWrappedText(ctx, def.shortLabel, rect.x + rect.w / 2, rect.y + rect.h * 0.31, rect.w * 0.52, rect.w >= 58 ? 12 : 10, {
+      font: ctx.font,
+      align: "center",
+      color: "#fffdf8",
+      maxLines: 2
+    });
   }
 
-  function drawBoardCell(board, row, col) {
-    const rect = getCellRect(row, col);
+  function drawBoardCell(board, geometry, row, col) {
+    const player = getPlayer();
+    const rect = getCellRect(geometry, row, col);
     const cell = getCell(board, row, col);
-    const hover = game.pointerCell && game.pointerCell.row === row && game.pointerCell.col === col;
-    const inspected = getPlayer().inspectedCell && getPlayer().inspectedCell.row === row && getPlayer().inspectedCell.col === col;
-    const lastAttempt = game.lastAttempt && game.lastAttempt.row === row && game.lastAttempt.col === col;
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, "rgba(251, 246, 236, 0.9)", "rgba(95, 70, 51, 0.12)", 1.5);
+    const lastAttempt = game.ui.lastAttempt && game.ui.lastAttempt.row === row && game.ui.lastAttempt.col === col;
+    const inspected = game.ui.inspectedCell && game.ui.inspectedCell.row === row && game.ui.inspectedCell.col === col;
+    const hovered = game.ui.hoveredCell && game.ui.hoveredCell.row === row && game.ui.hoveredCell.col === col;
+    const pulse = 0.62 + Math.sin(runtime.now / 180) * 0.15;
+
+    registerTarget(rect, () => {
+      game.ui.inspectedCell = { row, col };
+      if (game.ui.selection.source === "landscape") {
+        attemptLandscapePlacement(row, col);
+        return;
+      }
+      if (game.ui.selection.source === "market") {
+        attemptCampPlacement(row, col);
+        return;
+      }
+      const currentCell = getCell(player.board, row, col);
+      if (!currentCell.landscapeTile) setMessage(game, "info", "Empty parcel", "No landscape tile has been placed here yet.");
+      else if (currentCell.campTile) setMessage(game, "info", "Developed parcel", `${getLandscapeDef(currentCell.landscapeTile.typeId).name} supports ${getCampDef(currentCell.campTile.typeId).name}.`);
+      else setMessage(game, "info", "Open parcel", `${getLandscapeDef(currentCell.landscapeTile.typeId).name} is open for camp development.`);
+    }, {
+      id: `board-${row}-${col}`,
+      kind: "board-cell",
+      data: { row, col }
+    });
+
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.max(10, rect.w * 0.16), "rgba(251, 246, 236, 0.92)", "rgba(95, 70, 51, 0.12)", 1.4);
     if (!cell.landscapeTile) {
       ctx.strokeStyle = "rgba(95, 70, 51, 0.2)";
-      ctx.setLineDash([8, 6]);
-      ctx.strokeRect(rect.x + 12, rect.y + 12, rect.w - 24, rect.h - 24);
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(rect.x + 10, rect.y + 10, rect.w - 20, rect.h - 20);
       ctx.setLineDash([]);
-      if (hover) Core.drawRoundedRect(ctx, rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8, 18, "rgba(241, 214, 170, 0.28)", "rgba(214, 111, 66, 0.28)", 2);
-      return;
+    } else {
+      drawLandscapeTileVisual(rect, cell.landscapeTile);
+      if (cell.campTile) drawCampTileVisual(rect, cell.campTile);
     }
-    drawLandscapeTile(rect, cell.landscapeTile);
-    if (cell.campTile) drawCampTile(rect, cell.campTile);
-    if (hover) Core.drawRoundedRect(ctx, rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6, 18, "rgba(255,255,255,0.06)", "rgba(214, 111, 66, 0.42)", 2.5);
-    if (inspected) Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, 16, null, "rgba(53, 86, 63, 0.42)", 2);
-    if (lastAttempt) Core.drawRoundedRect(ctx, rect.x + 10, rect.y + 10, rect.w - 20, rect.h - 20, 16, game.lastAttempt.reasons.length ? "rgba(214,111,66,0.18)" : "rgba(53,134,82,0.18)", game.lastAttempt.reasons.length ? "rgba(214,111,66,0.45)" : "rgba(53,134,82,0.45)", 2);
+    if (hovered) Core.drawRoundedRect(ctx, rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, Math.max(8, rect.w * 0.14), null, `rgba(215, 118, 56, ${pulse})`, 2);
+    if (inspected) Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, Math.max(8, rect.w * 0.14), null, "rgba(56, 108, 69, 0.58)", 2);
+    if (lastAttempt) {
+      const invalid = game.ui.lastAttempt.reasons.length > 0;
+      const color = invalid ? "rgba(185, 75, 60, 0.72)" : "rgba(56, 120, 77, 0.72)";
+      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), invalid ? "rgba(185,75,60,0.14)" : "rgba(56,120,77,0.14)", color, 2);
+    }
   }
 
-  function drawPreviewOverlay(player) {
-    if (!player.selection.source || !game.pointerCell) return;
-    const rect = getCellRect(game.pointerCell.row, game.pointerCell.col);
-    if (player.selection.source === "landscape") {
-      const reasons = getLandscapePlacementReasons(game, player, game.pointerCell.row, game.pointerCell.col, player.selection.typeId, player.selection.rotation);
-      ctx.save();
-      ctx.globalAlpha = reasons.length ? 0.55 : 0.78;
-      drawLandscapeTile(rect, { typeId: player.selection.typeId, rotation: player.selection.rotation });
-      ctx.restore();
-      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, 16, null, reasons.length ? "rgba(214,111,66,0.6)" : "rgba(53,134,82,0.55)", 2.5);
-      return;
-    }
-    const reasons = getCampTilePlacementReasons(game, player, game.pointerCell.row, game.pointerCell.col, player.selection.typeId);
-    if (getCell(player.board, game.pointerCell.row, game.pointerCell.col)?.landscapeTile) {
+  function drawPlacementPreview(player, geometry) {
+    if (!game.ui.hoveredCell || !game.ui.selection.source) return;
+    const rect = getCellRect(geometry, game.ui.hoveredCell.row, game.ui.hoveredCell.col);
+    if (game.ui.selection.source === "landscape") {
+      const reasons = getLandscapePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
       ctx.save();
       ctx.globalAlpha = reasons.length ? 0.5 : 0.8;
-      drawCampTile(rect, { typeId: player.selection.typeId });
+      drawLandscapeTileVisual(rect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
+      ctx.restore();
+      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
+      return;
+    }
+    const reasons = getCampTilePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId);
+    if (getCell(player.board, game.ui.hoveredCell.row, game.ui.hoveredCell.col)?.landscapeTile) {
+      ctx.save();
+      ctx.globalAlpha = reasons.length ? 0.5 : 0.82;
+      drawCampTileVisual(rect, { typeId: game.ui.selection.typeId });
       ctx.restore();
     }
-    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, 16, null, reasons.length ? "rgba(214,111,66,0.6)" : "rgba(53,134,82,0.55)", 2.5);
+    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
   }
 
-  function renderBoard() {
-    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    ctx.fillStyle = "#f5eddc";
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    Core.drawRoundedRect(ctx, BOARD_ORIGIN_X - 22, BOARD_ORIGIN_Y - 28, BOARD_WIDTH + 44, BOARD_HEIGHT + 56, 28, "rgba(255,249,239,0.88)", "rgba(95,70,51,0.16)", 2);
-    drawBoardLabels();
+  function renderLandscapeRack(player, rect) {
+    const content = drawPanel(rect, game.roundIndex === 0 ? "Starting Landscape Tiles" : `${getCurrentRound().name} Expansion Hand`, player.landscapeInventory.length ? "Tap a tile, rotate it if needed, then place it on the board." : "All landscape tiles from this phase are already placed.");
+    if (!player.landscapeInventory.length) {
+      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Landscape hand complete", content.x + content.w / 2, content.y + content.h / 2);
+      return;
+    }
+
+    const entries = player.landscapeInventory.slice();
+    const columns = runtime.layout.mode === "mobile-portrait" ? 2 : 3;
+    const rows = Math.ceil(entries.length / columns);
+    const gap = 10;
+    const cardWidth = (content.w - gap * (columns - 1)) / columns;
+    const cardHeight = (content.h - gap * (rows - 1)) / rows;
+
+    entries.forEach((entry, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      const cardRect = { x: content.x + col * (cardWidth + gap), y: content.y + row * (cardHeight + gap), w: cardWidth, h: cardHeight };
+      const selected = game.ui.selection.source === "landscape" && game.ui.selection.typeId === entry.typeId;
+      registerTarget(cardRect, () => selectLandscapeTile(entry.typeId), { id: `landscape-${entry.typeId}`, kind: "landscape-card" });
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, selected ? "rgba(255, 229, 197, 0.98)" : "rgba(250, 242, 230, 0.98)", selected ? "#cc7a3f" : "rgba(108,80,54,0.16)", selected ? 2 : 1.2);
+      const miniRect = { x: cardRect.x + 10, y: cardRect.y + 10, w: Math.min(56, cardRect.h - 20), h: Math.min(56, cardRect.h - 20) };
+      drawLandscapeTileVisual(miniRect, { typeId: entry.typeId, rotation: selected ? game.ui.selection.rotation : 0 });
+      ctx.fillStyle = "#452f1e";
+      ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      const textX = miniRect.x + miniRect.w + 10;
+      ctx.fillText(getLandscapeDef(entry.typeId).name, textX, cardRect.y + 12);
+      ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+      ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.fillText(`x${entry.count}`, textX, cardRect.y + 32);
+      if (selected) {
+        ctx.fillStyle = "#b9642a";
+        ctx.fillText(`${game.ui.selection.rotation * 90} deg`, textX, cardRect.y + 50);
+      }
+    });
+  }
+
+  function renderBoardPanel(rect) {
     const player = getPlayer();
+    const subtitle = player ? `${player.name}'s 8x5 campground board` : "Player boards appear once the game begins";
+    drawPanel(rect, "Campground Board", subtitle);
+    if (!player) return;
+    const geometry = getBoardGeometry(rect);
+    drawBoardLabels(geometry);
     for (let row = 0; row < BOARD_ROWS; row += 1) {
-      for (let col = 0; col < BOARD_COLS; col += 1) drawBoardCell(player.board, row, col);
+      for (let col = 0; col < BOARD_COLS; col += 1) drawBoardCell(player.board, geometry, row, col);
     }
-    drawPreviewOverlay(player);
+    drawPlacementPreview(player, geometry);
+    if (geometry.rackRect) renderLandscapeRack(player, geometry.rackRect);
   }
 
-  function renderBoardHint() {
+  function renderMarketPanel(rect) {
     const player = getPlayer();
-    if (player.selection.source === "landscape" && game.pointerCell) {
-      const reasons = getLandscapePlacementReasons(game, player, game.pointerCell.row, game.pointerCell.col, player.selection.typeId, player.selection.rotation);
-      elements.boardHint.innerHTML = reasons.length ? `<strong>${formatBoardCellLabel(game.pointerCell.row, game.pointerCell.col)}</strong>: ${reasons[0]}` : `<strong>${formatBoardCellLabel(game.pointerCell.row, game.pointerCell.col)}</strong>: Valid placement for ${getLandscapeDef(player.selection.typeId).name}.`;
+    const buildOpen = game.phase === "build" && !game.turn.actionTaken;
+    const subtitle = buildOpen ? "Two amenity columns plus four campsite columns stay face-up. Each contractor costs $10,000." : "Contractors stay visible between turns, but hiring only works during the build phase.";
+    const content = drawPanel(rect, "Contractor Market", subtitle);
+    if (!player) return;
+
+    const columnsPerPage = getVisibleMarketPageSize();
+    const totalPages = Math.ceil(game.market.columns.length / columnsPerPage);
+    game.ui.marketPage = Core.clamp(game.ui.marketPage, 0, totalPages - 1);
+    const startIndex = game.ui.marketPage * columnsPerPage;
+    const visibleColumns = game.market.columns.slice(startIndex, startIndex + columnsPerPage);
+
+    const headerHeight = 34;
+    ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+    ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`Showing columns ${startIndex + 1}-${startIndex + visibleColumns.length} of ${game.market.columns.length}`, content.x, content.y + headerHeight / 2);
+    if (totalPages > 1) {
+      drawButton({ x: content.x + content.w - 104, y: content.y + 1, w: 46, h: 30 }, "<", () => {
+        game.ui.marketPage = Math.max(0, game.ui.marketPage - 1);
+      }, { id: "market-prev", enabled: game.ui.marketPage > 0 });
+      drawButton({ x: content.x + content.w - 50, y: content.y + 1, w: 46, h: 30 }, ">", () => {
+        game.ui.marketPage = Math.min(totalPages - 1, game.ui.marketPage + 1);
+      }, { id: "market-next", enabled: game.ui.marketPage < totalPages - 1 });
+    }
+
+    const bodyRect = { x: content.x, y: content.y + headerHeight + 8, w: content.w, h: content.h - headerHeight - 8 };
+    const colGap = 8;
+    const rowGap = 6;
+    const colWidth = (bodyRect.w - colGap * (visibleColumns.length - 1)) / visibleColumns.length;
+    const rowHeight = (bodyRect.h - rowGap * 8) / 9;
+
+    visibleColumns.forEach((column, visibleIndex) => {
+      const colRect = { x: bodyRect.x + visibleIndex * (colWidth + colGap), y: bodyRect.y, w: colWidth, h: bodyRect.h };
+      Core.drawRoundedRect(ctx, colRect.x, colRect.y, colRect.w, rowHeight, 16, column.category === "amenity" ? "rgba(198, 224, 226, 0.96)" : "rgba(235, 224, 202, 0.96)", "rgba(108,80,54,0.16)", 1);
+      ctx.fillStyle = "#4b3726";
+      ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(column.label, colRect.x + colRect.w / 2, colRect.y + rowHeight / 2);
+
+      column.slots.forEach((slot, slotIndex) => {
+        const def = getCampDef(slot.typeId);
+        const slotRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap + slotIndex * (rowHeight + rowGap), w: colRect.w, h: rowHeight };
+        const globalColumnIndex = startIndex + visibleIndex;
+        const selected = game.ui.selection.source === "market" && game.ui.selection.columnIndex === globalColumnIndex && game.ui.selection.slotIndex === slotIndex;
+        registerTarget(slotRect, buildOpen ? () => selectMarketTile(globalColumnIndex, slotIndex) : null, {
+          id: `market-${globalColumnIndex}-${slotIndex}`,
+          enabled: buildOpen,
+          kind: "market-slot"
+        });
+        Core.drawRoundedRect(ctx, slotRect.x, slotRect.y, slotRect.w, slotRect.h, 16, selected ? "rgba(255, 232, 204, 0.98)" : "rgba(250, 243, 233, 0.98)", selected ? "#cc7a3f" : "rgba(108,80,54,0.16)", selected ? 2 : 1.1);
+        const miniRect = { x: slotRect.x + 8, y: slotRect.y + 6, w: slotRect.h - 12, h: slotRect.h - 12 };
+        drawCampTileVisual(miniRect, { typeId: def.id });
+        const compact = slotRect.h < 54 || slotRect.w < 150;
+        ctx.fillStyle = buildOpen ? "#442f20" : "rgba(68,47,32,0.52)";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        if (compact) {
+          ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+          ctx.fillText(def.shortLabel, miniRect.x + miniRect.w + 8, slotRect.y + 9);
+          ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+          ctx.fillText("$10k", slotRect.x + slotRect.w - 44, slotRect.y + 9);
+        } else {
+          ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+          ctx.fillText(def.name, miniRect.x + miniRect.w + 8, slotRect.y + 8);
+          ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+          ctx.fillStyle = column.category === "amenity" ? "#3f6870" : "#7d5a37";
+          ctx.fillText(column.category === "amenity" ? "Amenity" : "Camp", miniRect.x + miniRect.w + 8, slotRect.y + 26);
+          ctx.fillStyle = buildOpen ? "#442f20" : "rgba(68,47,32,0.52)";
+          ctx.fillText("$10k", slotRect.x + slotRect.w - 42, slotRect.y + 8);
+        }
+      });
+    });
+  }
+
+  function renderObjectiveCards(player, objectives, rect, variant) {
+    if (!objectives.length) {
+      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(variant === "director" ? "Director goals reveal after the first round." : "No objectives available.", rect.x + rect.w / 2, rect.y + rect.h / 2);
       return;
     }
-    if (player.selection.source === "market" && game.pointerCell) {
-      const reasons = getCampTilePlacementReasons(game, player, game.pointerCell.row, game.pointerCell.col, player.selection.typeId);
-      const bonuses = scoreAdjacencyBonuses(player.board, game.pointerCell.row, game.pointerCell.col, player.selection.typeId);
-      elements.boardHint.innerHTML = reasons.length ? `<strong>${formatBoardCellLabel(game.pointerCell.row, game.pointerCell.col)}</strong>: ${reasons[0]}` : `<strong>${formatBoardCellLabel(game.pointerCell.row, game.pointerCell.col)}</strong>: Valid placement for ${getCampDef(player.selection.typeId).name}.${bonuses.lines.length ? ` ${bonuses.lines[0]}` : ""}`;
-      return;
-    }
-    if (player.inspectedCell) {
-      const cell = getCell(player.board, player.inspectedCell.row, player.inspectedCell.col);
-      if (!cell.landscapeTile) elements.boardHint.innerHTML = `<strong>${formatBoardCellLabel(player.inspectedCell.row, player.inspectedCell.col)}</strong>: Empty parcel. Add a landscape tile here during setup or seasonal expansion.`;
-      else if (cell.campTile) elements.boardHint.innerHTML = `<strong>${formatBoardCellLabel(player.inspectedCell.row, player.inspectedCell.col)}</strong>: ${getLandscapeDef(cell.landscapeTile.typeId).name} with ${getCampDef(cell.campTile.typeId).name} on top.`;
-      else elements.boardHint.innerHTML = `<strong>${formatBoardCellLabel(player.inspectedCell.row, player.inspectedCell.col)}</strong>: ${getLandscapeDef(cell.landscapeTile.typeId).name} is open for camp development.`;
-      return;
-    }
-    if (game.phase === "setup") elements.boardHint.innerHTML = "<strong>Setup tip:</strong> Start with the Entrance on the border, then grow one connected road network that folds in the Camp Office.";
-    else if (game.phase === "expansion") elements.boardHint.innerHTML = `<strong>${getCurrentRound().name} expansion:</strong> Place every landscape tile in your current hand before contractor hiring reopens.`;
-    else if (game.phase === "build") elements.boardHint.innerHTML = "<strong>Build tip:</strong> Select a contractor from the market, then tap a valid landscape parcel to buy and place it.";
-    else if (game.phase === "round-summary") elements.boardHint.innerHTML = "<strong>Round scored:</strong> Check the summary overlay, then continue to the next season when you are ready.";
-    else elements.boardHint.innerHTML = "<strong>Final scoring:</strong> Review the completed campground and start a fresh game whenever you want another run.";
+    const results = buildObjectiveResultsForPlayer(player, objectives);
+    const gap = 10;
+    const cardHeight = (rect.h - gap * (results.length - 1)) / results.length;
+    results.forEach((entry, index) => {
+      const cardRect = { x: rect.x, y: rect.y + index * (cardHeight + gap), w: rect.w, h: cardHeight };
+      const complete = entry.result.points >= entry.objective.points;
+      const fill = complete ? "rgba(232, 246, 228, 0.98)" : "rgba(250, 242, 232, 0.98)";
+      const stroke = complete ? "rgba(86, 132, 93, 0.48)" : "rgba(108,80,54,0.16)";
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, fill, stroke, 1.2);
+      ctx.fillStyle = "#452f1e";
+      ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(entry.objective.name, cardRect.x + 12, cardRect.y + 10);
+      drawPill(cardRect.x + cardRect.w - 82, cardRect.y + 8, `${entry.result.points}/${entry.objective.points}`, complete ? "#5f8d65" : variant === "director" ? "#8e6a9f" : "#c6783c", "#fff9f3");
+      Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + 12, cardRect.y + 32, cardRect.w - 24, 14, {
+        font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.86)",
+        maxLines: 2
+      });
+      Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + 12, cardRect.y + cardRect.h - 28, cardRect.w - 24, 13, {
+        font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: complete ? "#3f6b47" : "#7d5a37",
+        maxLines: 1
+      });
+    });
+  }
+
+  function renderObjectivesPanel(rect) {
+    const player = getPlayer();
+    const content = drawPanel(rect, "Objectives", "Shared seasonal goals and Camp Director goals score against the current player's board.");
+    if (!player) return;
+    renderSegmentTabs({ x: content.x, y: content.y, w: content.w, h: 36 }, [
+      { id: "shared", label: "Shared" },
+      { id: "director", label: "Director", enabled: game.directorRevealed }
+    ], game.ui.objectiveTab, (value) => {
+      game.ui.objectiveTab = value;
+    }, "objective-tab");
+    const objectives = game.ui.objectiveTab === "director" ? game.activeDirectorObjectives : game.activeRoundObjectives;
+    renderObjectiveCards(player, objectives, { x: content.x, y: content.y + 48, w: content.w, h: content.h - 48 }, game.ui.objectiveTab === "director" ? "director" : "shared");
+  }
+
+  function renderScorePanel(rect) {
+    const player = getPlayer();
+    const content = drawPanel(rect, "Camp Scores", "Only the current player's board is shown, but the scoreboard tracks everyone.");
+    if (!player) return;
+    const standings = game.players.slice().sort((a, b) => b.score - a.score);
+    const rowHeight = 52;
+    standings.forEach((entry, index) => {
+      const rowRect = { x: content.x, y: content.y + index * (rowHeight + 8), w: content.w, h: rowHeight };
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(249, 241, 229, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, entry.color.fill);
+      ctx.fillStyle = entry.color.text;
+      ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
+      ctx.fillStyle = "#432e1e";
+      ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(entry.name, rowRect.x + 56, rowRect.y + 10);
+      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+      const status = game.phase === "build" && entry.passedThisRound ? " | passed this round" : "";
+      ctx.fillText(`${Core.formatMoney(entry.money)} | ${entry.roundCampPlacements[game.roundIndex]} placed this round${status}`, rowRect.x + 56, rowRect.y + 29);
+      ctx.fillStyle = "#432e1e";
+      ctx.font = "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(`${entry.score} pts`, rowRect.x + rowRect.w - 14, rowRect.y + 16);
+    });
+  }
+
+  function renderInfoPanel(rect) {
+    const player = getPlayer();
+    const content = drawPanel(rect, "Current Focus", player ? `${player.name} | ${getPhaseLabel()}` : "Setup");
+    const summary = getBottomSummary();
+    Core.drawRoundedRect(ctx, content.x, content.y, content.w, content.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(summary.title, content.x + 12, content.y + 10);
+    Core.drawWrappedText(ctx, summary.body, content.x + 12, content.y + 30, content.w - 24, 15, {
+      font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      maxLines: 4
+    });
+  }
+
+  function renderDesktopOrLandscapeSide() {
+    renderInfoPanel(runtime.layout.infoPanel);
+    renderSegmentTabs(runtime.layout.sideTabs, [
+      { id: "objectives", label: "Goals" },
+      { id: "score", label: "Score" }
+    ], game.ui.sideTab, (value) => {
+      game.ui.sideTab = value;
+    }, "side-tab");
+    if (game.ui.sideTab === "score") renderScorePanel(runtime.layout.sideBody);
+    else renderObjectivesPanel(runtime.layout.sideBody);
   }
 
   function renderOverlay() {
-    if (!game.overlay) {
-      elements.overlay.classList.remove("open");
+    if (!game.overlay) return;
+    ctx.fillStyle = "rgba(47, 34, 23, 0.58)";
+    ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
+
+    const panelWidth = Math.min(runtime.layout.width - runtime.layout.pad * 2, runtime.layout.mode === "mobile-portrait" ? 360 : 760);
+    const panelHeight = game.overlay.kind === "start"
+      ? 340
+      : game.overlay.kind === "handoff"
+        ? 290
+        : runtime.layout.mode === "mobile-portrait"
+          ? 430
+          : 460;
+    const rect = {
+      x: (runtime.layout.width - panelWidth) / 2,
+      y: (runtime.layout.height - panelHeight) / 2,
+      w: panelWidth,
+      h: panelHeight
+    };
+
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 28, "rgba(255, 248, 239, 0.98)", "rgba(108,80,54,0.18)", 1.6);
+    ctx.fillStyle = "#3d2d20";
+    ctx.font = "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+
+    if (game.overlay.kind === "start") {
+      renderStartOverlay(rect);
       return;
     }
-    elements.overlay.classList.add("open");
-    elements.overlayTitle.textContent = game.overlay.title;
-    const intro = game.overlay.intro.map((line) => `<div>${line}</div>`).join("");
-    const scoreItems = game.overlay.results.map((entry) => `<div class="overlay-score-item"><div><strong>${entry.objective.name}</strong><div>${game.overlay.kind === "final" ? `${entry.section}: ` : ""}${entry.result.detail}</div></div><div>${entry.result.points}/${entry.objective.points}</div></div>`).join("");
-    elements.overlayBody.innerHTML = `${intro}<div class="overlay-score-list">${scoreItems}</div><div class="overlay-total">${game.overlay.kind === "final" ? `Final total: ${game.overlay.total} points` : `Round total: ${game.overlay.total} points`}</div>`;
-    elements.overlayActions.innerHTML = game.overlay.actions.map((action) => `<button class="ui-button ${action.variant || ""}" type="button" data-overlay-action="${action.id}">${action.label}</button>`).join("");
+    if (game.overlay.kind === "handoff") {
+      renderHandoffOverlay(rect);
+      return;
+    }
+    if (game.overlay.kind === "round-summary") {
+      renderRoundSummaryOverlay(rect);
+      return;
+    }
+    if (game.overlay.kind === "final") renderFinalOverlay(rect);
   }
 
-  bindEvents();
-  renderApp();
+  function renderStartOverlay(rect) {
+    ctx.fillText("Smore to Explore", rect.x + rect.w / 2, rect.y + 22);
+    Core.drawWrappedText(ctx, "Single-canvas pass-and-play for 2 to 5 players. Each player builds a separate campground, while the contractor market and seasonal goals stay shared.", rect.x + rect.w / 2, rect.y + 70, rect.w - 48, 18, {
+      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.86)",
+      align: "center",
+      maxLines: 4
+    });
+
+    const chooserRect = { x: rect.x + 52, y: rect.y + 166, w: rect.w - 104, h: 74 };
+    Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
+    ctx.fillStyle = "#4a3524";
+    ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("Player Count", chooserRect.x + chooserRect.w / 2, chooserRect.y + 10);
+    drawButton({ x: chooserRect.x + 18, y: chooserRect.y + 30, w: 54, h: 28 }, "-", () => {
+      game.ui.configuredPlayerCount = Math.max(2, game.ui.configuredPlayerCount - 1);
+    }, {
+      id: "overlay-player-minus",
+      scope: "overlay",
+      enabled: game.ui.configuredPlayerCount > 2
+    });
+    drawButton({ x: chooserRect.x + chooserRect.w - 72, y: chooserRect.y + 30, w: 54, h: 28 }, "+", () => {
+      game.ui.configuredPlayerCount = Math.min(5, game.ui.configuredPlayerCount + 1);
+    }, {
+      id: "overlay-player-plus",
+      scope: "overlay",
+      enabled: game.ui.configuredPlayerCount < 5
+    });
+    ctx.fillStyle = "#4a3524";
+    ctx.font = "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(game.ui.configuredPlayerCount), chooserRect.x + chooserRect.w / 2, chooserRect.y + 46);
+
+    drawButton({ x: rect.x + 80, y: rect.y + rect.h - 78, w: rect.w - 160, h: 44 }, "Start Campground", () => {
+      beginPlaySession(game.ui.configuredPlayerCount);
+    }, {
+      id: "overlay-start-game",
+      scope: "overlay",
+      variant: "primary"
+    });
+  }
+
+  function renderHandoffOverlay(rect) {
+    const player = getPlayer();
+    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + 24);
+    const badgeRect = { x: rect.x + rect.w / 2 - 110, y: rect.y + 68, w: 220, h: 48 };
+    Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 24, player.color.fill, "rgba(0,0,0,0.08)", 1.2);
+    ctx.fillStyle = player.color.text;
+    ctx.font = "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${getCurrentRound().name} | ${getPhaseLabel()}`, badgeRect.x + badgeRect.w / 2, badgeRect.y + badgeRect.h / 2);
+
+    Core.drawWrappedText(ctx, game.overlay.lines.join("\n\n"), rect.x + rect.w / 2, rect.y + 132, rect.w - 72, 18, {
+      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      align: "center",
+      maxLines: 6
+    });
+
+    drawButton({ x: rect.x + 86, y: rect.y + rect.h - 74, w: rect.w - 172, h: 42 }, "Ready", closeOverlay, {
+      id: "overlay-ready",
+      scope: "overlay",
+      variant: "primary"
+    });
+  }
+
+  function renderRoundSummaryOverlay(rect) {
+    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + 20);
+    Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + 60, rect.w - 64, 18, {
+      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      align: "center",
+      maxLines: 3
+    });
+
+    const rowsY = rect.y + 122;
+    const rowHeight = 54;
+    game.overlay.rows.forEach((row, index) => {
+      const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
+      ctx.fillStyle = row.player.color.text;
+      ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
+      ctx.fillStyle = "#432e1e";
+      ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(row.left, rowRect.x + 56, rowRect.y + 10);
+      ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+      ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 30);
+      ctx.fillStyle = "#432e1e";
+      ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 17);
+    });
+
+    drawButton({ x: rect.x + 90, y: rect.y + rect.h - 68, w: rect.w - 180, h: 42 }, `Start ${ROUND_DEFS[game.roundIndex + 1].name}`, startNextRound, {
+      id: "overlay-next-round",
+      scope: "overlay",
+      variant: "primary"
+    });
+  }
+
+  function renderFinalOverlay(rect) {
+    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + 18);
+    Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + 56, rect.w - 60, 18, {
+      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      align: "center",
+      maxLines: 3
+    });
+
+    const rowsY = rect.y + 116;
+    const rowHeight = 52;
+    game.overlay.rows.forEach((row, index) => {
+      const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
+      ctx.fillStyle = row.player.color.text;
+      ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
+      ctx.fillStyle = "#432e1e";
+      ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(row.left, rowRect.x + 56, rowRect.y + 10);
+      ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+      ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 29);
+      ctx.fillStyle = "#432e1e";
+      ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 16);
+    });
+
+    drawButton({ x: rect.x + 90, y: rect.y + rect.h - 66, w: rect.w - 180, h: 42 }, "Back to Start", restartToStartScreen, {
+      id: "overlay-restart",
+      scope: "overlay",
+      variant: "primary"
+    });
+  }
+
+  function renderFrame(now) {
+    runtime.now = now;
+    runtime.layout = computeLayout(controller.state.width, controller.state.height);
+    runtime.targets = [];
+    cleanupTransientState();
+    if (!game.directorRevealed && game.ui.objectiveTab === "director") game.ui.objectiveTab = "shared";
+
+    renderBackground();
+    renderTopBar(runtime.layout.topBar);
+
+    if (runtime.layout.mode === "desktop") {
+      renderBoardPanel(runtime.layout.boardPanel);
+      renderDesktopOrLandscapeSide();
+      renderMarketPanel(runtime.layout.marketPanel);
+      renderBottomBar(runtime.layout.bottomBar);
+    } else if (runtime.layout.mode === "mobile-landscape") {
+      renderBoardPanel(runtime.layout.boardPanel);
+      renderInfoPanel(runtime.layout.infoPanel);
+      renderSegmentTabs(runtime.layout.sideTabs, [
+        { id: "objectives", label: "Goals" },
+        { id: "score", label: "Score" },
+        { id: "market", label: "Market" }
+      ], game.ui.sideTab, (value) => {
+        game.ui.sideTab = value;
+      }, "landscape-side-tab");
+      if (game.ui.sideTab === "market") renderMarketPanel(runtime.layout.sideBody);
+      else if (game.ui.sideTab === "score") renderScorePanel(runtime.layout.sideBody);
+      else renderObjectivesPanel(runtime.layout.sideBody);
+      renderBottomBar(runtime.layout.bottomBar);
+    } else {
+      renderPortraitTabBar(runtime.layout.tabBar);
+      if (game.ui.mobileTab === "board") renderBoardPanel(runtime.layout.mainPanel);
+      else if (game.ui.mobileTab === "market") renderMarketPanel(runtime.layout.mainPanel);
+      else if (game.ui.mobileTab === "score") renderScorePanel(runtime.layout.mainPanel);
+      else renderObjectivesPanel(runtime.layout.mainPanel);
+      renderBottomBar(runtime.layout.bottomBar);
+    }
+
+    renderOverlay();
+    requestAnimationFrame(renderFrame);
+  }
+
+  requestAnimationFrame(renderFrame);
 })();

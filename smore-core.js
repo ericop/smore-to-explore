@@ -1,16 +1,12 @@
-(function () {
+(() => {
   "use strict";
 
   function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
+    return Math.max(min, Math.min(max, value));
   }
 
-  function sum(list, iteratee) {
-    return list.reduce((total, item, index) => total + iteratee(item, index), 0);
-  }
-
-  function count(list, predicate) {
-    return list.reduce((total, item, index) => total + (predicate(item, index) ? 1 : 0), 0);
+  function sum(list, selector = (value) => value) {
+    return list.reduce((total, entry, index) => total + selector(entry, index), 0);
   }
 
   function unique(list) {
@@ -18,252 +14,290 @@
   }
 
   function shuffle(list) {
-    const copy = [...list];
+    const copy = list.slice();
     for (let index = copy.length - 1; index > 0; index -= 1) {
       const swapIndex = Math.floor(Math.random() * (index + 1));
-      const next = copy[index];
-      copy[index] = copy[swapIndex];
-      copy[swapIndex] = next;
+      [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
     }
     return copy;
   }
 
-  function pickWeighted(items, weightAccessor) {
-    const totalWeight = sum(items, (item) => Math.max(0, weightAccessor(item)));
-    if (!totalWeight) {
-      return items[0];
-    }
+  function pickWeighted(list, weightSelector = (value) => value.weight || 1) {
+    const totalWeight = sum(list, (entry) => Math.max(0, weightSelector(entry)));
+    if (!list.length || totalWeight <= 0) return list[0] || null;
 
     let roll = Math.random() * totalWeight;
-    for (const item of items) {
-      roll -= Math.max(0, weightAccessor(item));
-      if (roll <= 0) {
-        return item;
-      }
+    for (const entry of list) {
+      roll -= Math.max(0, weightSelector(entry));
+      if (roll <= 0) return entry;
     }
-
-    return items[items.length - 1];
+    return list[list.length - 1];
   }
 
-  function rotateEdges(edges, turns) {
-    const normalizedTurns = ((turns % 4) + 4) % 4;
-    if (normalizedTurns === 0) {
-      return { ...edges };
-    }
+  function rotateEdges(edges, rotation = 0) {
+    const turns = ((rotation % 4) + 4) % 4;
+    if (turns === 0) return { ...edges };
 
-    let current = { ...edges };
-    for (let step = 0; step < normalizedTurns; step += 1) {
-      current = {
-        north: current.west,
-        east: current.north,
-        south: current.east,
-        west: current.south
+    let rotated = { ...edges };
+    for (let index = 0; index < turns; index += 1) {
+      rotated = {
+        north: rotated.west,
+        east: rotated.north,
+        south: rotated.east,
+        west: rotated.south
       };
     }
-
-    return current;
+    return rotated;
   }
 
   function formatMoney(value) {
-    return `$${Number(value || 0).toLocaleString("en-US")}`;
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0
+    }).format(value);
   }
 
-  function createCanvasController(options) {
-    const { canvas, width, height, onPointerMove, onPointerDown, onPointerLeave } = options;
+  function pointInRect(point, rect) {
+    return !!rect &&
+      point.x >= rect.x &&
+      point.x <= rect.x + rect.w &&
+      point.y >= rect.y &&
+      point.y <= rect.y + rect.h;
+  }
+
+  function insetRect(rect, inset) {
+    if (typeof inset === "number") {
+      return { x: rect.x + inset, y: rect.y + inset, w: rect.w - inset * 2, h: rect.h - inset * 2 };
+    }
+    return {
+      x: rect.x + (inset.left || 0),
+      y: rect.y + (inset.top || 0),
+      w: rect.w - (inset.left || 0) - (inset.right || 0),
+      h: rect.h - (inset.top || 0) - (inset.bottom || 0)
+    };
+  }
+
+  function buildRoundRectPath(ctx, x, y, w, h, radius = 0) {
+    const safeRadius = clamp(radius, 0, Math.min(w, h) / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + safeRadius, y);
+    ctx.arcTo(x + w, y, x + w, y + h, safeRadius);
+    ctx.arcTo(x + w, y + h, x, y + h, safeRadius);
+    ctx.arcTo(x, y + h, x, y, safeRadius);
+    ctx.arcTo(x, y, x + w, y, safeRadius);
+    ctx.closePath();
+  }
+
+  function drawRoundedRect(ctx, x, y, w, h, radius = 0, fill = null, stroke = null, lineWidth = 1) {
+    if (w <= 0 || h <= 0) return;
+    buildRoundRectPath(ctx, x, y, w, h, radius);
+    if (fill) {
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
+    if (stroke) {
+      ctx.lineWidth = lineWidth;
+      ctx.strokeStyle = stroke;
+      ctx.stroke();
+    }
+  }
+
+  function splitWords(text) {
+    return String(text || "")
+      .replace(/\r/g, "")
+      .split("\n")
+      .map((paragraph) => paragraph.split(/\s+/).filter(Boolean));
+  }
+
+  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, options = {}) {
+    const paragraphs = splitWords(text);
+    const font = options.font || ctx.font;
+    const align = options.align || "left";
+    const color = options.color || ctx.fillStyle;
+    const maxLines = options.maxLines || Infinity;
+    const paragraphGap = options.paragraphGap ?? Math.round(lineHeight * 0.45);
+    const lines = [];
+
+    ctx.save();
+    ctx.font = font;
+
+    for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex += 1) {
+      const words = paragraphs[paragraphIndex];
+      if (!words.length) {
+        lines.push("");
+        continue;
+      }
+
+      let currentLine = words[0];
+      for (let index = 1; index < words.length; index += 1) {
+        const candidate = `${currentLine} ${words[index]}`;
+        if (ctx.measureText(candidate).width <= maxWidth) currentLine = candidate;
+        else {
+          lines.push(currentLine);
+          currentLine = words[index];
+        }
+      }
+      lines.push(currentLine);
+      if (paragraphIndex < paragraphs.length - 1) lines.push(null);
+    }
+
+    let visibleLines = [];
+    for (const line of lines) {
+      if (visibleLines.length >= maxLines) break;
+      visibleLines.push(line);
+    }
+    if (lines.length > maxLines && visibleLines.length) {
+      const lastIndex = visibleLines.length - 1;
+      const lastLine = visibleLines[lastIndex] || "";
+      let trimmed = lastLine.replace(/[.?!,:;]+$/, "");
+      while (trimmed && ctx.measureText(`${trimmed}…`).width > maxWidth) {
+        trimmed = trimmed.slice(0, -1).trimEnd();
+      }
+      visibleLines[lastIndex] = `${trimmed || lastLine}…`;
+    }
+
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.textBaseline = "top";
+
+    let cursorY = y;
+    for (const line of visibleLines) {
+      if (line === null) {
+        cursorY += paragraphGap;
+        continue;
+      }
+      ctx.fillText(line, x, cursorY);
+      cursorY += lineHeight;
+    }
+
+    ctx.restore();
+    return {
+      lineCount: visibleLines.filter((line) => line !== null).length,
+      height: cursorY - y
+    };
+  }
+
+  function createCanvasController({
+    canvas,
+    onResize,
+    onPointerMove,
+    onPointerDown,
+    onPointerUp,
+    onPointerLeave
+  }) {
     const context = canvas.getContext("2d");
+    if (!context) throw new Error("Smore to Explore needs a 2D canvas context.");
+
     const state = {
-      width,
-      height
+      width: 0,
+      height: 0,
+      pixelRatio: 1,
+      isFullscreen: false,
+      fullscreenSupported: !!document.fullscreenEnabled
     };
 
-    function resize() {
-      const pixelRatio = window.devicePixelRatio || 1;
-      canvas.width = Math.round(width * pixelRatio);
-      canvas.height = Math.round(height * pixelRatio);
+    function updateSize() {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width));
+      const height = Math.max(1, Math.round(rect.height));
+      const pixelRatio = clamp(window.devicePixelRatio || 1, 1, 3);
+
+      if (canvas.width !== Math.round(width * pixelRatio) || canvas.height !== Math.round(height * pixelRatio)) {
+        canvas.width = Math.round(width * pixelRatio);
+        canvas.height = Math.round(height * pixelRatio);
+      }
+
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      context.imageSmoothingEnabled = true;
+
+      state.width = width;
+      state.height = height;
+      state.pixelRatio = pixelRatio;
+      state.isFullscreen = !!document.fullscreenElement;
+
+      if (onResize) onResize({ ...state });
     }
 
     function toCanvasPoint(event) {
       const rect = canvas.getBoundingClientRect();
-      if (!rect.width || !rect.height) {
-        return { x: 0, y: 0 };
-      }
-
       return {
-        x: ((event.clientX - rect.left) / rect.width) * width,
-        y: ((event.clientY - rect.top) / rect.height) * height
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
       };
     }
 
-    resize();
-    window.addEventListener("resize", resize);
+    function handlePointerMove(event) {
+      if (onPointerMove) onPointerMove(toCanvasPoint(event), event);
+    }
 
-    canvas.addEventListener("pointermove", (event) => {
-      if (typeof onPointerMove === "function") {
-        onPointerMove(toCanvasPoint(event), event);
-      }
-    });
+    function handlePointerDown(event) {
+      if (event.pointerType !== "mouse") canvas.setPointerCapture?.(event.pointerId);
+      if (onPointerDown) onPointerDown(toCanvasPoint(event), event);
+    }
 
-    canvas.addEventListener("pointerdown", (event) => {
-      if (typeof onPointerDown === "function") {
-        onPointerDown(toCanvasPoint(event), event);
-      }
-    });
+    function handlePointerUp(event) {
+      if (onPointerUp) onPointerUp(toCanvasPoint(event), event);
+    }
 
-    canvas.addEventListener("pointerleave", (event) => {
-      if (typeof onPointerLeave === "function") {
-        onPointerLeave(event);
+    function handlePointerLeave(event) {
+      if (onPointerLeave) onPointerLeave(toCanvasPoint(event), event);
+    }
+
+    async function toggleFullscreen(target = canvas) {
+      if (!document.fullscreenEnabled) return false;
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return true;
       }
-    });
+      await target.requestFullscreen();
+      return true;
+    }
+
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointerleave", handlePointerLeave);
+    canvas.addEventListener("pointercancel", handlePointerLeave);
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+    window.addEventListener("resize", updateSize);
+    window.addEventListener("orientationchange", updateSize);
+    document.addEventListener("fullscreenchange", updateSize);
+
+    updateSize();
 
     return {
       canvas,
       context,
       state,
-      resize,
-      toCanvasPoint
+      resize: updateSize,
+      toCanvasPoint,
+      toggleFullscreen,
+      destroy() {
+        canvas.removeEventListener("pointermove", handlePointerMove);
+        canvas.removeEventListener("pointerdown", handlePointerDown);
+        canvas.removeEventListener("pointerup", handlePointerUp);
+        canvas.removeEventListener("pointerleave", handlePointerLeave);
+        canvas.removeEventListener("pointercancel", handlePointerLeave);
+        window.removeEventListener("resize", updateSize);
+        window.removeEventListener("orientationchange", updateSize);
+        document.removeEventListener("fullscreenchange", updateSize);
+      }
     };
-  }
-
-  function setupFullscreen(options) {
-    const {
-      button,
-      target = document.documentElement,
-      onChange
-    } = options;
-
-    let pseudoFullscreen = false;
-
-    function isActive() {
-      return Boolean(document.fullscreenElement) || pseudoFullscreen;
-    }
-
-    function sync() {
-      document.body.classList.toggle("fullscreen-mode", isActive());
-      if (button) {
-        button.textContent = isActive() ? "Exit Fullscreen" : "Fullscreen";
-      }
-      if (typeof onChange === "function") {
-        onChange(isActive());
-      }
-    }
-
-    async function toggle() {
-      if (!document.fullscreenElement && !pseudoFullscreen) {
-        if (target.requestFullscreen) {
-          try {
-            await target.requestFullscreen();
-            sync();
-            return;
-          } catch (error) {
-            pseudoFullscreen = true;
-            sync();
-            return;
-          }
-        }
-
-        pseudoFullscreen = true;
-        sync();
-        return;
-      }
-
-      if (document.fullscreenElement && document.exitFullscreen) {
-        await document.exitFullscreen();
-        sync();
-        return;
-      }
-
-      pseudoFullscreen = false;
-      sync();
-    }
-
-    if (button) {
-      button.addEventListener("click", toggle);
-    }
-
-    document.addEventListener("fullscreenchange", () => {
-      pseudoFullscreen = false;
-      sync();
-    });
-
-    sync();
-
-    return {
-      toggle,
-      isActive
-    };
-  }
-
-  function drawRoundedRect(context, x, y, width, height, radius, fillStyle, strokeStyle, lineWidth) {
-    const r = Math.min(radius, width / 2, height / 2);
-    context.beginPath();
-    context.moveTo(x + r, y);
-    context.lineTo(x + width - r, y);
-    context.quadraticCurveTo(x + width, y, x + width, y + r);
-    context.lineTo(x + width, y + height - r);
-    context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-    context.lineTo(x + r, y + height);
-    context.quadraticCurveTo(x, y + height, x, y + height - r);
-    context.lineTo(x, y + r);
-    context.quadraticCurveTo(x, y, x + r, y);
-    context.closePath();
-
-    if (fillStyle) {
-      context.fillStyle = fillStyle;
-      context.fill();
-    }
-
-    if (strokeStyle) {
-      context.strokeStyle = strokeStyle;
-      context.lineWidth = lineWidth || 1;
-      context.stroke();
-    }
-  }
-
-  function drawWrappedText(context, text, x, y, maxWidth, lineHeight, options) {
-    const settings = options || {};
-    const words = String(text || "").split(/\s+/).filter(Boolean);
-    let line = "";
-    let currentY = y;
-
-    if (settings.font) {
-      context.font = settings.font;
-    }
-    context.fillStyle = settings.color || "#2f261f";
-    context.textAlign = settings.align || "left";
-    context.textBaseline = settings.baseline || "top";
-
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      const measurement = context.measureText(candidate);
-      if (measurement.width > maxWidth && line) {
-        context.fillText(line, x, currentY);
-        line = word;
-        currentY += lineHeight;
-      } else {
-        line = candidate;
-      }
-    }
-
-    if (line) {
-      context.fillText(line, x, currentY);
-    }
-
-    return currentY + lineHeight;
   }
 
   window.SmoreCore = {
     clamp,
-    count,
-    createCanvasController,
-    drawRoundedRect,
-    drawWrappedText,
-    formatMoney,
+    sum,
+    unique,
+    shuffle,
     pickWeighted,
     rotateEdges,
-    setupFullscreen,
-    shuffle,
-    sum,
-    unique
+    formatMoney,
+    pointInRect,
+    insetRect,
+    drawRoundedRect,
+    drawWrappedText,
+    createCanvasController
   };
 })();
