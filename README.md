@@ -2,6 +2,10 @@
 
 Smore to Explore is a cozy browser prototype about building a campground across three summer rounds.
 
+## Play the game yourself
+
+Play online at [https://ericop.github.io/smore-to-explore/](https://ericop.github.io/smore-to-explore/).
+
 The current prototype focuses on:
 
 - a manual landscape setup phase on an `8 x 5` board
