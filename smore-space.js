@@ -271,6 +271,23 @@
     return trimmed ? trimmed.slice(0, 18) : getDefaultPlayerName(index);
   }
 
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function hexToRgba(hex, alpha) {
+    const cleaned = String(hex || "").replace("#", "");
+    if (cleaned.length !== 6) return `rgba(202, 111, 54, ${alpha})`;
+    const red = parseInt(cleaned.slice(0, 2), 16);
+    const green = parseInt(cleaned.slice(2, 4), 16);
+    const blue = parseInt(cleaned.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
   function readStoredPlayerNames() {
     try {
       const raw = window.localStorage.getItem(PLAYER_NAME_STORAGE_KEY);
@@ -329,10 +346,15 @@
       open(players) {
         if (!grid) return;
         grid.innerHTML = players.map((player, index) => {
-          const safeName = String(player.name || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+          const safeName = escapeHtml(player.name);
+          const fill = player.color?.fill || "#8d5a36";
+          const glow = hexToRgba(fill, 0.18);
+          const shadow = hexToRgba(fill, 0.22);
+          const soft = hexToRgba(fill, 0.12);
+          const label = escapeHtml(getDefaultPlayerName(index));
           return [
-            "<div class='name-editor-field'>",
-            `  <label for='playerName${index}'>${getDefaultPlayerName(index)}</label>`,
+            `<div class='name-editor-field' style='--player-fill:${fill}; --player-glow:${glow}; --player-shadow:${shadow}; --player-soft:${soft};'>`,
+            `  <label for='playerName${index}'><span class='name-editor-swatch' aria-hidden='true'></span>${label}</label>`,
             `  <input id='playerName${index}' data-player-index='${index}' type='text' maxlength='18' autocomplete='off' value='${safeName}'>`,
             "</div>"
           ].join("");
