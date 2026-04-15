@@ -2315,25 +2315,32 @@
           kind: "market-slot"
         });
         Core.drawRoundedRect(ctx, slotRect.x, slotRect.y, slotRect.w, slotRect.h, 16, selected ? "rgba(255, 232, 204, 0.98)" : "rgba(250, 243, 233, 0.98)", selected ? "#cc7a3f" : "rgba(108,80,54,0.16)", selected ? 2 : 1.1);
-        const miniRect = { x: slotRect.x + 8, y: slotRect.y + 6, w: slotRect.h - 12, h: slotRect.h - 12 };
+        const iconSize = Math.max(16, slotRect.h - 10);
+        const miniRect = { x: slotRect.x + 6, y: slotRect.y + (slotRect.h - iconSize) / 2, w: iconSize, h: iconSize };
         drawCampTileVisual(miniRect, { typeId: def.id });
         const compact = slotRect.h < 54 || slotRect.w < 150;
         ctx.fillStyle = buildOpen ? "#442f20" : "rgba(68,47,32,0.52)";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "top";
+        const textX = miniRect.x + miniRect.w + 8;
+        const priceX = slotRect.x + slotRect.w - 10;
         if (compact) {
           ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-          ctx.fillText(def.shortLabel, miniRect.x + miniRect.w + 8, slotRect.y + 9);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(def.shortLabel, textX, slotRect.y + slotRect.h / 2 + 0.5);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
-          ctx.fillText("$10k", slotRect.x + slotRect.w - 44, slotRect.y + 9);
+          ctx.textAlign = "right";
+          ctx.fillText("$10k", priceX, slotRect.y + slotRect.h / 2 + 0.5);
         } else {
           ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
-          ctx.fillText(def.name, miniRect.x + miniRect.w + 8, slotRect.y + 8);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "top";
+          ctx.fillText(def.name, textX, slotRect.y + 7);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.fillStyle = column.category === "amenity" ? "#3f6870" : "#7d5a37";
-          ctx.fillText(column.category === "amenity" ? "Amenity" : "Camp", miniRect.x + miniRect.w + 8, slotRect.y + 26);
+          ctx.fillText(column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
           ctx.fillStyle = buildOpen ? "#442f20" : "rgba(68,47,32,0.52)";
-          ctx.fillText("$10k", slotRect.x + slotRect.w - 42, slotRect.y + 8);
+          ctx.textAlign = "right";
+          ctx.fillText("$10k", priceX, slotRect.y + 7);
         }
       });
     });
