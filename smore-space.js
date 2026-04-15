@@ -1905,8 +1905,10 @@
     const buttonHeight = runtime.layout.mode === "mobile-portrait" ? 32 : 30;
     const menuWidth = buttonHeight;
     const buttonGap = 8;
+    const menuX = rect.x + rect.w - menuWidth - 18;
+    const fullscreenX = menuX - buttonGap - buttonWidth;
     drawButton(
-      { x: rect.x + rect.w - buttonWidth - menuWidth - buttonGap - 18, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
+      { x: fullscreenX, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
       controller.state.isFullscreen ? "Exit Full" : "Fullscreen",
       async () => {
         if (!controller.state.fullscreenSupported) {
@@ -1926,7 +1928,7 @@
       }
     );
     drawMenuButton(
-      { x: rect.x + rect.w - menuWidth - 18, y: rect.y + 14, w: menuWidth, h: buttonHeight },
+      { x: menuX, y: rect.y + 14, w: menuWidth, h: buttonHeight },
       openPauseMenu,
       {
         id: "top-pause-menu"
@@ -1935,42 +1937,41 @@
 
     if (!player) return;
 
-    const bannerRect = {
-      x: rect.x + rect.w * 0.36,
-      y: rect.y + 14,
-      w: rect.w * 0.38,
-      h: runtime.layout.mode === "mobile-portrait" ? 54 : 58
+    const rosterRect = {
+      x: rect.x + rect.w * 0.34,
+      y: rect.y + 16,
+      w: fullscreenX - (rect.x + rect.w * 0.34) - 12,
+      h: runtime.layout.mode === "mobile-portrait" ? 62 : 66
     };
-    Core.drawRoundedRect(ctx, bannerRect.x, bannerRect.y, bannerRect.w, bannerRect.h, 22, player.color.fill, "rgba(0,0,0,0.08)", 1.5);
-    ctx.fillStyle = player.color.text;
-    ctx.font = runtime.layout.mode === "mobile-portrait"
-      ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif"
-      : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText(player.name, bannerRect.x + bannerRect.w / 2, bannerRect.y + 8);
-    ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, bannerRect.x + bannerRect.w / 2, bannerRect.y + 33);
-
-    const chipY = rect.y + rect.h - 30;
     const chipGap = 8;
-    const chipWidth = (rect.w - 36 - chipGap * (game.players.length - 1)) / game.players.length;
+    const chipWidth = (rosterRect.w - chipGap * (game.players.length - 1)) / game.players.length;
     game.players.forEach((entry, index) => {
       const chipRect = {
-        x: rect.x + 18 + index * (chipWidth + chipGap),
-        y: chipY,
+        x: rosterRect.x + index * (chipWidth + chipGap),
+        y: rosterRect.y,
         w: chipWidth,
-        h: 22
+        h: rosterRect.h
       };
-      const fill = index === game.currentPlayerIndex ? entry.color.fill : "rgba(243, 232, 216, 0.92)";
-      const text = index === game.currentPlayerIndex ? entry.color.text : "#5b4330";
-      Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 11, fill, "rgba(108,80,54,0.14)", 1);
+      const active = index === game.currentPlayerIndex;
+      const fill = active ? entry.color.fill : "rgba(243, 232, 216, 0.96)";
+      const stroke = active ? "rgba(0,0,0,0.08)" : "rgba(108,80,54,0.14)";
+      const text = active ? entry.color.text : "#5b4330";
+      Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 20, fill, stroke, active ? 1.6 : 1);
+      if (!active) {
+        Core.drawRoundedRect(ctx, chipRect.x + 6, chipRect.y + 6, 8, chipRect.h - 12, 4, entry.color.fill, null, 0);
+      }
       ctx.fillStyle = text;
-      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.font = runtime.layout.mode === "mobile-portrait"
+        ? "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+      ctx.textBaseline = "top";
       const statusSuffix = game.phase === "build" && entry.passedThisRound ? " | passed" : "";
-      ctx.fillText(`${entry.name}: ${entry.score} pts${statusSuffix}`, chipRect.x + chipRect.w / 2, chipRect.y + chipRect.h / 2);
+      ctx.fillText(entry.name, chipRect.x + chipRect.w / 2, chipRect.y + 10);
+      ctx.font = runtime.layout.mode === "mobile-portrait"
+        ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.fillText(`${Core.formatMoney(entry.money)} | ${entry.score} pts${statusSuffix}`, chipRect.x + chipRect.w / 2, chipRect.y + 34);
     });
   }
 
