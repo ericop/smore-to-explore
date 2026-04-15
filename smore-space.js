@@ -5,6 +5,7 @@
   const ObjectiveFactory = window.SmoreObjectiveFactory;
   const appShell = document.getElementById("appShell");
   const canvas = document.getElementById("gameCanvas");
+  const nameEditorHost = document.getElementById("nameEditorHost");
   const fallbackMessage = document.getElementById("fallbackMessage");
 
   if (!Core || !ObjectiveFactory || !canvas || !appShell) {
@@ -20,6 +21,7 @@
   const ACTIVE_SHARED_OBJECTIVE_COUNT = 4;
   const ACTIVE_DIRECTOR_OBJECTIVE_COUNT = 3;
   const MAX_FEED_ITEMS = 6;
+  const PLAYER_NAME_STORAGE_KEY = "smore-to-explore-player-names-v1";
 
   const SIDES = ["north", "east", "south", "west"];
   const OPPOSITE = {
@@ -220,6 +222,8 @@
     onPointerLeave: handlePointerLeave
   });
 
+  const nameEditor = createNameEditorController();
+
   const ctx = controller.context;
   let game = createBootstrapState(2);
 
@@ -258,10 +262,106 @@
     };
   }
 
+  function getDefaultPlayerName(index) {
+    return `Player ${index + 1}`;
+  }
+
+  function normalizePlayerName(name, index) {
+    const trimmed = String(name || "").trim().replace(/\s+/g, " ");
+    return trimmed ? trimmed.slice(0, 18) : getDefaultPlayerName(index);
+  }
+
+  function readStoredPlayerNames() {
+    try {
+      const raw = window.localStorage.getItem(PLAYER_NAME_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function writeStoredPlayerNames(names) {
+    try {
+      window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, JSON.stringify(names));
+    } catch (_error) {
+      // Ignore storage errors and keep the current session playable.
+    }
+  }
+
+  function getStoredPlayerName(index) {
+    return normalizePlayerName(readStoredPlayerNames()[index], index);
+  }
+
+  function getCurrentPlayerNames() {
+    return game.players.map((player, index) => normalizePlayerName(player.name, index));
+  }
+
+  function createNameEditorController() {
+    if (!nameEditorHost) return null;
+
+    nameEditorHost.innerHTML = [
+      "<div class='name-editor-card'>",
+      "  <h2>Rename Players</h2>",
+      "  <p>Update the pass-and-play roster. These names are saved on this device for future sessions.</p>",
+      "  <div class='name-editor-grid' id='nameEditorGrid'></div>",
+      "  <div class='name-editor-actions'>",
+      "    <button type='button' id='nameEditorCancel'>Cancel</button>",
+      "    <button type='button' class='primary' id='nameEditorSave'>Save Names</button>",
+      "  </div>",
+      "</div>"
+    ].join("");
+
+    const grid = document.getElementById("nameEditorGrid");
+    const cancelButton = document.getElementById("nameEditorCancel");
+    const saveButton = document.getElementById("nameEditorSave");
+
+    cancelButton?.addEventListener("click", () => {
+      closeOverlay();
+    });
+
+    saveButton?.addEventListener("click", () => {
+      applyPlayerNamesFromEditor();
+    });
+
+    return {
+      open(players) {
+        if (!grid) return;
+        grid.innerHTML = players.map((player, index) => {
+          const safeName = String(player.name || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+          return [
+            "<div class='name-editor-field'>",
+            `  <label for='playerName${index}'>${getDefaultPlayerName(index)}</label>`,
+            `  <input id='playerName${index}' data-player-index='${index}' type='text' maxlength='18' autocomplete='off' value='${safeName}'>`,
+            "</div>"
+          ].join("");
+        }).join("");
+        nameEditorHost.hidden = false;
+        nameEditorHost.classList.add("visible");
+        nameEditorHost.setAttribute("aria-hidden", "false");
+        window.setTimeout(() => {
+          const firstInput = grid.querySelector("input");
+          firstInput?.focus();
+          firstInput?.select();
+        }, 0);
+      },
+      close() {
+        nameEditorHost.classList.remove("visible");
+        nameEditorHost.setAttribute("aria-hidden", "true");
+        nameEditorHost.hidden = true;
+      },
+      readNames() {
+        if (!grid) return [];
+        return Array.from(grid.querySelectorAll("input")).map((input) => input.value);
+      }
+    };
+  }
+
   function createPlayerState(index) {
     return {
       id: `player-${index + 1}`,
-      name: `Player ${index + 1}`,
+      name: getStoredPlayerName(index),
       color: PLAYER_COLORS[index % PLAYER_COLORS.length],
       board: createBoard(),
       money: STARTING_BUDGET,
@@ -1067,7 +1167,52 @@
   }
 
   function restartToStartScreen() {
+    nameEditor?.close();
     game = createBootstrapState(game.ui.configuredPlayerCount || 2);
+  }
+
+  function openPauseMenu() {
+    nameEditor?.close();
+    game.overlay = {
+      kind: "pause-menu",
+      blocking: true
+    };
+  }
+
+  function openRenamePlayersOverlay() {
+    game.overlay = {
+      kind: "rename-players",
+      blocking: true
+    };
+    nameEditor?.open(game.players);
+  }
+
+  function openRestartConfirmOverlay() {
+    nameEditor?.close();
+    game.overlay = {
+      kind: "restart-confirm",
+      blocking: true
+    };
+  }
+
+  function openAboutOverlay() {
+    nameEditor?.close();
+    game.overlay = {
+      kind: "about",
+      blocking: true
+    };
+  }
+
+  function applyPlayerNamesFromEditor() {
+    if (!nameEditor) return;
+    const names = nameEditor.readNames().map((name, index) => normalizePlayerName(name, index));
+    game.players.forEach((player, index) => {
+      player.name = names[index] || getDefaultPlayerName(index);
+    });
+    writeStoredPlayerNames(names);
+    pushFeed(game, "info", "Roster updated", `${game.players.map((player) => player.name).join(", ")} joined the campground plan.`);
+    setMessage(game, "success", "Player names saved", "The new roster is saved on this device for future sessions.");
+    closeOverlay();
   }
 
   function isCurrentLandscapePhaseComplete() {
@@ -1398,6 +1543,7 @@
   }
 
   function closeOverlay() {
+    nameEditor?.close();
     game.overlay = null;
   }
 
@@ -1658,6 +1804,22 @@
     ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + yOffset + (options.textYOffset ?? 0.5));
   }
 
+  function drawMenuButton(rect, onClick, options = {}) {
+    drawButton(rect, "", onClick, options);
+    const stroke = options.selected ? "#fff9f3" : "#4a3524";
+    const left = rect.x + rect.w * 0.28;
+    const right = rect.x + rect.w * 0.72;
+    const centerY = rect.y + rect.h / 2 + (options.textYOffset ?? 0);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2.2;
+    [-6, 0, 6].forEach((offset) => {
+      ctx.beginPath();
+      ctx.moveTo(left, centerY + offset);
+      ctx.lineTo(right, centerY + offset);
+      ctx.stroke();
+    });
+  }
+
   function drawPill(x, y, text, fill, textColor, options = {}) {
     const paddingX = options.paddingX || 12;
     const height = options.height || 24;
@@ -1719,9 +1881,10 @@
 
     const buttonWidth = runtime.layout.mode === "mobile-portrait" ? 72 : 84;
     const buttonHeight = runtime.layout.mode === "mobile-portrait" ? 32 : 30;
+    const menuWidth = buttonHeight;
     const buttonGap = 8;
     drawButton(
-      { x: rect.x + rect.w - buttonWidth * 2 - buttonGap - 18, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
+      { x: rect.x + rect.w - buttonWidth - menuWidth - buttonGap - 18, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
       controller.state.isFullscreen ? "Exit Full" : "Fullscreen",
       async () => {
         if (!controller.state.fullscreenSupported) {
@@ -1740,14 +1903,11 @@
         font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
       }
     );
-    drawButton(
-      { x: rect.x + rect.w - buttonWidth - 18, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
-      "Restart",
-      restartToStartScreen,
+    drawMenuButton(
+      { x: rect.x + rect.w - menuWidth - 18, y: rect.y + 14, w: menuWidth, h: buttonHeight },
+      openPauseMenu,
       {
-        id: "top-restart",
-        variant: "danger",
-        font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        id: "top-pause-menu"
       }
     );
 
@@ -2541,11 +2701,19 @@
     ctx.fillStyle = "rgba(47, 34, 23, 0.58)";
     ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
 
+    if (game.overlay.kind === "rename-players") return;
+
     const panelWidth = Math.min(runtime.layout.width - runtime.layout.pad * 2, runtime.layout.mode === "mobile-portrait" ? 360 : 760);
     const panelHeight = game.overlay.kind === "start"
       ? 340
       : game.overlay.kind === "handoff"
         ? 290
+        : game.overlay.kind === "pause-menu"
+          ? 334
+          : game.overlay.kind === "restart-confirm"
+            ? 246
+            : game.overlay.kind === "about"
+              ? 332
         : runtime.layout.mode === "mobile-portrait"
           ? 430
           : 460;
@@ -2568,6 +2736,18 @@
     }
     if (game.overlay.kind === "handoff") {
       renderHandoffOverlay(rect);
+      return;
+    }
+    if (game.overlay.kind === "pause-menu") {
+      renderPauseMenuOverlay(rect);
+      return;
+    }
+    if (game.overlay.kind === "restart-confirm") {
+      renderRestartConfirmOverlay(rect);
+      return;
+    }
+    if (game.overlay.kind === "about") {
+      renderAboutOverlay(rect);
       return;
     }
     if (game.overlay.kind === "round-summary") {
@@ -2652,6 +2832,73 @@
     const buttonWidth = Math.min(rect.w - 172, runtime.layout.mode === "mobile-portrait" ? 220 : 280);
     drawButton({ x: rect.x + (rect.w - buttonWidth) / 2, y: rect.y + rect.h - 74, w: buttonWidth, h: 42 }, "Ready", closeOverlay, {
       id: "overlay-ready",
+      scope: "overlay",
+      variant: "primary"
+    });
+  }
+
+  function renderPauseMenuOverlay(rect) {
+    ctx.fillText("Pause Menu", rect.x + rect.w / 2, rect.y + 20);
+    Core.drawWrappedText(ctx, "Open roster tools, read about the prototype, or restart the current session.", rect.x + rect.w / 2, rect.y + 62, rect.w - 72, 18, {
+      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      align: "center",
+      maxLines: 3
+    });
+
+    const buttonWidth = Math.min(rect.w - 112, 280);
+    const startY = rect.y + 118;
+    const gap = 12;
+    [
+      { label: "Resume", onClick: closeOverlay, variant: "primary", id: "overlay-resume" },
+      { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
+      { label: "About", onClick: openAboutOverlay, id: "overlay-about" },
+      { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
+    ].forEach((button, index) => {
+      drawButton({
+        x: rect.x + (rect.w - buttonWidth) / 2,
+        y: startY + index * (42 + gap),
+        w: buttonWidth,
+        h: 42
+      }, button.label, button.onClick, {
+        id: button.id,
+        scope: "overlay",
+        variant: button.variant
+      });
+    });
+  }
+
+  function renderRestartConfirmOverlay(rect) {
+    ctx.fillText("Restart game?", rect.x + rect.w / 2, rect.y + 24);
+    Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, rect.y + 78, rect.w - 72, 20, {
+      font: "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      align: "center",
+      maxLines: 4
+    });
+    const buttonWidth = Math.min(170, (rect.w - 92) / 2);
+    const y = rect.y + rect.h - 74;
+    drawButton({ x: rect.x + 32, y, w: buttonWidth, h: 42 }, "Cancel", openPauseMenu, {
+      id: "overlay-restart-cancel",
+      scope: "overlay"
+    });
+    drawButton({ x: rect.x + rect.w - buttonWidth - 32, y, w: buttonWidth, h: 42 }, "Restart", restartToStartScreen, {
+      id: "overlay-restart-accept",
+      scope: "overlay",
+      variant: "danger"
+    });
+  }
+
+  function renderAboutOverlay(rect) {
+    ctx.fillText("About", rect.x + rect.w / 2, rect.y + 22);
+    Core.drawWrappedText(ctx, "This game was made by EOP and his wife with the help of Codex to test out a board game idea in the browser. Hope you enjoy testing it with them ;)", rect.x + rect.w / 2, rect.y + 78, rect.w - 72, 22, {
+      font: "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      align: "center",
+      maxLines: 7
+    });
+    drawButton({ x: rect.x + rect.w / 2 - 110, y: rect.y + rect.h - 70, w: 220, h: 42 }, "Back", openPauseMenu, {
+      id: "overlay-about-back",
       scope: "overlay",
       variant: "primary"
     });
