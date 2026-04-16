@@ -241,6 +241,7 @@
     return {
       configuredPlayerCount: playerCount,
       mobileTab: "board",
+      boardView: "hand",
       sideTab: "objectives",
       objectiveTab: "shared",
       objectivePages: {
@@ -248,6 +249,7 @@
         director: 0
       },
       marketPage: 0,
+      marketSlotPage: 0,
       selection: createSelection(),
       inspectedCell: null,
       hoveredCell: null,
@@ -1156,6 +1158,7 @@
     const player = gameState.players[gameState.currentPlayerIndex];
     const round = getCurrentRound(gameState);
     let lines = [];
+    if (gameState.ui) gameState.ui.boardView = gameState.phase === "setupLandscape" ? "hand" : "board";
     if (gameState.phase === "setupLandscape" && gameState.roundIndex === 0) {
       lines = [
         `${player.name} is building the opening road skeleton.`,
@@ -1265,7 +1268,8 @@
     };
     game.ui.inspectedCell = null;
     game.ui.lastAttempt = null;
-    setMessage(game, "info", "Landscape selected", `${getLandscapeDef(typeId).name} is ready. Rotate it, then tap a board parcel to place it.`);
+    if (runtime.layout?.mode === "mobile-portrait") game.ui.boardView = "board";
+    setMessage(game, "info", "Landscape selected", `${getLandscapeDef(typeId).name} is ready. Use the turn tray to rotate it, then tap a board parcel to place it.`);
   }
 
   function selectMarketTile(columnIndex, slotIndex) {
@@ -1281,7 +1285,7 @@
       setMessage(game, "info", "Selection cleared", "Choose another contractor or inspect your board.");
     } else {
       const def = getCampDef(game.ui.selection.typeId);
-      setMessage(game, "info", "Contractor selected", `${def.name} costs ${Core.formatMoney(def.cost)}. Tap a valid parcel on your board to place it.`);
+      setMessage(game, "info", "Contractor selected", `${def.name} costs ${Core.formatMoney(def.cost)}. The phone switches back to the board so you can tap a valid parcel to place it.`);
       if (runtime.layout?.mode === "mobile-portrait") game.ui.mobileTab = "board";
     }
   }
@@ -1625,7 +1629,7 @@
   }
 
   function getLayoutMode(width, height) {
-    if (width >= 1320 && height >= 860) return "desktop";
+    if (width >= 1180 && height >= 760) return "desktop";
     if (height >= width) return "mobile-portrait";
     return "mobile-landscape";
   }
@@ -1678,8 +1682,11 @@
       return { mode, pad, gap, width, height, topBar, bottomBar, boardPanel, infoPanel: { x: sidePanel.x, y: sidePanel.y, w: sidePanel.w, h: infoHeight }, sideTabs, sideBody };
     }
 
-    const topBarHeight = 110;
-    const bottomBarHeight = 104;
+    const playerCount = Math.max(2, game.players.length || game.ui.configuredPlayerCount || 2);
+    const extraRosterRows = playerCount > 4 ? 1 : 0;
+    const selectionHeavy = game.ui.selection.source === "landscape" || game.ui.selection.source === "market";
+    const topBarHeight = game.players.length ? 182 + extraRosterRows * 34 : 120;
+    const bottomBarHeight = selectionHeavy ? 176 : game.phase === "setupLandscape" ? 154 : 142;
     const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
     const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
     const content = {
@@ -1688,24 +1695,30 @@
       w: width - pad * 2,
       h: bottomBar.y - (topBar.y + topBar.h + gap) - gap
     };
-    const tabBar = { x: content.x, y: content.y, w: content.w, h: 46 };
+    const tabBar = { x: content.x, y: content.y, w: content.w, h: 52 };
     const mainPanel = { x: content.x, y: tabBar.y + tabBar.h + gap, w: content.w, h: content.h - tabBar.h - gap };
     return { mode, pad, gap, width, height, topBar, bottomBar, tabBar, mainPanel };
   }
 
   function getBoardGeometry(panelRect) {
-    const headerHeight = 34;
+    const headerHeight = runtime.layout.mode === "mobile-portrait" ? 58 : 34;
     const inner = Core.insetRect(panelRect, 12);
-    const rackVisible = game.phase === "setupLandscape";
-    const rackHeight = rackVisible ? Core.clamp(Math.round(panelRect.h * (runtime.layout.mode === "mobile-portrait" ? 0.24 : 0.22)), 104, 160) : 0;
+    const rackVisible = game.phase === "setupLandscape" && runtime.layout.mode !== "mobile-portrait";
+    const rackHeight = rackVisible ? Core.clamp(Math.round(panelRect.h * 0.24), runtime.layout.mode === "mobile-landscape" ? 128 : 104, 168) : 0;
     const boardArea = {
       x: inner.x,
       y: inner.y + headerHeight,
       w: inner.w,
       h: inner.h - headerHeight - (rackVisible ? rackHeight + 8 : 0)
     };
-    const labelSize = runtime.layout.mode === "mobile-portrait" ? 18 : 22;
-    const gap = Core.clamp(Math.floor(Math.min(boardArea.w / 80, boardArea.h / 40) * 6), 3, 8);
+    return getBoardGeometryForArea(boardArea, rackVisible
+      ? { x: inner.x, y: panelRect.y + panelRect.h - rackHeight - 12, w: inner.w, h: rackHeight }
+      : null, headerHeight);
+  }
+
+  function getBoardGeometryForArea(boardArea, rackRect = null, headerHeight = 0) {
+    const labelSize = runtime.layout.mode === "mobile-portrait" ? 16 : 22;
+    const gap = Core.clamp(Math.floor(Math.min(boardArea.w / 80, boardArea.h / 40) * 6), runtime.layout.mode === "mobile-portrait" ? 2 : 3, 8);
     const availableWidth = boardArea.w - labelSize;
     const availableHeight = boardArea.h - labelSize;
     const cellSize = Math.floor(Math.min(
@@ -1716,9 +1729,6 @@
     const boardHeight = cellSize * BOARD_ROWS + gap * (BOARD_ROWS - 1);
     const originX = boardArea.x + labelSize + Math.max(0, (availableWidth - boardWidth) / 2);
     const originY = boardArea.y + labelSize + Math.max(0, (availableHeight - boardHeight) / 2);
-    const rackRect = rackVisible
-      ? { x: inner.x, y: panelRect.y + panelRect.h - rackHeight - 12, w: inner.w, h: rackHeight }
-      : null;
     return { headerHeight, labelSize, gap, cellSize, originX, originY, boardWidth, boardHeight, rackRect };
   }
 
@@ -1741,7 +1751,7 @@
     if (!runtime.layout) return 6;
     if (runtime.layout.mode === "desktop") return 6;
     if (runtime.layout.mode === "mobile-landscape") return 3;
-    return 2;
+    return runtime.layout.width < 410 ? 1 : 2;
   }
 
   function getObjectiveCardsPerPage() {
@@ -1753,27 +1763,28 @@
   function drawPanel(rect, title, subtitle) {
     Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 22, "rgba(255, 249, 240, 0.96)", "rgba(108, 80, 54, 0.16)", 1.4);
     ctx.fillStyle = "#3f2d20";
-    ctx.font = runtime.layout.mode === "mobile-portrait"
-      ? "700 17px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    const isPortrait = runtime.layout.mode === "mobile-portrait";
+    ctx.font = isPortrait
+      ? "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "700 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(title, rect.x + 12, rect.y + 10);
     if (subtitle) {
-      Core.drawWrappedText(ctx, subtitle, rect.x + rect.w - 12, rect.y + 12, Math.max(110, rect.w * 0.54), 13, {
-        font: runtime.layout.mode === "mobile-portrait"
-          ? "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      Core.drawWrappedText(ctx, subtitle, isPortrait ? rect.x + 12 : rect.x + rect.w - 12, rect.y + (isPortrait ? 30 : 12), isPortrait ? rect.w - 24 : Math.max(110, rect.w * 0.54), isPortrait ? 12 : 13, {
+        font: isPortrait
+          ? "600 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
           : "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        align: "right",
+        align: isPortrait ? "left" : "right",
         color: "rgba(82, 61, 44, 0.72)",
-        maxLines: runtime.layout.mode === "mobile-portrait" ? 2 : 2
+        maxLines: isPortrait ? 2 : 2
       });
     }
     return {
       x: rect.x + 10,
-      y: rect.y + 42,
+      y: rect.y + (isPortrait ? 56 : 42),
       w: rect.w - 20,
-      h: rect.h - 52
+      h: rect.h - (isPortrait ? 66 : 52)
     };
   }
 
@@ -1809,18 +1820,21 @@
     const palette = getButtonPalette(options.variant, enabled, options.selected);
     const hovered = runtime.hoveredTargetId === id;
     const yOffset = hovered && enabled ? -1 : 0;
+    const radius = options.radius || (runtime.layout?.mode === "mobile-portrait" ? 18 : 16);
 
     if (onClick) {
       registerTarget(rect, onClick, { id, enabled, scope: options.scope || "main", kind: "button" });
     }
 
-    Core.drawRoundedRect(ctx, rect.x, rect.y + yOffset, rect.w, rect.h, options.radius || 16, palette.fill, palette.stroke, hovered && enabled ? 2 : 1.5);
+    Core.drawRoundedRect(ctx, rect.x, rect.y + yOffset, rect.w, rect.h, radius, palette.fill, palette.stroke, hovered && enabled ? 2 : 1.5);
     if (hovered && enabled) {
-      Core.drawRoundedRect(ctx, rect.x + 2, rect.y + yOffset + 2, rect.w - 4, rect.h - 4, (options.radius || 16) - 2, null, "rgba(255,255,255,0.28)", 1);
+      Core.drawRoundedRect(ctx, rect.x + 2, rect.y + yOffset + 2, rect.w - 4, rect.h - 4, radius - 2, null, "rgba(255,255,255,0.28)", 1);
     }
 
     ctx.fillStyle = palette.text;
-    ctx.font = options.font || "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = options.font || (runtime.layout?.mode === "mobile-portrait"
+      ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif");
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + yOffset + (options.textYOffset ?? 0.5));
@@ -1858,6 +1872,22 @@
     return width;
   }
 
+  function fitText(text, maxWidth, font) {
+    const value = String(text || "");
+    ctx.save();
+    if (font) ctx.font = font;
+    if (ctx.measureText(value).width <= maxWidth) {
+      ctx.restore();
+      return value;
+    }
+    let trimmed = value;
+    while (trimmed.length > 1 && ctx.measureText(`${trimmed}...`).width > maxWidth) {
+      trimmed = trimmed.slice(0, -1).trimEnd();
+    }
+    ctx.restore();
+    return `${trimmed || value.slice(0, 1)}...`;
+  }
+
   function renderBackground() {
     const gradient = ctx.createLinearGradient(0, 0, 0, runtime.layout.height);
     gradient.addColorStop(0, "#f7eedf");
@@ -1875,9 +1905,149 @@
     ctx.fill();
   }
 
+  function renderPortraitTopBar(rect, player) {
+    const pad = 14;
+    const titleFont = "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const buttonHeight = 36;
+    const menuWidth = 40;
+    const fullWidth = 58;
+    const menuX = rect.x + rect.w - pad - menuWidth;
+    const fullscreenX = menuX - 8 - fullWidth;
+
+    ctx.fillStyle = "#3b2c20";
+    ctx.font = titleFont;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("Smore to Explore", rect.x + pad, rect.y + 12);
+
+    drawButton(
+      { x: fullscreenX, y: rect.y + 10, w: fullWidth, h: buttonHeight },
+      controller.state.isFullscreen ? "Exit" : "Full",
+      async () => {
+        if (!controller.state.fullscreenSupported) {
+          setMessage(game, "warning", "Fullscreen unavailable", "This browser is managing fullscreen itself on the current device.");
+          return;
+        }
+        try {
+          await controller.toggleFullscreen(appShell);
+        } catch (_error) {
+          setMessage(game, "warning", "Fullscreen unavailable", "The browser refused fullscreen for this tap.");
+        }
+      },
+      {
+        id: "top-fullscreen",
+        enabled: controller.state.fullscreenSupported,
+        font: "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      }
+    );
+    drawMenuButton(
+      { x: menuX, y: rect.y + 10, w: menuWidth, h: buttonHeight },
+      openPauseMenu,
+      {
+        id: "top-pause-menu"
+      }
+    );
+
+    if (!player) {
+      Core.drawWrappedText(ctx, "Pass one phone around the table and build each campground one turn at a time.", rect.x + pad, rect.y + 48, rect.w - pad * 2 - menuWidth - fullWidth - 16, 14, {
+        font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.8)",
+        maxLines: 2
+      });
+      return;
+    }
+
+    const roundName = getCurrentRound().name;
+    const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
+    const pillY = rect.y + 42;
+    const roundWidth = drawPill(rect.x + pad, pillY, roundName, "#efe2ca", "#5f4731", {
+      height: 24,
+      paddingX: 12,
+      font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
+    drawPill(rect.x + pad + roundWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+      height: 24,
+      paddingX: 12,
+      font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
+
+    const heroRect = {
+      x: rect.x + pad,
+      y: rect.y + 70,
+      w: rect.w - pad * 2,
+      h: 54
+    };
+    Core.drawRoundedRect(ctx, heroRect.x, heroRect.y, heroRect.w, heroRect.h, 20, player.color.fill, "rgba(0,0,0,0.08)", 1.5);
+    Core.drawRoundedRect(ctx, heroRect.x + 1, heroRect.y + 1, heroRect.w - 2, heroRect.h - 2, 19, null, "rgba(255,255,255,0.22)", 1);
+
+    ctx.fillStyle = player.color.text;
+    ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("Current player", heroRect.x + 14, heroRect.y + 8);
+    ctx.font = "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText(fitText(player.name, heroRect.w * 0.48, ctx.font), heroRect.x + 14, heroRect.y + 24);
+
+    const statusText = game.phase === "build" && player.passedThisRound
+      ? "Passed"
+      : game.turn.actionTaken
+        ? "Turn done"
+        : "Ready now";
+    drawPill(heroRect.x + heroRect.w - 96, heroRect.y + 9, statusText, "rgba(255,255,255,0.24)", player.color.text, {
+      height: 20,
+      paddingX: 10,
+      font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      stroke: "rgba(255,255,255,0.2)"
+    });
+
+    ctx.textAlign = "right";
+    ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText(Core.formatMoney(player.money), heroRect.x + heroRect.w - 14, heroRect.y + 18);
+    ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText(`${player.score} pts`, heroRect.x + heroRect.w - 14, heroRect.y + 37);
+
+    const others = game.players.filter((_, index) => index !== game.currentPlayerIndex);
+    if (!others.length) return;
+
+    ctx.fillStyle = "rgba(74, 53, 36, 0.76)";
+    ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("Other players", rect.x + pad, heroRect.y + heroRect.h + 6);
+
+    const chipTop = heroRect.y + heroRect.h + 20;
+    const chipGap = 6;
+    const columns = Math.min(3, others.length);
+    const chipWidth = (rect.w - pad * 2 - chipGap * (columns - 1)) / columns;
+    const chipHeight = 28;
+    others.forEach((entry, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      const chipRect = {
+        x: rect.x + pad + col * (chipWidth + chipGap),
+        y: chipTop + row * (chipHeight + chipGap),
+        w: chipWidth,
+        h: chipHeight
+      };
+      Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 14, "rgba(248, 240, 228, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, chipRect.x + 6, chipRect.y + 6, 6, chipRect.h - 12, 3, entry.color.fill);
+      ctx.fillStyle = "#4a3524";
+      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      const suffix = game.phase === "build" && entry.passedThisRound ? " | passed" : "";
+      ctx.fillText(fitText(`${entry.name}${suffix}`, chipRect.w - 24, ctx.font), chipRect.x + 18, chipRect.y + chipRect.h / 2 + 0.5);
+    });
+  }
+
   function renderTopBar(rect) {
     const player = getPlayer();
     Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 26, "rgba(255, 250, 243, 0.97)", "rgba(108, 80, 54, 0.16)", 1.5);
+
+    if (runtime.layout.mode === "mobile-portrait") {
+      renderPortraitTopBar(rect, player);
+      return;
+    }
 
     ctx.fillStyle = "#3b2c20";
     ctx.font = runtime.layout.mode === "mobile-portrait"
@@ -1967,7 +2137,7 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
       const statusSuffix = game.phase === "build" && entry.passedThisRound ? " | passed" : "";
-      ctx.fillText(entry.name, chipRect.x + chipRect.w / 2, chipRect.y + 10);
+      ctx.fillText(fitText(entry.name, chipRect.w - 18, ctx.font), chipRect.x + chipRect.w / 2, chipRect.y + 10);
       ctx.font = runtime.layout.mode === "mobile-portrait"
         ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
         : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -2114,19 +2284,65 @@
     });
   }
 
+  function drawSelectionTray(rect, summary) {
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+    const previewRect = { x: rect.x + 8, y: rect.y + 8, w: 52, h: 52 };
+    if (game.ui.selection.source === "landscape") {
+      drawLandscapeTileVisual(previewRect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
+    } else if (game.ui.selection.source === "market") {
+      drawCampTileVisual(previewRect, { typeId: game.ui.selection.typeId });
+    }
+    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : "#4a3524";
+    ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    const textX = previewRect.x + previewRect.w + 10;
+    const textWidth = rect.w - (textX - rect.x) - 10;
+    ctx.fillText(fitText(summary.title, textWidth, ctx.font), textX, rect.y + 10);
+    Core.drawWrappedText(ctx, summary.body, textX, rect.y + 28, textWidth, 13, {
+      font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      maxLines: 2
+    });
+  }
+
   function renderBottomBar(rect) {
     const player = getPlayer();
     Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 22, "rgba(255, 248, 239, 0.97)", "rgba(108, 80, 54, 0.16)", 1.4);
+    const summary = getBottomSummary();
+    const actions = getBottomActions(player);
+
+    if (runtime.layout.mode === "mobile-portrait") {
+      const inner = Core.insetRect(rect, 10);
+      let actionRect;
+      if (game.ui.selection.source) {
+        const trayRect = { x: inner.x, y: inner.y, w: inner.w, h: 68 };
+        drawSelectionTray(trayRect, summary);
+        actionRect = { x: inner.x, y: trayRect.y + trayRect.h + 8, w: inner.w, h: rect.y + rect.h - (trayRect.y + trayRect.h + 18) };
+      } else {
+        const summaryRect = { x: inner.x, y: inner.y, w: inner.w, h: 54 };
+        Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+        ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(fitText(summary.title, summaryRect.w - 20, ctx.font), summaryRect.x + 10, summaryRect.y + 8);
+        Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 24, summaryRect.w - 20, 12, {
+          font: "600 10px 'Avenir Next', 'Trebuchet MS', sans-serif",
+          color: "rgba(82, 61, 44, 0.86)",
+          maxLines: 2
+        });
+        actionRect = { x: inner.x, y: summaryRect.y + summaryRect.h + 8, w: inner.w, h: rect.y + rect.h - (summaryRect.y + summaryRect.h + 18) };
+      }
+      drawActionGrid(actionRect, actions);
+      return;
+    }
+
     const gap = 10;
-    const summaryRect = runtime.layout.mode === "mobile-portrait"
-      ? { x: rect.x + 10, y: rect.y + 10, w: rect.w - 20, h: 40 }
-      : { x: rect.x + 10, y: rect.y + 10, w: rect.w * 0.54, h: rect.h - 20 };
-    const buttonRect = runtime.layout.mode === "mobile-portrait"
-      ? { x: rect.x + 10, y: summaryRect.y + summaryRect.h + 8, w: rect.w - 20, h: rect.h - summaryRect.h - 18 }
-      : { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 10, w: rect.w - summaryRect.w - gap - 20, h: rect.h - 20 };
+    const summaryRect = { x: rect.x + 10, y: rect.y + 10, w: rect.w * 0.54, h: rect.h - 20 };
+    const buttonRect = { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 10, w: rect.w - summaryRect.w - gap - 20, h: rect.h - 20 };
 
     Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-    const summary = getBottomSummary();
     ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
     ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
@@ -2135,9 +2351,9 @@
     Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 23, summaryRect.w - 20, 13, {
       font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.86)",
-      maxLines: runtime.layout.mode === "mobile-portrait" ? 1 : 2
+      maxLines: 2
     });
-    drawActionGrid(buttonRect, getBottomActions(player));
+    drawActionGrid(buttonRect, actions);
   }
 
   function renderPortraitTabBar(rect) {
@@ -2148,20 +2364,20 @@
       { id: "objectives", label: "Goals" },
       { id: "score", label: "Score" }
     ];
-    const gap = 6;
-    const width = (rect.w - gap * (tabs.length - 1) - 12) / tabs.length;
+    const gap = 5;
+    const width = (rect.w - gap * (tabs.length - 1) - 10) / tabs.length;
     tabs.forEach((tab, index) => {
       drawButton({
-        x: rect.x + 6 + index * (width + gap),
-        y: rect.y + 6,
+        x: rect.x + 5 + index * (width + gap),
+        y: rect.y + 5,
         w: width,
-        h: rect.h - 12
+        h: rect.h - 10
       }, tab.label, () => {
         game.ui.mobileTab = tab.id;
       }, {
         id: `portrait-tab-${tab.id}`,
         selected: game.ui.mobileTab === tab.id,
-        font: "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        font: "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
         textYOffset: 1
       });
     });
@@ -2169,7 +2385,7 @@
 
   function renderSegmentTabs(rect, tabs, activeId, onSelect, scopePrefix) {
     Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 18, "rgba(249, 242, 232, 0.96)", "rgba(108,80,54,0.14)", 1);
-    const gap = 4;
+    const gap = runtime.layout.mode === "mobile-portrait" ? 5 : 4;
     const width = (rect.w - gap * (tabs.length - 1) - 8) / tabs.length;
     tabs.forEach((tab, index) => {
       drawButton({
@@ -2181,7 +2397,9 @@
         id: `${scopePrefix}-${tab.id}`,
         enabled: tab.enabled !== false,
         selected: activeId === tab.id,
-        font: "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        font: runtime.layout.mode === "mobile-portrait"
+          ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+          : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
         textYOffset: 1
       });
     });
@@ -2387,8 +2605,7 @@
     Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
   }
 
-  function renderLandscapeRack(player, rect) {
-    const content = drawPanel(rect, game.roundIndex === 0 ? "Starting Landscape Tiles" : `${getCurrentRound().name} Expansion Hand`, player.landscapeInventory.length ? "Tap a tile, rotate it if needed, then place it on the board." : "All landscape tiles from this phase are already placed.");
+  function renderLandscapeRackCards(player, content) {
     if (!player.landscapeInventory.length) {
       ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
       ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -2401,7 +2618,7 @@
     const entries = player.landscapeInventory.slice();
     const columns = runtime.layout.mode === "mobile-portrait" ? 2 : 3;
     const rows = Math.ceil(entries.length / columns);
-    const gap = 10;
+    const gap = runtime.layout.mode === "mobile-portrait" ? 8 : 10;
     const cardWidth = (content.w - gap * (columns - 1)) / columns;
     const cardHeight = (content.h - gap * (rows - 1)) / rows;
 
@@ -2412,29 +2629,59 @@
       const selected = game.ui.selection.source === "landscape" && game.ui.selection.typeId === entry.typeId;
       registerTarget(cardRect, () => selectLandscapeTile(entry.typeId), { id: `landscape-${entry.typeId}`, kind: "landscape-card" });
       Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, selected ? "rgba(255, 229, 197, 0.98)" : "rgba(250, 242, 230, 0.98)", selected ? "#cc7a3f" : "rgba(108,80,54,0.16)", selected ? 2 : 1.2);
-      const miniRect = { x: cardRect.x + 10, y: cardRect.y + 10, w: Math.min(56, cardRect.h - 20), h: Math.min(56, cardRect.h - 20) };
+      const miniRect = { x: cardRect.x + 10, y: cardRect.y + 10, w: Math.min(runtime.layout.mode === "mobile-portrait" ? 44 : 56, cardRect.h - 20), h: Math.min(runtime.layout.mode === "mobile-portrait" ? 44 : 56, cardRect.h - 20) };
       drawLandscapeTileVisual(miniRect, { typeId: entry.typeId, rotation: selected ? game.ui.selection.rotation : 0 });
+      const def = getLandscapeDef(entry.typeId);
       ctx.fillStyle = "#452f1e";
-      ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.font = runtime.layout.mode === "mobile-portrait"
+        ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       const textX = miniRect.x + miniRect.w + 10;
-      ctx.fillText(getLandscapeDef(entry.typeId).name, textX, cardRect.y + 12);
+      ctx.fillText(fitText(def.name, cardRect.w - (textX - cardRect.x) - 10, ctx.font), textX, cardRect.y + 12);
       ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
-      ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.fillText(`x${entry.count}`, textX, cardRect.y + 32);
+      ctx.font = runtime.layout.mode === "mobile-portrait"
+        ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.fillText(selected ? `x${entry.count} | ${game.ui.selection.rotation * 90} deg` : `x${entry.count}`, textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 28 : 32));
       if (selected) {
         ctx.fillStyle = "#b9642a";
-        ctx.fillText(`${game.ui.selection.rotation * 90} deg`, textX, cardRect.y + 50);
+        ctx.fillText("Selected", textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 42 : 50));
       }
     });
+  }
+
+  function renderLandscapeRack(player, rect) {
+    const content = drawPanel(rect, game.roundIndex === 0 ? "Starting Landscape Tiles" : `${getCurrentRound().name} Expansion Hand`, player.landscapeInventory.length ? "Pick a tile, rotate it in the turn tray, then tap the board." : "All landscape tiles from this phase are already placed.");
+    renderLandscapeRackCards(player, content);
   }
 
   function renderBoardPanel(rect) {
     const player = getPlayer();
     const subtitle = player ? `${player.name}'s 8x5 campground board` : "Player boards appear once the game begins";
-    drawPanel(rect, "Campground Board", subtitle);
+    const content = drawPanel(rect, "Campground Board", subtitle);
     if (!player) return;
+    if (runtime.layout.mode === "mobile-portrait" && game.phase === "setupLandscape") {
+      renderSegmentTabs({ x: content.x, y: content.y, w: content.w, h: 34 }, [
+        { id: "board", label: "Board" },
+        { id: "hand", label: `Tiles (${countRemainingLandscapeTiles(player.landscapeInventory)})` }
+      ], game.ui.boardView, (value) => {
+        game.ui.boardView = value;
+      }, "board-view");
+      const bodyRect = { x: content.x, y: content.y + 42, w: content.w, h: content.h - 42 };
+      if (game.ui.boardView === "hand") {
+        renderLandscapeRackCards(player, bodyRect);
+        return;
+      }
+      const geometry = getBoardGeometryForArea(bodyRect);
+      drawBoardLabels(geometry);
+      for (let row = 0; row < BOARD_ROWS; row += 1) {
+        for (let col = 0; col < BOARD_COLS; col += 1) drawBoardCell(player.board, geometry, row, col);
+      }
+      drawPlacementPreview(player, geometry);
+      return;
+    }
     const geometry = getBoardGeometry(rect);
     drawBoardLabels(geometry);
     for (let row = 0; row < BOARD_ROWS; row += 1) {
@@ -2446,6 +2693,7 @@
 
   function renderMarketPanel(rect) {
     const player = getPlayer();
+    const isPortrait = runtime.layout.mode === "mobile-portrait";
     const buildOpen = game.phase === "build" && !game.turn.actionTaken;
     const subtitle = buildOpen ? "Two amenity columns plus four campsite columns stay face-up. Each contractor costs $10,000." : "Contractors stay visible between turns, but hiring only works during the build phase.";
     const content = drawPanel(rect, "Contractor Market", subtitle);
@@ -2456,40 +2704,61 @@
     game.ui.marketPage = Core.clamp(game.ui.marketPage, 0, totalPages - 1);
     const startIndex = game.ui.marketPage * columnsPerPage;
     const visibleColumns = game.market.columns.slice(startIndex, startIndex + columnsPerPage);
+    const slotsPerPage = isPortrait ? 4 : 8;
+    const totalSlotPages = Math.max(1, Math.ceil(8 / slotsPerPage));
+    game.ui.marketSlotPage = Core.clamp(game.ui.marketSlotPage || 0, 0, totalSlotPages - 1);
+    const slotStartIndex = game.ui.marketSlotPage * slotsPerPage;
 
-    const headerHeight = 34;
+    const headerHeight = isPortrait ? 68 : 34;
     ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
-    ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.textAlign = "left";
+    ctx.font = isPortrait
+      ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = isPortrait ? "center" : "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(`Showing columns ${startIndex + 1}-${startIndex + visibleColumns.length} of ${game.market.columns.length}`, content.x, content.y + headerHeight / 2);
+    ctx.fillText(`Showing columns ${startIndex + 1}-${startIndex + visibleColumns.length} of ${game.market.columns.length}`, isPortrait ? content.x + content.w / 2 : content.x, content.y + (isPortrait ? 16 : headerHeight / 2));
     if (totalPages > 1) {
-      drawButton({ x: content.x + content.w - 104, y: content.y + 1, w: 46, h: 30 }, "<", () => {
+      drawButton({ x: content.x, y: content.y + 4, w: isPortrait ? 42 : 46, h: 30 }, "<", () => {
         game.ui.marketPage = Math.max(0, game.ui.marketPage - 1);
+        game.ui.marketSlotPage = 0;
       }, { id: "market-prev", enabled: game.ui.marketPage > 0 });
-      drawButton({ x: content.x + content.w - 50, y: content.y + 1, w: 46, h: 30 }, ">", () => {
+      drawButton({ x: content.x + content.w - (isPortrait ? 42 : 46), y: content.y + 4, w: isPortrait ? 42 : 46, h: 30 }, ">", () => {
         game.ui.marketPage = Math.min(totalPages - 1, game.ui.marketPage + 1);
+        game.ui.marketSlotPage = 0;
       }, { id: "market-next", enabled: game.ui.marketPage < totalPages - 1 });
+    }
+    if (isPortrait && totalSlotPages > 1) {
+      ctx.fillText(`Contractors ${slotStartIndex + 1}-${Math.min(8, slotStartIndex + slotsPerPage)} of 8`, content.x + content.w / 2, content.y + 46);
+      drawButton({ x: content.x, y: content.y + 32, w: 42, h: 30 }, "<", () => {
+        game.ui.marketSlotPage = Math.max(0, game.ui.marketSlotPage - 1);
+      }, { id: "market-slot-prev", enabled: game.ui.marketSlotPage > 0 });
+      drawButton({ x: content.x + content.w - 42, y: content.y + 32, w: 42, h: 30 }, ">", () => {
+        game.ui.marketSlotPage = Math.min(totalSlotPages - 1, game.ui.marketSlotPage + 1);
+      }, { id: "market-slot-next", enabled: game.ui.marketSlotPage < totalSlotPages - 1 });
     }
 
     const bodyRect = { x: content.x, y: content.y + headerHeight + 8, w: content.w, h: content.h - headerHeight - 8 };
     const colGap = 8;
     const rowGap = 6;
     const colWidth = (bodyRect.w - colGap * (visibleColumns.length - 1)) / visibleColumns.length;
-    const rowHeight = (bodyRect.h - rowGap * 8) / 9;
+    const visibleRowCount = 1 + slotsPerPage;
+    const rowHeight = (bodyRect.h - rowGap * (visibleRowCount - 1)) / visibleRowCount;
 
     visibleColumns.forEach((column, visibleIndex) => {
       const colRect = { x: bodyRect.x + visibleIndex * (colWidth + colGap), y: bodyRect.y, w: colWidth, h: bodyRect.h };
       Core.drawRoundedRect(ctx, colRect.x, colRect.y, colRect.w, rowHeight, 16, column.category === "amenity" ? "rgba(198, 224, 226, 0.96)" : "rgba(235, 224, 202, 0.96)", "rgba(108,80,54,0.16)", 1);
       ctx.fillStyle = "#4b3726";
-      ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.font = isPortrait
+        ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(column.label, colRect.x + colRect.w / 2, colRect.y + rowHeight / 2);
+      ctx.fillText(fitText(column.label, colRect.w - 16, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2);
 
-      column.slots.forEach((slot, slotIndex) => {
+      column.slots.slice(slotStartIndex, slotStartIndex + slotsPerPage).forEach((slot, visibleSlotIndex) => {
         const def = getCampDef(slot.typeId);
-        const slotRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap + slotIndex * (rowHeight + rowGap), w: colRect.w, h: rowHeight };
+        const slotIndex = slotStartIndex + visibleSlotIndex;
+        const slotRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap + visibleSlotIndex * (rowHeight + rowGap), w: colRect.w, h: rowHeight };
         const globalColumnIndex = startIndex + visibleIndex;
         const selected = game.ui.selection.source === "market" && game.ui.selection.columnIndex === globalColumnIndex && game.ui.selection.slotIndex === slotIndex;
         registerTarget(slotRect, buildOpen ? () => selectMarketTile(globalColumnIndex, slotIndex) : null, {
@@ -2506,10 +2775,12 @@
         const textX = miniRect.x + miniRect.w + 8;
         const priceX = slotRect.x + slotRect.w - 10;
         if (compact) {
-          ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+          ctx.font = isPortrait
+            ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+            : "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
-          ctx.fillText(def.shortLabel, textX, slotRect.y + slotRect.h / 2 + 0.5);
+          ctx.fillText(fitText(def.shortLabel, priceX - textX - 30, ctx.font), textX, slotRect.y + slotRect.h / 2 + 0.5);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.textAlign = "right";
           ctx.fillText("$10k", priceX, slotRect.y + slotRect.h / 2 + 0.5);
@@ -2517,7 +2788,7 @@
           ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
-          ctx.fillText(def.name, textX, slotRect.y + 7);
+          ctx.fillText(fitText(def.name, slotRect.w - miniRect.w - 28, ctx.font), textX, slotRect.y + 7);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.fillStyle = column.category === "amenity" ? "#3f6870" : "#7d5a37";
           ctx.fillText(column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
@@ -2678,7 +2949,7 @@
       ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      ctx.fillText(entry.name, rowRect.x + 56, rowRect.y + 10);
+      ctx.fillText(fitText(entry.name, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
       ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
       const status = game.phase === "build" && entry.passedThisRound ? " | passed this round" : "";
@@ -2726,26 +2997,38 @@
 
     if (game.overlay.kind === "rename-players") return;
 
-    const panelWidth = Math.min(runtime.layout.width - runtime.layout.pad * 2, runtime.layout.mode === "mobile-portrait" ? 360 : 760);
-    const panelHeight = game.overlay.kind === "start"
-      ? 340
+    const isPortrait = runtime.layout.mode === "mobile-portrait";
+    const maxHeight = runtime.layout.height - runtime.layout.pad * 2;
+    const panelWidth = Math.min(runtime.layout.width - runtime.layout.pad * 2, isPortrait ? runtime.layout.width - runtime.layout.pad * 2 : 760);
+    let panelHeight = game.overlay.kind === "start"
+      ? (isPortrait ? 378 : 340)
       : game.overlay.kind === "handoff"
-        ? 290
+        ? (isPortrait ? 322 : 290)
         : game.overlay.kind === "pause-menu"
-          ? 334
+          ? (isPortrait ? 360 : 334)
           : game.overlay.kind === "restart-confirm"
-            ? 246
+            ? (isPortrait ? 270 : 246)
             : game.overlay.kind === "about"
-              ? 332
-        : runtime.layout.mode === "mobile-portrait"
-          ? 430
-          : 460;
-    const rect = {
-      x: (runtime.layout.width - panelWidth) / 2,
-      y: (runtime.layout.height - panelHeight) / 2,
-      w: panelWidth,
-      h: panelHeight
-    };
+              ? (isPortrait ? 346 : 332)
+              : game.overlay.kind === "round-summary"
+                ? 176 + ((game.overlay.rows?.length || 0) * (isPortrait ? 56 : 62)) + 74
+                : game.overlay.kind === "final"
+                  ? 164 + ((game.overlay.rows?.length || 0) * (isPortrait ? 54 : 60)) + 78
+                  : (isPortrait ? 430 : 460);
+    panelHeight = Math.min(maxHeight, panelHeight);
+    const rect = isPortrait
+      ? {
+          x: runtime.layout.pad,
+          y: runtime.layout.height - runtime.layout.pad - panelHeight,
+          w: panelWidth,
+          h: panelHeight
+        }
+      : {
+          x: (runtime.layout.width - panelWidth) / 2,
+          y: (runtime.layout.height - panelHeight) / 2,
+          w: panelWidth,
+          h: panelHeight
+        };
 
     Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 28, "rgba(255, 248, 239, 0.98)", "rgba(108,80,54,0.18)", 1.6);
     ctx.fillStyle = "#3d2d20";
@@ -2781,6 +3064,7 @@
   }
 
   function renderStartOverlay(rect) {
+    const isPortrait = runtime.layout.mode === "mobile-portrait";
     ctx.fillText("Smore to Explore", rect.x + rect.w / 2, rect.y + 22);
     Core.drawWrappedText(ctx, "Single-canvas pass-and-play for 2 to 5 players. Each player builds a separate campground, while the contractor market and seasonal goals stay shared.", rect.x + rect.w / 2, rect.y + 70, rect.w - 48, 18, {
       font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
@@ -2789,21 +3073,21 @@
       maxLines: 4
     });
 
-    const chooserRect = { x: rect.x + 52, y: rect.y + 166, w: rect.w - 104, h: 74 };
+    const chooserRect = { x: rect.x + (isPortrait ? 26 : 52), y: rect.y + 166, w: rect.w - (isPortrait ? 52 : 104), h: isPortrait ? 82 : 74 };
     Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
     ctx.fillStyle = "#4a3524";
     ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText("Player Count", chooserRect.x + chooserRect.w / 2, chooserRect.y + 10);
-    drawButton({ x: chooserRect.x + 18, y: chooserRect.y + 30, w: 54, h: 28 }, "-", () => {
+    drawButton({ x: chooserRect.x + 18, y: chooserRect.y + 34, w: isPortrait ? 60 : 54, h: isPortrait ? 36 : 28 }, "-", () => {
       game.ui.configuredPlayerCount = Math.max(2, game.ui.configuredPlayerCount - 1);
     }, {
       id: "overlay-player-minus",
       scope: "overlay",
       enabled: game.ui.configuredPlayerCount > 2
     });
-    drawButton({ x: chooserRect.x + chooserRect.w - 72, y: chooserRect.y + 30, w: 54, h: 28 }, "+", () => {
+    drawButton({ x: chooserRect.x + chooserRect.w - (isPortrait ? 78 : 72), y: chooserRect.y + 34, w: isPortrait ? 60 : 54, h: isPortrait ? 36 : 28 }, "+", () => {
       game.ui.configuredPlayerCount = Math.min(5, game.ui.configuredPlayerCount + 1);
     }, {
       id: "overlay-player-plus",
@@ -2814,9 +3098,9 @@
     ctx.font = "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(game.ui.configuredPlayerCount), chooserRect.x + chooserRect.w / 2, chooserRect.y + 46);
+    ctx.fillText(String(game.ui.configuredPlayerCount), chooserRect.x + chooserRect.w / 2, chooserRect.y + (isPortrait ? 52 : 46));
 
-    drawButton({ x: rect.x + 80, y: rect.y + rect.h - 78, w: rect.w - 160, h: 44 }, "Start Campground", () => {
+    drawButton({ x: rect.x + (isPortrait ? 26 : 80), y: rect.y + rect.h - 78, w: rect.w - (isPortrait ? 52 : 160), h: 46 }, "Start Campground", () => {
       beginPlaySession(game.ui.configuredPlayerCount);
     }, {
       id: "overlay-start-game",
@@ -2892,6 +3176,7 @@
   }
 
   function renderRestartConfirmOverlay(rect) {
+    const isPortrait = runtime.layout.mode === "mobile-portrait";
     ctx.fillText("Restart game?", rect.x + rect.w / 2, rect.y + 24);
     Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, rect.y + 78, rect.w - 72, 20, {
       font: "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
@@ -2899,6 +3184,18 @@
       align: "center",
       maxLines: 4
     });
+    if (isPortrait) {
+      drawButton({ x: rect.x + 24, y: rect.y + rect.h - 118, w: rect.w - 48, h: 42 }, "Cancel", openPauseMenu, {
+        id: "overlay-restart-cancel",
+        scope: "overlay"
+      });
+      drawButton({ x: rect.x + 24, y: rect.y + rect.h - 66, w: rect.w - 48, h: 42 }, "Restart", restartToStartScreen, {
+        id: "overlay-restart-accept",
+        scope: "overlay",
+        variant: "danger"
+      });
+      return;
+    }
     const buttonWidth = Math.min(170, (rect.w - 92) / 2);
     const y = rect.y + rect.h - 74;
     drawButton({ x: rect.x + 32, y, w: buttonWidth, h: 42 }, "Cancel", openPauseMenu, {
@@ -2920,7 +3217,7 @@
       align: "center",
       maxLines: 7
     });
-    drawButton({ x: rect.x + rect.w / 2 - 110, y: rect.y + rect.h - 70, w: 220, h: 42 }, "Back", openPauseMenu, {
+    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : rect.w / 2 - 110), y: rect.y + rect.h - 70, w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : 220, h: 42 }, "Back", openPauseMenu, {
       id: "overlay-about-back",
       scope: "overlay",
       variant: "primary"
@@ -2951,7 +3248,7 @@
       ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      ctx.fillText(row.left, rowRect.x + 56, rowRect.y + 10);
+      ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
       ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
       ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 30);
@@ -2961,7 +3258,7 @@
       ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 17);
     });
 
-    drawButton({ x: rect.x + 90, y: rect.y + rect.h - 68, w: rect.w - 180, h: 42 }, `Start ${ROUND_DEFS[game.roundIndex + 1].name}`, startNextRound, {
+    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : 90), y: rect.y + rect.h - 68, w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : rect.w - 180, h: 42 }, `Start ${ROUND_DEFS[game.roundIndex + 1].name}`, startNextRound, {
       id: "overlay-next-round",
       scope: "overlay",
       variant: "primary"
@@ -2992,7 +3289,7 @@
       ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      ctx.fillText(row.left, rowRect.x + 56, rowRect.y + 10);
+      ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
       ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
       ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 29);
@@ -3002,7 +3299,7 @@
       ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 16);
     });
 
-    drawButton({ x: rect.x + 90, y: rect.y + rect.h - 66, w: rect.w - 180, h: 42 }, "Back to Start", restartToStartScreen, {
+    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : 90), y: rect.y + rect.h - 66, w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : rect.w - 180, h: 42 }, "Back to Start", restartToStartScreen, {
       id: "overlay-restart",
       scope: "overlay",
       variant: "primary"
