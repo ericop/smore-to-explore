@@ -22,6 +22,91 @@
   const ACTIVE_DIRECTOR_OBJECTIVE_COUNT = 3;
   const MAX_FEED_ITEMS = 6;
   const PLAYER_NAME_STORAGE_KEY = "smore-to-explore-player-names-v1";
+  const GAME_PITCH = "Build the smartest campground through three summer rounds, score shared goals, and win the final Camp Director review.";
+  const GAME_INTRO = "Pass one device around the table and grow your own campground one turn at a time.";
+  const HOW_TO_STEPS = [
+    {
+      title: "One Device, Many Turns",
+      lead: "Smore to Explore is a local pass-and-play campground strategy game. Everyone uses the same phone, tablet, or laptop and hands it to the next player after each turn.",
+      bullets: [
+        "Each player builds a separate 8x5 campground board.",
+        "The contractor market and seasonal goals stay shared by the whole table.",
+        "After Late Summer and the final director review, the highest total score wins."
+      ],
+      reminder: "Use the handoff screen as the signal to physically pass the device."
+    },
+    {
+      title: "The Big Picture",
+      lead: "You shape your campground over three summers. First you lay new land, then you buy and place camp features that fit that layout.",
+      bullets: [
+        "Grow roads, lakefront parcels, forests, and open scenic spaces.",
+        "Spend cash on campsites, cabins, and amenities that match your terrain.",
+        "Plan for scoring goals instead of simply filling every open space."
+      ],
+      reminder: "A crowded board is not automatically a strong board. Good layouts leave room for later seasons."
+    },
+    {
+      title: "How A Turn Works",
+      lead: "Each season has a landscape setup phase and a build phase. The game moves in a practical rhythm once you know which phase you are in.",
+      bullets: [
+        "During landscape setup, place every tile in your current hand before the market opens.",
+        "During build, buy one visible contractor tile and place it, or pass for the rest of the round.",
+        "When every player has passed, the round scores and the next season begins."
+      ],
+      reminder: "A build turn is only one buy-and-place action, so check the board before you spend."
+    },
+    {
+      title: "Board And Placement Rules",
+      lead: "Landscape placement is strict, especially around roads and the Entrance tile. Most early mistakes come from ignoring those road rules.",
+      bullets: [
+        "The very first tile must be the Entrance, and its gate must face the outside edge of the board.",
+        "Every new landscape tile must touch your current campground, and road edges must connect to matching road edges.",
+        "Open edges cannot crash into an existing road, and the Camp Office must connect back to the Entrance road network by the end of setup."
+      ],
+      reminder: "Rotate slowly and double-check the road direction before placing. One bad bend can block future expansion."
+    },
+    {
+      title: "Money And The Market",
+      lead: "Contractor tiles come from the shared market, and every contractor costs $10,000. The market is public, so everyone can plan around the same options.",
+      bullets: [
+        "The market shows two amenity columns and four camp columns while the build phase is open.",
+        "When you buy a contractor, that market slot refills immediately.",
+        "You cannot reserve a tile for later and you cannot place a contractor you cannot afford."
+      ],
+      reminder: "Check the parcel first, then spend the money. A tile can be affordable and still be illegal to place."
+    },
+    {
+      title: "Goals And Scoring",
+      lead: "Most points come from objectives, not from simply placing the fanciest tiles. The scoring rewards planning and layout efficiency.",
+      bullets: [
+        "Shared seasonal goals score at the end of each summer for every player.",
+        "Camp Director goals reveal after Early Summer and score during the final review.",
+        "A layout that looks nice can still score poorly if it ignores the current public goals."
+      ],
+      reminder: "Use the score and goals tabs often. The best placements usually help both the board and the objective row."
+    },
+    {
+      title: "Seasons And Progression",
+      lead: "The full game runs through Early Summer, Mid Summer, and Late Summer. Each season expands the same board instead of starting over.",
+      bullets: [
+        "The opening setup uses 10 starting landscape tiles.",
+        "At the start of Mid and Late Summer, every player gains $50,000 and 8 new expansion landscape tiles.",
+        "After Late Summer scoring, director goals are added and the highest total score wins."
+      ],
+      reminder: "Treat every season as setup for the next one. Road and terrain decisions keep mattering later."
+    },
+    {
+      title: "Common Gotchas",
+      lead: "These are the mistakes new groups run into most often. Catching them early makes the game much smoother.",
+      bullets: [
+        "Pass the device after the handoff prompt so the next player starts with a clean turn view.",
+        "Entrance and Camp Office parcels stay reserved. You cannot build camps or amenities on them.",
+        "Some camp tiles need road edges, some need stronger two-sided road access, and waterfront/scenic rules are enforced when you place.",
+        "Undo is easiest during landscape setup before you continue, so fix a bad road immediately."
+      ],
+      reminder: "If a move feels awkward, inspect the parcel before tapping. Most rules questions come down to road links, terrain matching, and planning ahead."
+    }
+  ];
 
   const SIDES = ["north", "east", "south", "west"];
   const OPPOSITE = {
@@ -240,6 +325,11 @@
   function createUiState(playerCount = 2) {
     return {
       configuredPlayerCount: playerCount,
+      showStartScreen: true,
+      gameActive: false,
+      howToOpen: false,
+      howToStep: 0,
+      aboutOpen: false,
       mobileTab: "board",
       boardView: "hand",
       sideTab: "objectives",
@@ -414,14 +504,11 @@
       market: createMarket(),
       message: {
         tone: "info",
-        title: "Pass-and-play ready",
-        body: "Choose a player count, then build separate campgrounds on one shared device."
+        title: "Welcome to camp",
+        body: "Open the rules, set your player count, and start a fresh pass-and-play game from the main menu."
       },
       feed: [],
-      overlay: {
-        kind: "start",
-        blocking: true
-      },
+      overlay: null,
       ui: createUiState(playerCount),
       turn: createTurnState()
     };
@@ -450,7 +537,11 @@
       },
       feed: [],
       overlay: null,
-      ui: createUiState(playerCount),
+      ui: {
+        ...createUiState(playerCount),
+        showStartScreen: false,
+        gameActive: true
+      },
       turn: createTurnState()
     };
 
@@ -1187,6 +1278,39 @@
     };
   }
 
+  function frontScreenActive() {
+    return !!(game.ui.showStartScreen || game.ui.howToOpen || game.ui.aboutOpen);
+  }
+
+  function openHowToScreen(step = 0) {
+    nameEditor?.close();
+    game.ui.howToOpen = true;
+    game.ui.aboutOpen = false;
+    game.ui.howToStep = Core.clamp(step, 0, HOW_TO_STEPS.length - 1);
+  }
+
+  function closeHowToScreen() {
+    game.ui.howToOpen = false;
+  }
+
+  function openAboutScreen() {
+    nameEditor?.close();
+    game.ui.aboutOpen = true;
+    game.ui.howToOpen = false;
+  }
+
+  function closeAboutScreen() {
+    game.ui.aboutOpen = false;
+  }
+
+  function adjustConfiguredPlayerCount(delta) {
+    game.ui.configuredPlayerCount = Core.clamp((game.ui.configuredPlayerCount || 2) + delta, 2, 5);
+  }
+
+  function startNewGameFromMenu() {
+    beginPlaySession(game.ui.configuredPlayerCount || 2);
+  }
+
   function beginPlaySession(playerCount) {
     game = createGameState(playerCount);
   }
@@ -1221,11 +1345,7 @@
   }
 
   function openAboutOverlay() {
-    nameEditor?.close();
-    game.overlay = {
-      kind: "about",
-      blocking: true
-    };
+    openAboutScreen();
   }
 
   function applyPlayerNamesFromEditor() {
@@ -1592,10 +1712,12 @@
   }
 
   function findTargetAtPoint(point) {
-    const overlayOnly = !!game.overlay?.blocking;
+    const frontOnly = frontScreenActive();
+    const overlayOnly = !frontOnly && !!game.overlay?.blocking;
     for (let index = runtime.targets.length - 1; index >= 0; index -= 1) {
       const target = runtime.targets[index];
       if (!target.enabled) continue;
+      if (frontOnly && target.scope !== "front") continue;
       if (overlayOnly && target.scope !== "overlay") continue;
       if (Core.pointInRect(point, target.rect)) return target;
     }
@@ -3029,6 +3151,325 @@
     }
   }
 
+  function getFrontScreenKind() {
+    if (game.ui.howToOpen) return "howto";
+    if (game.ui.aboutOpen) return "about";
+    if (game.ui.showStartScreen) return "menu";
+    return null;
+  }
+
+  function drawScreenButton(rect, label, onClick, options = {}) {
+    drawButton(rect, label, onClick, {
+      ...options,
+      scope: "front"
+    });
+  }
+
+  function drawFrontScreenShell(title, subtitle = "", options = {}) {
+    const shell = {
+      x: runtime.layout.pad,
+      y: runtime.layout.pad,
+      w: runtime.layout.width - runtime.layout.pad * 2,
+      h: runtime.layout.height - runtime.layout.pad * 2
+    };
+    Core.drawRoundedRect(ctx, shell.x, shell.y, shell.w, shell.h, 30, "rgba(255, 248, 239, 0.97)", "rgba(108,80,54,0.18)", 1.6);
+    Core.drawRoundedRect(ctx, shell.x + 1, shell.y + 1, shell.w - 2, shell.h - 2, 29, null, "rgba(255,255,255,0.22)", 1);
+
+    ctx.fillStyle = "rgba(233, 213, 184, 0.45)";
+    ctx.beginPath();
+    ctx.arc(shell.x + shell.w * 0.15, shell.y + shell.h * 0.14, Math.min(shell.w, shell.h) * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(shell.x + shell.w * 0.84, shell.y + shell.h * 0.18, Math.min(shell.w, shell.h) * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#3d2d20";
+    ctx.font = options.titleFont || (runtime.layout.mode === "mobile-portrait"
+      ? "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 34px 'Avenir Next', 'Trebuchet MS', sans-serif");
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(title, shell.x + 22, shell.y + 20);
+
+    if (subtitle) {
+      Core.drawWrappedText(ctx, subtitle, shell.x + 22, shell.y + 62, Math.min(shell.w - 44, runtime.layout.mode === "desktop" ? 620 : shell.w - 44), runtime.layout.mode === "mobile-portrait" ? 18 : 20, {
+        font: runtime.layout.mode === "mobile-portrait"
+          ? "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+          : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.84)",
+        maxLines: runtime.layout.mode === "mobile-portrait" ? 3 : 2
+      });
+    }
+
+    if (options.onClose) {
+      drawScreenButton({ x: shell.x + shell.w - 62, y: shell.y + 18, w: 40, h: 40 }, "X", options.onClose, {
+        id: `${options.scopeKey || "screen"}-close`,
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    }
+
+    return {
+      shell,
+      body: {
+        x: shell.x + 22,
+        y: shell.y + (subtitle ? 120 : 82),
+        w: shell.w - 44,
+        h: shell.h - (subtitle ? 142 : 104)
+      }
+    };
+  }
+
+  function renderHeroPillRow(body) {
+    const pills = [
+      { text: "2-5 Players", fill: "#efe2ca", textColor: "#5f4731" },
+      { text: "Pass-and-Play", fill: "#dfead4", textColor: "#446038" },
+      { text: "3 Summer Rounds", fill: "#e2d8ef", textColor: "#5e4b78" }
+    ];
+    let x = body.x;
+    let y = body.y;
+    const rowHeight = 28;
+    pills.forEach((pill) => {
+      ctx.save();
+      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      const estimatedWidth = ctx.measureText(pill.text).width + 28;
+      ctx.restore();
+      if (x > body.x && x + estimatedWidth > body.x + body.w) {
+        x = body.x;
+        y += rowHeight + 8;
+      }
+      const width = drawPill(x, y, pill.text, pill.fill, pill.textColor, {
+        height: rowHeight,
+        paddingX: 14,
+        font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      x += width + 8;
+    });
+    return y - body.y + rowHeight;
+  }
+
+  function renderMainMenuScreen() {
+    const compact = runtime.layout.mode === "mobile-portrait";
+    const { shell, body } = drawFrontScreenShell("Smore to Explore", GAME_PITCH);
+    const pillHeight = renderHeroPillRow(body);
+
+    const introMetrics = Core.drawWrappedText(ctx, GAME_INTRO, body.x, body.y + pillHeight + 16, Math.min(body.w, compact ? body.w : 560), compact ? 18 : 20, {
+      font: compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.86)",
+      maxLines: 2
+    });
+
+    const actionTop = body.y + pillHeight + introMetrics.height + (compact ? 30 : 36);
+    const actionGap = compact ? 12 : 16;
+    const rowHeight = compact ? 78 : 86;
+    const primaryWidth = compact ? body.w : Math.min(body.w, 620);
+    const rowX = compact ? body.x : body.x + (body.w - primaryWidth) / 2;
+    const pickerWidth = compact ? Math.max(176, Math.round(primaryWidth * 0.52)) : Math.max(240, Math.round(primaryWidth * 0.46));
+    const startWidth = primaryWidth - pickerWidth - actionGap;
+    const pickerRect = { x: rowX, y: actionTop, w: pickerWidth, h: rowHeight };
+    const startRect = { x: pickerRect.x + pickerRect.w + actionGap, y: actionTop, w: startWidth, h: rowHeight };
+
+    Core.drawRoundedRect(ctx, pickerRect.x, pickerRect.y, pickerRect.w, pickerRect.h, 22, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
+    ctx.fillStyle = "#4a3524";
+    ctx.font = compact ? "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("Player Count", pickerRect.x + pickerRect.w / 2, pickerRect.y + 10);
+    drawScreenButton({ x: pickerRect.x + 14, y: pickerRect.y + (compact ? 38 : 42), w: compact ? 52 : 58, h: compact ? 28 : 32 }, "-", () => adjustConfiguredPlayerCount(-1), {
+      id: "menu-player-minus",
+      enabled: game.ui.configuredPlayerCount > 2
+    });
+    drawScreenButton({ x: pickerRect.x + pickerRect.w - (compact ? 66 : 72), y: pickerRect.y + (compact ? 38 : 42), w: compact ? 52 : 58, h: compact ? 28 : 32 }, "+", () => adjustConfiguredPlayerCount(1), {
+      id: "menu-player-plus",
+      enabled: game.ui.configuredPlayerCount < 5
+    });
+    ctx.font = compact ? "800 24px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 30px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(game.ui.configuredPlayerCount), pickerRect.x + pickerRect.w / 2, pickerRect.y + (compact ? 54 : 58));
+
+    drawScreenButton(startRect, "Start New Game", startNewGameFromMenu, {
+      id: "menu-start",
+      variant: "primary",
+      font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
+
+    const secondaryTop = startRect.y + startRect.h + actionGap;
+    if (compact) {
+      drawScreenButton({ x: rowX, y: secondaryTop, w: primaryWidth, h: 52 }, "How to Play", () => openHowToScreen(0), {
+        id: "menu-howto",
+        variant: "warning",
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      drawScreenButton({ x: rowX, y: secondaryTop + 64, w: primaryWidth, h: 46 }, "About", openAboutScreen, {
+        id: "menu-about",
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    } else {
+      const secondaryWidth = (primaryWidth - actionGap) / 2;
+      drawScreenButton({ x: rowX, y: secondaryTop, w: secondaryWidth, h: 54 }, "How to Play", () => openHowToScreen(0), {
+        id: "menu-howto",
+        variant: "warning",
+        font: "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      drawScreenButton({ x: rowX + secondaryWidth + actionGap, y: secondaryTop, w: secondaryWidth, h: 54 }, "About", openAboutScreen, {
+        id: "menu-about",
+        font: "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    }
+
+    ctx.fillStyle = "rgba(82, 61, 44, 0.7)";
+    ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Local prototype | Best on one shared device around the table", shell.x + shell.w / 2, shell.y + shell.h - 20);
+  }
+
+  function drawTutorialStepCards(body, step) {
+    const compact = runtime.layout.mode === "mobile-portrait";
+    ctx.fillStyle = "#5a4330";
+    ctx.font = compact ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(`Step ${game.ui.howToStep + 1} of ${HOW_TO_STEPS.length}`, body.x, body.y);
+
+    const dotsY = body.y + 4;
+    HOW_TO_STEPS.forEach((_, index) => {
+      const active = index === game.ui.howToStep;
+      const dotX = body.x + body.w - 12 - (HOW_TO_STEPS.length - 1 - index) * 16;
+      ctx.fillStyle = active ? "#ca6f36" : "rgba(108,80,54,0.22)";
+      ctx.beginPath();
+      ctx.arc(dotX, dotsY + 6, active ? 5 : 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = "#3d2d20";
+    ctx.font = compact ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText(step.title, body.x, body.y + 28);
+    const leadMetrics = Core.drawWrappedText(ctx, step.lead, body.x, body.y + 64, body.w, compact ? 18 : 20, {
+      font: compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.86)",
+      maxLines: compact ? 4 : 3
+    });
+
+    const cardTop = body.y + 76 + leadMetrics.height;
+    const cardGap = compact ? 8 : 10;
+    const reminderHeight = compact ? 56 : 62;
+    const availableForCards = body.h - leadMetrics.height - reminderHeight - (compact ? 116 : 126);
+    const cardHeight = Math.max(compact ? 48 : 56, Math.min(compact ? 66 : 76, Math.floor((availableForCards - cardGap * (step.bullets.length - 1)) / step.bullets.length)));
+    step.bullets.forEach((bullet, index) => {
+      const cardRect = { x: body.x, y: cardTop + index * (cardHeight + cardGap), w: body.w, h: cardHeight };
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
+      Core.drawRoundedRect(ctx, cardRect.x + 10, cardRect.y + 10, 24, 24, 12, "rgba(202, 111, 54, 0.16)");
+      ctx.fillStyle = "#b7632c";
+      ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(index + 1), cardRect.x + 22, cardRect.y + 22);
+      Core.drawWrappedText(ctx, bullet, cardRect.x + 44, cardRect.y + 10, cardRect.w - 56, compact ? 14 : 16, {
+        font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "#4a3524",
+        maxLines: 3
+      });
+    });
+
+    const reminderRect = { x: body.x, y: body.y + body.h - (compact ? 104 : 110), w: body.w, h: reminderHeight };
+    Core.drawRoundedRect(ctx, reminderRect.x, reminderRect.y, reminderRect.w, reminderRect.h, 18, "rgba(233, 243, 224, 0.98)", "rgba(95, 141, 101, 0.22)", 1.1);
+    ctx.fillStyle = "#3f6b47";
+    ctx.font = compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("Keep in mind", reminderRect.x + 12, reminderRect.y + 10);
+    Core.drawWrappedText(ctx, step.reminder, reminderRect.x + 12, reminderRect.y + 28, reminderRect.w - 24, compact ? 14 : 16, {
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "#456049",
+      maxLines: 2
+    });
+  }
+
+  function renderHowToScreen() {
+    const compact = runtime.layout.mode === "mobile-portrait";
+    const step = HOW_TO_STEPS[game.ui.howToStep];
+    const { shell, body } = drawFrontScreenShell("How to Play", "A quick guided walkthrough of the real turn flow, placement rules, scoring, and the mistakes new groups usually make.", {
+      onClose: closeHowToScreen,
+      scopeKey: "howto"
+    });
+    drawTutorialStepCards(body, step);
+
+    const backWidth = compact ? 92 : 120;
+    const nextWidth = compact ? 110 : 150;
+    const navY = shell.y + shell.h - (compact ? 62 : 68);
+    drawScreenButton({ x: shell.x + 22, y: navY, w: backWidth, h: compact ? 40 : 44 }, "Back", () => {
+      game.ui.howToStep = Math.max(0, game.ui.howToStep - 1);
+    }, {
+      id: "howto-back",
+      enabled: game.ui.howToStep > 0
+    });
+    drawScreenButton({ x: shell.x + shell.w - nextWidth - 22, y: navY, w: nextWidth, h: compact ? 40 : 44 }, game.ui.howToStep === HOW_TO_STEPS.length - 1 ? "Done" : "Next", () => {
+      if (game.ui.howToStep === HOW_TO_STEPS.length - 1) closeHowToScreen();
+      else game.ui.howToStep = Math.min(HOW_TO_STEPS.length - 1, game.ui.howToStep + 1);
+    }, {
+      id: "howto-next",
+      variant: "primary"
+    });
+  }
+
+  function renderAboutScreen() {
+    const compact = runtime.layout.mode === "mobile-portrait";
+    const { shell, body } = drawFrontScreenShell("About Smore to Explore", "A local pass-and-play campground building game for 2 to 5 players.", {
+      onClose: closeAboutScreen,
+      scopeKey: "about"
+    });
+
+    const cards = [
+      {
+        title: "What it is",
+        text: "Each player builds a separate campground on the same shared device while the contractor market and seasonal goals stay public for the whole table."
+      },
+      {
+        title: "How it plays",
+        text: "Lay out your roads and terrain, buy camp features that fit the board, and score seasonal plus director goals over three summer rounds."
+      },
+      {
+        title: "Credits",
+        text: "Created by EOP and his wife with help from Codex as a browser prototype for a campground board game idea."
+      }
+    ];
+
+    const cardGap = compact ? 10 : 14;
+    const cardHeight = compact ? 92 : 100;
+    cards.forEach((card, index) => {
+      const rect = { x: body.x, y: body.y + index * (cardHeight + cardGap), w: body.w, h: cardHeight };
+      Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
+      ctx.fillStyle = "#3d2d20";
+      ctx.font = compact ? "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 17px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(card.title, rect.x + 14, rect.y + 12);
+      Core.drawWrappedText(ctx, card.text, rect.x + 14, rect.y + 38, rect.w - 28, compact ? 16 : 18, {
+        font: compact ? "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.86)",
+        maxLines: compact ? 3 : 3
+      });
+    });
+
+    drawScreenButton({ x: shell.x + shell.w - 180, y: shell.y + shell.h - 62, w: 158, h: compact ? 40 : 44 }, "Close", closeAboutScreen, {
+      id: "about-back",
+      variant: "primary"
+    });
+  }
+
+  function renderFrontScreen() {
+    const kind = getFrontScreenKind();
+    if (kind === "howto") {
+      renderHowToScreen();
+      return;
+    }
+    if (kind === "about") {
+      renderAboutScreen();
+      return;
+    }
+    renderMainMenuScreen();
+  }
+
   function renderOverlay() {
     if (!game.overlay) return;
     ctx.fillStyle = "rgba(47, 34, 23, 0.58)";
@@ -3225,23 +3666,24 @@
 
     const buttons = [
       { label: "Resume", onClick: closeOverlay, variant: "primary", id: "overlay-resume" },
+      { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
       { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
-      { label: "About", onClick: openAboutOverlay, id: "overlay-about" },
+      { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
       { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
     ];
     if (compact) {
       const cols = 2;
       const gap = 8;
-      const startY = rect.y + 88;
+      const startY = rect.y + 82;
       const buttonWidth = (rect.w - 48 - gap) / cols;
       buttons.forEach((button, index) => {
         const col = index % cols;
         const row = Math.floor(index / cols);
         drawButton({
           x: rect.x + 20 + col * (buttonWidth + gap),
-          y: startY + row * (34 + gap),
+          y: startY + row * (32 + gap),
           w: buttonWidth,
-          h: 34
+          h: 32
         }, button.label, button.onClick, {
           id: button.id,
           scope: "overlay",
@@ -3252,14 +3694,14 @@
       return;
     }
     const buttonWidth = Math.min(rect.w - 112, 280);
-    const startY = rect.y + 118;
-    const gap = 12;
+    const startY = rect.y + 100;
+    const gap = 10;
     buttons.forEach((button, index) => {
       drawButton({
         x: rect.x + (rect.w - buttonWidth) / 2,
-        y: startY + index * (42 + gap),
+        y: startY + index * (36 + gap),
         w: buttonWidth,
-        h: 42
+        h: 36
       }, button.label, button.onClick, {
         id: button.id,
         scope: "overlay",
@@ -3417,6 +3859,11 @@
     if (!game.directorRevealed && game.ui.objectiveTab === "director") game.ui.objectiveTab = "shared";
 
     renderBackground();
+    if (!game.ui.gameActive || frontScreenActive()) {
+      renderFrontScreen();
+      requestAnimationFrame(renderFrame);
+      return;
+    }
     renderTopBar(runtime.layout.topBar);
 
     if (runtime.layout.mode === "desktop") {
