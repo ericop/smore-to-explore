@@ -2761,15 +2761,15 @@
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       const textX = miniRect.x + miniRect.w + 10;
-      ctx.fillText(fitText(def.name, cardRect.w - (textX - cardRect.x) - 10, ctx.font), textX, cardRect.y + 12);
+      const inlineLabel = `${def.name} x${entry.count}`;
+      ctx.fillText(fitText(inlineLabel, cardRect.w - (textX - cardRect.x) - 10, ctx.font), textX, cardRect.y + 12);
       ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
       ctx.font = runtime.layout.mode === "mobile-portrait"
         ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
         : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.fillText(selected ? `x${entry.count} | ${game.ui.selection.rotation * 90} deg` : `x${entry.count}`, textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 28 : 32));
       if (selected) {
         ctx.fillStyle = "#b9642a";
-        ctx.fillText("Selected", textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 42 : 50));
+        ctx.fillText(`Selected | ${game.ui.selection.rotation * 90} deg`, textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 28 : 32));
       }
     });
   }
