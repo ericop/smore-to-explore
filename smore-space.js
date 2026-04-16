@@ -2990,6 +2990,45 @@
     else renderObjectivesPanel(runtime.layout.sideBody);
   }
 
+  function isCompactOverlayRect(rect) {
+    return runtime.layout.mode !== "desktop" && rect.h <= 250;
+  }
+
+  function drawCompactOverlayRows(rect, rows, options = {}) {
+    const startY = options.startY ?? rect.y + 92;
+    const buttonTop = options.buttonTop ?? rect.y + rect.h - 50;
+    const rowGap = options.rowGap ?? 6;
+    const rowHeight = options.rowHeight ?? 32;
+    const availableHeight = Math.max(0, buttonTop - startY - 8);
+    const visibleCount = Math.max(0, Math.min(rows.length, Math.floor((availableHeight + rowGap) / (rowHeight + rowGap))));
+    const visibleRows = rows.slice(0, visibleCount);
+
+    visibleRows.forEach((row, index) => {
+      const rowRect = { x: rect.x + 18, y: startY + index * (rowHeight + rowGap), w: rect.w - 36, h: rowHeight };
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
+      ctx.fillStyle = row.player.color.text;
+      ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
+      ctx.fillStyle = "#432e1e";
+      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
+      ctx.textAlign = "right";
+      ctx.fillText(fitText(row.right, 78, ctx.font), rowRect.x + rowRect.w - 10, rowRect.y + 10);
+    });
+
+    if (rows.length > visibleRows.length) {
+      ctx.fillStyle = "rgba(82, 61, 44, 0.74)";
+      ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`+${rows.length - visibleRows.length} more players`, rect.x + rect.w / 2, startY + visibleRows.length * (rowHeight + rowGap) + 6);
+    }
+  }
+
   function renderOverlay() {
     if (!game.overlay) return;
     ctx.fillStyle = "rgba(47, 34, 23, 0.58)";
@@ -2998,6 +3037,7 @@
     if (game.overlay.kind === "rename-players") return;
 
     const isPortrait = runtime.layout.mode === "mobile-portrait";
+    const isMobileOverlay = runtime.layout.mode !== "desktop";
     const maxHeight = runtime.layout.height - runtime.layout.pad * 2;
     const panelWidth = Math.min(runtime.layout.width - runtime.layout.pad * 2, isPortrait ? runtime.layout.width - runtime.layout.pad * 2 : 760);
     let panelHeight = game.overlay.kind === "start"
@@ -3015,7 +3055,7 @@
                 : game.overlay.kind === "final"
                   ? 164 + ((game.overlay.rows?.length || 0) * (isPortrait ? 54 : 60)) + 78
                   : (isPortrait ? 430 : 460);
-    panelHeight = Math.min(maxHeight, panelHeight);
+    panelHeight = Math.min(maxHeight, isMobileOverlay ? 250 : panelHeight);
     const rect = isPortrait
       ? {
           x: runtime.layout.pad,
@@ -3065,25 +3105,26 @@
 
   function renderStartOverlay(rect) {
     const isPortrait = runtime.layout.mode === "mobile-portrait";
-    const titleY = rect.y + (isPortrait ? 20 : 18);
-    const introY = titleY + 48;
+    const compact = isCompactOverlayRect(rect);
+    const titleY = rect.y + (compact ? 14 : (isPortrait ? 20 : 18));
+    const introY = titleY + (compact ? 36 : 48);
     const horizontalInset = isPortrait ? 26 : 40;
     ctx.fillText("Smore to Explore", rect.x + rect.w / 2, titleY);
     const introMetrics = Core.drawWrappedText(ctx, "Build the best campground over three summer rounds as each player shapes a separate board on the same device. Draft from the shared contractor market, chase seasonal goals, and pass the game to the next player after each turn.", rect.x + rect.w / 2, introY, rect.w - horizontalInset * 2, isPortrait ? 17 : 18, {
-      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.86)",
       align: "center",
-      maxLines: isPortrait ? 4 : 3
+      maxLines: compact ? 3 : (isPortrait ? 4 : 3)
     });
-    const chooserTop = introY + introMetrics.height + (isPortrait ? 16 : 14);
-    const rowGap = isPortrait ? 12 : 14;
+    const chooserTop = introY + introMetrics.height + (compact ? 10 : (isPortrait ? 16 : 14));
+    const rowGap = compact ? 8 : (isPortrait ? 12 : 14);
     const rowX = rect.x + (isPortrait ? 26 : 44);
     const rowW = rect.w - (isPortrait ? 52 : 88);
     const buttonWidth = Math.max(
-      isPortrait ? 118 : 184,
-      Math.min(isPortrait ? 142 : 220, Math.round(rowW * (isPortrait ? 0.34 : 0.34)))
+      compact ? 108 : (isPortrait ? 118 : 184),
+      Math.min(compact ? 128 : (isPortrait ? 142 : 220), Math.round(rowW * (compact ? 0.36 : 0.34)))
     );
-    const rowHeight = isPortrait ? 82 : 74;
+    const rowHeight = compact ? 58 : (isPortrait ? 82 : 74);
     const chooserRect = {
       x: rowX,
       y: chooserTop,
@@ -3092,18 +3133,18 @@
     };
     Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
     ctx.fillStyle = "#4a3524";
-    ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = compact ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText("Player Count", chooserRect.x + chooserRect.w / 2, chooserRect.y + 10);
-    drawButton({ x: chooserRect.x + 18, y: chooserRect.y + 34, w: isPortrait ? 60 : 54, h: isPortrait ? 36 : 28 }, "-", () => {
+    ctx.fillText("Players", chooserRect.x + chooserRect.w / 2, chooserRect.y + (compact ? 6 : 10));
+    drawButton({ x: chooserRect.x + 12, y: chooserRect.y + (compact ? 24 : 34), w: compact ? 46 : (isPortrait ? 60 : 54), h: compact ? 26 : (isPortrait ? 36 : 28) }, "-", () => {
       game.ui.configuredPlayerCount = Math.max(2, game.ui.configuredPlayerCount - 1);
     }, {
       id: "overlay-player-minus",
       scope: "overlay",
       enabled: game.ui.configuredPlayerCount > 2
     });
-    drawButton({ x: chooserRect.x + chooserRect.w - (isPortrait ? 78 : 72), y: chooserRect.y + 34, w: isPortrait ? 60 : 54, h: isPortrait ? 36 : 28 }, "+", () => {
+    drawButton({ x: chooserRect.x + chooserRect.w - (compact ? 58 : (isPortrait ? 78 : 72)), y: chooserRect.y + (compact ? 24 : 34), w: compact ? 46 : (isPortrait ? 60 : 54), h: compact ? 26 : (isPortrait ? 36 : 28) }, "+", () => {
       game.ui.configuredPlayerCount = Math.min(5, game.ui.configuredPlayerCount + 1);
     }, {
       id: "overlay-player-plus",
@@ -3111,10 +3152,10 @@
       enabled: game.ui.configuredPlayerCount < 5
     });
     ctx.fillStyle = "#4a3524";
-    ctx.font = "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = compact ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(game.ui.configuredPlayerCount), chooserRect.x + chooserRect.w / 2, chooserRect.y + (isPortrait ? 52 : 46));
+    ctx.fillText(String(game.ui.configuredPlayerCount), chooserRect.x + chooserRect.w / 2, chooserRect.y + (compact ? 37 : (isPortrait ? 52 : 46)));
 
     drawButton({ x: chooserRect.x + chooserRect.w + rowGap, y: chooserRect.y, w: buttonWidth, h: rowHeight }, "Start Campground", () => {
       beginPlaySession(game.ui.configuredPlayerCount);
@@ -3122,41 +3163,50 @@
       id: "overlay-start-game",
       scope: "overlay",
       variant: "primary",
-      font: isPortrait
+      font: compact
+        ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : isPortrait
         ? "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
         : "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
   }
 
   function renderHandoffOverlay(rect) {
+    const compact = isCompactOverlayRect(rect);
     const player = getPlayer();
-    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + 24);
+    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 24));
     const badgeText = `${getCurrentRound().name} | ${getPhaseLabel()}`;
     ctx.save();
-    ctx.font = runtime.layout.mode === "mobile-portrait"
+    ctx.font = compact
+      ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : runtime.layout.mode === "mobile-portrait"
       ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    const badgeWidth = Math.min(rect.w - 120, Math.max(250, ctx.measureText(badgeText).width + 48));
+    const badgeWidth = compact
+      ? Math.min(rect.w - 48, Math.max(170, ctx.measureText(badgeText).width + 28))
+      : Math.min(rect.w - 120, Math.max(250, ctx.measureText(badgeText).width + 48));
     ctx.restore();
-    const badgeRect = { x: rect.x + (rect.w - badgeWidth) / 2, y: rect.y + 68, w: badgeWidth, h: 44 };
+    const badgeRect = { x: rect.x + (rect.w - badgeWidth) / 2, y: rect.y + (compact ? 46 : 68), w: badgeWidth, h: compact ? 30 : 44 };
     Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, "rgba(222, 162, 102, 0.20)", "rgba(177, 111, 54, 0.34)", 1.4);
     ctx.fillStyle = "#6c4325";
-    ctx.font = runtime.layout.mode === "mobile-portrait"
+    ctx.font = compact
+      ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : runtime.layout.mode === "mobile-portrait"
       ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(badgeText, badgeRect.x + badgeRect.w / 2, badgeRect.y + badgeRect.h / 2 + 1);
 
-    Core.drawWrappedText(ctx, game.overlay.lines.join("\n\n"), rect.x + rect.w / 2, rect.y + 132, rect.w - 72, 18, {
-      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    Core.drawWrappedText(ctx, game.overlay.lines.join("\n\n"), rect.x + rect.w / 2, rect.y + (compact ? 86 : 132), rect.w - (compact ? 40 : 72), compact ? 14 : 18, {
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.84)",
       align: "center",
-      maxLines: 6
+      maxLines: compact ? 4 : 6
     });
 
-    const buttonWidth = Math.min(rect.w - 172, runtime.layout.mode === "mobile-portrait" ? 220 : 280);
-    drawButton({ x: rect.x + (rect.w - buttonWidth) / 2, y: rect.y + rect.h - 74, w: buttonWidth, h: 42 }, "Ready", closeOverlay, {
+    const buttonWidth = Math.min(rect.w - (compact ? 48 : 172), compact ? 180 : runtime.layout.mode === "mobile-portrait" ? 220 : 280);
+    drawButton({ x: rect.x + (rect.w - buttonWidth) / 2, y: rect.y + rect.h - (compact ? 48 : 74), w: buttonWidth, h: compact ? 34 : 42 }, "Ready", closeOverlay, {
       id: "overlay-ready",
       scope: "overlay",
       variant: "primary"
@@ -3164,23 +3214,47 @@
   }
 
   function renderPauseMenuOverlay(rect) {
-    ctx.fillText("Pause Menu", rect.x + rect.w / 2, rect.y + 20);
-    Core.drawWrappedText(ctx, "Open roster tools, read about the prototype, or restart the current session.", rect.x + rect.w / 2, rect.y + 62, rect.w - 72, 18, {
-      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    const compact = isCompactOverlayRect(rect);
+    ctx.fillText("Pause Menu", rect.x + rect.w / 2, rect.y + (compact ? 14 : 20));
+    Core.drawWrappedText(ctx, "Open roster tools, read about the prototype, or restart the current session.", rect.x + rect.w / 2, rect.y + (compact ? 44 : 62), rect.w - (compact ? 40 : 72), compact ? 14 : 18, {
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.84)",
       align: "center",
-      maxLines: 3
+      maxLines: compact ? 2 : 3
     });
 
-    const buttonWidth = Math.min(rect.w - 112, 280);
-    const startY = rect.y + 118;
-    const gap = 12;
-    [
+    const buttons = [
       { label: "Resume", onClick: closeOverlay, variant: "primary", id: "overlay-resume" },
       { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
       { label: "About", onClick: openAboutOverlay, id: "overlay-about" },
       { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
-    ].forEach((button, index) => {
+    ];
+    if (compact) {
+      const cols = 2;
+      const gap = 8;
+      const startY = rect.y + 88;
+      const buttonWidth = (rect.w - 48 - gap) / cols;
+      buttons.forEach((button, index) => {
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        drawButton({
+          x: rect.x + 20 + col * (buttonWidth + gap),
+          y: startY + row * (34 + gap),
+          w: buttonWidth,
+          h: 34
+        }, button.label, button.onClick, {
+          id: button.id,
+          scope: "overlay",
+          variant: button.variant,
+          font: "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        });
+      });
+      return;
+    }
+    const buttonWidth = Math.min(rect.w - 112, 280);
+    const startY = rect.y + 118;
+    const gap = 12;
+    buttons.forEach((button, index) => {
       drawButton({
         x: rect.x + (rect.w - buttonWidth) / 2,
         y: startY + index * (42 + gap),
@@ -3196,19 +3270,20 @@
 
   function renderRestartConfirmOverlay(rect) {
     const isPortrait = runtime.layout.mode === "mobile-portrait";
-    ctx.fillText("Restart game?", rect.x + rect.w / 2, rect.y + 24);
-    Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, rect.y + 78, rect.w - 72, 20, {
-      font: "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    const compact = isCompactOverlayRect(rect);
+    ctx.fillText("Restart game?", rect.x + rect.w / 2, rect.y + (compact ? 16 : 24));
+    Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, rect.y + (compact ? 50 : 78), rect.w - (compact ? 40 : 72), compact ? 16 : 20, {
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.84)",
       align: "center",
-      maxLines: 4
+      maxLines: compact ? 3 : 4
     });
-    if (isPortrait) {
-      drawButton({ x: rect.x + 24, y: rect.y + rect.h - 118, w: rect.w - 48, h: 42 }, "Cancel", openPauseMenu, {
+    if (compact || isPortrait) {
+      drawButton({ x: rect.x + 24, y: rect.y + rect.h - (compact ? 88 : 118), w: rect.w - 48, h: compact ? 30 : 42 }, "Cancel", openPauseMenu, {
         id: "overlay-restart-cancel",
         scope: "overlay"
       });
-      drawButton({ x: rect.x + 24, y: rect.y + rect.h - 66, w: rect.w - 48, h: 42 }, "Restart", restartToStartScreen, {
+      drawButton({ x: rect.x + 24, y: rect.y + rect.h - (compact ? 48 : 66), w: rect.w - 48, h: compact ? 30 : 42 }, "Restart", restartToStartScreen, {
         id: "overlay-restart-accept",
         scope: "overlay",
         variant: "danger"
@@ -3229,14 +3304,15 @@
   }
 
   function renderAboutOverlay(rect) {
-    ctx.fillText("About", rect.x + rect.w / 2, rect.y + 22);
-    Core.drawWrappedText(ctx, "This game was made by EOP and his wife with the help of Codex to test out a board game idea in the browser. Hope you enjoy testing it with them ;)", rect.x + rect.w / 2, rect.y + 78, rect.w - 72, 22, {
-      font: "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    const compact = isCompactOverlayRect(rect);
+    ctx.fillText("About", rect.x + rect.w / 2, rect.y + (compact ? 14 : 22));
+    Core.drawWrappedText(ctx, "This game was made by EOP and his wife with the help of Codex to test out a board game idea in the browser. Hope you enjoy testing it with them ;)", rect.x + rect.w / 2, rect.y + (compact ? 48 : 78), rect.w - (compact ? 40 : 72), compact ? 16 : 22, {
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.84)",
       align: "center",
-      maxLines: 7
+      maxLines: compact ? 6 : 7
     });
-    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : rect.w / 2 - 110), y: rect.y + rect.h - 70, w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : 220, h: 42 }, "Back", openPauseMenu, {
+    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : rect.w / 2 - 110), y: rect.y + rect.h - (compact ? 46 : 70), w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : 220, h: compact ? 30 : 42 }, "Back", openPauseMenu, {
       id: "overlay-about-back",
       scope: "overlay",
       variant: "primary"
@@ -3244,40 +3320,44 @@
   }
 
   function renderRoundSummaryOverlay(rect) {
-    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + 20);
-    Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + 60, rect.w - 64, 18, {
-      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    const compact = isCompactOverlayRect(rect);
+    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 20));
+    Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + (compact ? 42 : 60), rect.w - (compact ? 36 : 64), compact ? 14 : 18, {
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.84)",
       align: "center",
-      maxLines: 3
+      maxLines: compact ? 2 : 3
     });
+    if (compact) {
+      drawCompactOverlayRows(rect, game.overlay.rows, { startY: rect.y + 80, buttonTop: rect.y + rect.h - 42 });
+    } else {
+      const rowsY = rect.y + 122;
+      const rowHeight = 54;
+      game.overlay.rows.forEach((row, index) => {
+        const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
+        ctx.fillStyle = row.player.color.text;
+        ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
+        ctx.fillStyle = "#432e1e";
+        ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
+        ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+        ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 30);
+        ctx.fillStyle = "#432e1e";
+        ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 17);
+      });
+    }
 
-    const rowsY = rect.y + 122;
-    const rowHeight = 54;
-    game.overlay.rows.forEach((row, index) => {
-      const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
-      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-      Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
-      ctx.fillStyle = row.player.color.text;
-      ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
-      ctx.fillStyle = "#432e1e";
-      ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
-      ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
-      ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 30);
-      ctx.fillStyle = "#432e1e";
-      ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 17);
-    });
-
-    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : 90), y: rect.y + rect.h - 68, w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : rect.w - 180, h: 42 }, `Start ${ROUND_DEFS[game.roundIndex + 1].name}`, startNextRound, {
+    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : 90), y: rect.y + rect.h - (compact ? 38 : 68), w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : rect.w - 180, h: compact ? 30 : 42 }, `Start ${ROUND_DEFS[game.roundIndex + 1].name}`, startNextRound, {
       id: "overlay-next-round",
       scope: "overlay",
       variant: "primary"
@@ -3285,40 +3365,44 @@
   }
 
   function renderFinalOverlay(rect) {
-    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + 18);
-    Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + 56, rect.w - 60, 18, {
-      font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    const compact = isCompactOverlayRect(rect);
+    ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 18));
+    Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + (compact ? 42 : 56), rect.w - (compact ? 36 : 60), compact ? 14 : 18, {
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.84)",
       align: "center",
-      maxLines: 3
+      maxLines: compact ? 2 : 3
     });
+    if (compact) {
+      drawCompactOverlayRows(rect, game.overlay.rows, { startY: rect.y + 80, buttonTop: rect.y + rect.h - 42 });
+    } else {
+      const rowsY = rect.y + 116;
+      const rowHeight = 52;
+      game.overlay.rows.forEach((row, index) => {
+        const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
+        ctx.fillStyle = row.player.color.text;
+        ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
+        ctx.fillStyle = "#432e1e";
+        ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
+        ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+        ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 29);
+        ctx.fillStyle = "#432e1e";
+        ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 16);
+      });
+    }
 
-    const rowsY = rect.y + 116;
-    const rowHeight = 52;
-    game.overlay.rows.forEach((row, index) => {
-      const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
-      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-      Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
-      ctx.fillStyle = row.player.color.text;
-      ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
-      ctx.fillStyle = "#432e1e";
-      ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
-      ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
-      ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 29);
-      ctx.fillStyle = "#432e1e";
-      ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 16);
-    });
-
-    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : 90), y: rect.y + rect.h - 66, w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : rect.w - 180, h: 42 }, "Back to Start", restartToStartScreen, {
+    drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : 90), y: rect.y + rect.h - (compact ? 38 : 66), w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : rect.w - 180, h: compact ? 30 : 42 }, "Back to Start", restartToStartScreen, {
       id: "overlay-restart",
       scope: "overlay",
       variant: "primary"
