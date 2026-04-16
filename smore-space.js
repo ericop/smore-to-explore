@@ -296,7 +296,9 @@
     now: 0,
     layout: null,
     targets: [],
-    hoveredTargetId: null
+    hoveredTargetId: null,
+    frontScroll: null,
+    frontScrollDrag: null
   };
 
   const controller = Core.createCanvasController({
@@ -304,6 +306,8 @@
     onResize: handleResize,
     onPointerMove: handlePointerMove,
     onPointerDown: handlePointerDown,
+    onPointerUp: handlePointerUp,
+    onWheel: handleWheel,
     onPointerLeave: handlePointerLeave
   });
 
@@ -329,6 +333,7 @@
       gameActive: false,
       howToOpen: false,
       howToStep: 0,
+      howToScroll: 0,
       aboutOpen: false,
       mobileTab: "board",
       boardView: "hand",
@@ -1287,10 +1292,14 @@
     game.ui.howToOpen = true;
     game.ui.aboutOpen = false;
     game.ui.howToStep = Core.clamp(step, 0, HOW_TO_STEPS.length - 1);
+    game.ui.howToScroll = 0;
   }
 
   function closeHowToScreen() {
     game.ui.howToOpen = false;
+    game.ui.howToScroll = 0;
+    runtime.frontScroll = null;
+    runtime.frontScrollDrag = null;
   }
 
   function openAboutScreen() {
@@ -1301,6 +1310,62 @@
 
   function closeAboutScreen() {
     game.ui.aboutOpen = false;
+  }
+
+  function isFrontScreenCompact() {
+    return runtime.layout.mode !== "desktop" || runtime.layout.height < 780;
+  }
+
+  function measureWrappedTextHeight(text, maxWidth, lineHeight, options = {}) {
+    const font = options.font || "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const maxLines = options.maxLines || Number.POSITIVE_INFINITY;
+    const paragraphGap = options.paragraphGap ?? Math.round(lineHeight * 0.35);
+    const paragraphs = String(text || "")
+      .split(/\n+/)
+      .map((paragraph) => paragraph.trim().split(/\s+/).filter(Boolean));
+
+    const lines = [];
+    ctx.save();
+    ctx.font = font;
+
+    for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex += 1) {
+      const words = paragraphs[paragraphIndex];
+      if (!words.length) {
+        lines.push("");
+        continue;
+      }
+
+      let currentLine = words[0];
+      for (let index = 1; index < words.length; index += 1) {
+        const candidate = `${currentLine} ${words[index]}`;
+        if (ctx.measureText(candidate).width <= maxWidth) currentLine = candidate;
+        else {
+          lines.push(currentLine);
+          currentLine = words[index];
+        }
+      }
+      lines.push(currentLine);
+      if (paragraphIndex < paragraphs.length - 1) lines.push(null);
+    }
+
+    let visibleLines = 0;
+    let height = 0;
+    for (const line of lines) {
+      if (visibleLines >= maxLines) break;
+      if (line === null) {
+        height += paragraphGap;
+        continue;
+      }
+      visibleLines += 1;
+      height += lineHeight;
+    }
+
+    ctx.restore();
+    return height;
+  }
+
+  function clampHowToScroll(nextScroll, maxScroll = runtime.frontScroll?.maxScroll || 0) {
+    game.ui.howToScroll = Core.clamp(Math.round(nextScroll), 0, Math.max(0, Math.round(maxScroll)));
   }
 
   function adjustConfiguredPlayerCount(delta) {
@@ -1724,21 +1789,88 @@
     return null;
   }
 
+  function handleFrontScrollDrag(point) {
+    const scrollState = runtime.frontScroll;
+    const dragState = runtime.frontScrollDrag;
+    if (!scrollState || !dragState || dragState.kind !== "howto") return false;
+
+    if (dragState.mode === "thumb" && scrollState.trackRect && scrollState.thumbRect) {
+      const trackTravel = Math.max(1, scrollState.trackRect.h - scrollState.thumbRect.h);
+      const nextScroll = dragState.startScroll + (point.y - dragState.startY) / trackTravel * scrollState.maxScroll;
+      clampHowToScroll(nextScroll, scrollState.maxScroll);
+      return true;
+    }
+
+    clampHowToScroll(dragState.startScroll - (point.y - dragState.startY), scrollState.maxScroll);
+    return true;
+  }
+
   function handlePointerMove(point) {
+    if (runtime.frontScrollDrag && handleFrontScrollDrag(point)) {
+      runtime.hoveredTargetId = null;
+      game.ui.hoveredCell = null;
+      return;
+    }
     const target = findTargetAtPoint(point);
     runtime.hoveredTargetId = target?.id || null;
     game.ui.hoveredCell = target?.kind === "board-cell" ? target.data : null;
   }
 
   function handlePointerDown(point) {
+    const scrollState = runtime.frontScroll;
+    if (scrollState?.kind === "howto" && scrollState.maxScroll > 0) {
+      if (scrollState.thumbRect && Core.pointInRect(point, scrollState.thumbRect)) {
+        runtime.frontScrollDrag = {
+          kind: "howto",
+          mode: "thumb",
+          startY: point.y,
+          startScroll: game.ui.howToScroll
+        };
+        return;
+      }
+      if (scrollState.trackRect && Core.pointInRect(point, scrollState.trackRect)) {
+        const trackTravel = Math.max(1, scrollState.trackRect.h - scrollState.thumbRect.h);
+        const relativeY = Core.clamp(point.y - scrollState.trackRect.y - scrollState.thumbRect.h / 2, 0, trackTravel);
+        clampHowToScroll((relativeY / trackTravel) * scrollState.maxScroll, scrollState.maxScroll);
+        runtime.frontScrollDrag = {
+          kind: "howto",
+          mode: "thumb",
+          startY: point.y,
+          startScroll: game.ui.howToScroll
+        };
+        return;
+      }
+      if (Core.pointInRect(point, scrollState.rect)) {
+        runtime.frontScrollDrag = {
+          kind: "howto",
+          mode: "content",
+          startY: point.y,
+          startScroll: game.ui.howToScroll
+        };
+      }
+    }
+
     const target = findTargetAtPoint(point);
     if (!target || !target.onClick) return;
     target.onClick();
   }
 
+  function handlePointerUp() {
+    runtime.frontScrollDrag = null;
+  }
+
+  function handleWheel(point, event) {
+    const scrollState = runtime.frontScroll;
+    if (!scrollState || scrollState.kind !== "howto" || scrollState.maxScroll <= 0) return false;
+    if (!Core.pointInRect(point, scrollState.rect) && (!scrollState.trackRect || !Core.pointInRect(point, scrollState.trackRect))) return false;
+    clampHowToScroll(game.ui.howToScroll + event.deltaY, scrollState.maxScroll);
+    return true;
+  }
+
   function handlePointerLeave() {
     runtime.hoveredTargetId = null;
     game.ui.hoveredCell = null;
+    runtime.frontScrollDrag = null;
   }
 
   function getPhaseLabel() {
@@ -3166,6 +3298,7 @@
   }
 
   function drawFrontScreenShell(title, subtitle = "", options = {}) {
+    const compact = isFrontScreenCompact();
     const shell = {
       x: runtime.layout.pad,
       y: runtime.layout.pad,
@@ -3184,20 +3317,20 @@
     ctx.fill();
 
     ctx.fillStyle = "#3d2d20";
-    ctx.font = options.titleFont || (runtime.layout.mode === "mobile-portrait"
-      ? "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    ctx.font = options.titleFont || (compact
+      ? "800 24px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 34px 'Avenir Next', 'Trebuchet MS', sans-serif");
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(title, shell.x + 22, shell.y + 20);
 
     if (subtitle) {
-      Core.drawWrappedText(ctx, subtitle, shell.x + 22, shell.y + 62, Math.min(shell.w - 44, runtime.layout.mode === "desktop" ? 620 : shell.w - 44), runtime.layout.mode === "mobile-portrait" ? 18 : 20, {
-        font: runtime.layout.mode === "mobile-portrait"
+      Core.drawWrappedText(ctx, subtitle, shell.x + 22, shell.y + 62, Math.min(shell.w - 44, runtime.layout.mode === "desktop" ? 620 : shell.w - 44), compact ? 18 : 20, {
+        font: compact
           ? "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
           : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
         color: "rgba(82, 61, 44, 0.84)",
-        maxLines: runtime.layout.mode === "mobile-portrait" ? 3 : 2
+        maxLines: compact ? 3 : 2
       });
     }
 
@@ -3248,7 +3381,7 @@
   }
 
   function renderMainMenuScreen() {
-    const compact = runtime.layout.mode === "mobile-portrait";
+    const compact = isFrontScreenCompact();
     const { shell, body } = drawFrontScreenShell("Smore to Explore", GAME_PITCH);
     const pillHeight = renderHeroPillRow(body);
 
@@ -3323,18 +3456,81 @@
     ctx.fillText("Local prototype | Best on one shared device around the table", shell.x + shell.w / 2, shell.y + shell.h - 20);
   }
 
-  function drawTutorialStepCards(body, step) {
-    const compact = runtime.layout.mode === "mobile-portrait";
+  function getTutorialStepLayout(step, width, compact) {
+    const progressBottom = 24;
+    const titleTop = 28;
+    const titleLineHeight = compact ? 30 : 36;
+    const leadTop = compact ? 60 : 68;
+    const leadLineHeight = compact ? 17 : 20;
+    const leadFont = compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const bulletGap = compact ? 8 : 12;
+    const bulletPadY = compact ? 10 : 12;
+    const bulletBadgeSize = compact ? 24 : 26;
+    const bulletFont = compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const bulletLineHeight = compact ? 15 : 18;
+    const reminderPadY = compact ? 10 : 12;
+    const reminderLineHeight = compact ? 15 : 17;
+    const reminderFont = compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const reminderLabelHeight = compact ? 16 : 18;
+    const reminderTopGap = compact ? 10 : 14;
+
+    const leadHeight = measureWrappedTextHeight(step.lead, width, leadLineHeight, { font: leadFont, maxLines: compact ? 6 : 4 });
+    const bulletHeights = step.bullets.map((bullet) => {
+      const textHeight = measureWrappedTextHeight(bullet, width - 58, bulletLineHeight, { font: bulletFont, maxLines: 4 });
+      return Math.max(compact ? 44 : 52, textHeight + bulletPadY * 2);
+    });
+    const reminderTextHeight = measureWrappedTextHeight(step.reminder, width - 24, reminderLineHeight, { font: reminderFont, maxLines: 4 });
+    const reminderHeight = Math.max(compact ? 62 : 72, reminderPadY * 2 + reminderLabelHeight + 6 + reminderTextHeight);
+    const bulletsHeight = bulletHeights.reduce((sum, height) => sum + height, 0) + bulletGap * Math.max(0, step.bullets.length - 1);
+    const contentHeight = leadTop + leadHeight + 16 + bulletsHeight + reminderTopGap + reminderHeight;
+
+    return {
+      progressBottom,
+      titleTop,
+      titleLineHeight,
+      leadTop,
+      leadHeight,
+      leadLineHeight,
+      leadFont,
+      bulletGap,
+      bulletPadY,
+      bulletBadgeSize,
+      bulletFont,
+      bulletLineHeight,
+      bulletHeights,
+      reminderPadY,
+      reminderLineHeight,
+      reminderFont,
+      reminderHeight,
+      contentHeight
+    };
+  }
+
+  function drawTutorialStepCards(viewport, step, compact) {
+    const baseMetrics = getTutorialStepLayout(step, viewport.w, compact);
+    const needsScrollbar = baseMetrics.contentHeight > viewport.h;
+    const gutter = needsScrollbar ? 16 : 0;
+    const contentWidth = viewport.w - gutter;
+    const metrics = gutter ? getTutorialStepLayout(step, contentWidth, compact) : baseMetrics;
+    const maxScroll = Math.max(0, metrics.contentHeight - viewport.h);
+    const scrollY = Core.clamp(game.ui.howToScroll, 0, maxScroll);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(viewport.x, viewport.y, contentWidth, viewport.h);
+    ctx.clip();
+    ctx.translate(0, -scrollY);
+
     ctx.fillStyle = "#5a4330";
     ctx.font = compact ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(`Step ${game.ui.howToStep + 1} of ${HOW_TO_STEPS.length}`, body.x, body.y);
+    ctx.fillText(`Step ${game.ui.howToStep + 1} of ${HOW_TO_STEPS.length}`, viewport.x, viewport.y);
 
-    const dotsY = body.y + 4;
+    const dotsY = viewport.y + 4;
     HOW_TO_STEPS.forEach((_, index) => {
       const active = index === game.ui.howToStep;
-      const dotX = body.x + body.w - 12 - (HOW_TO_STEPS.length - 1 - index) * 16;
+      const dotX = viewport.x + contentWidth - 12 - (HOW_TO_STEPS.length - 1 - index) * (compact ? 14 : 16);
       ctx.fillStyle = active ? "#ca6f36" : "rgba(108,80,54,0.22)";
       ctx.beginPath();
       ctx.arc(dotX, dotsY + 6, active ? 5 : 4, 0, Math.PI * 2);
@@ -3343,69 +3539,102 @@
 
     ctx.fillStyle = "#3d2d20";
     ctx.font = compact ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillText(step.title, body.x, body.y + 28);
-    const leadMetrics = Core.drawWrappedText(ctx, step.lead, body.x, body.y + 64, body.w, compact ? 18 : 20, {
-      font: compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    ctx.fillText(step.title, viewport.x, viewport.y + metrics.titleTop);
+    Core.drawWrappedText(ctx, step.lead, viewport.x, viewport.y + metrics.leadTop, contentWidth, metrics.leadLineHeight, {
+      font: metrics.leadFont,
       color: "rgba(82, 61, 44, 0.86)",
-      maxLines: compact ? 4 : 3
+      maxLines: compact ? 6 : 4
     });
 
-    const cardTop = body.y + 76 + leadMetrics.height;
-    const cardGap = compact ? 8 : 10;
-    const reminderHeight = compact ? 56 : 62;
-    const availableForCards = body.h - leadMetrics.height - reminderHeight - (compact ? 116 : 126);
-    const cardHeight = Math.max(compact ? 48 : 56, Math.min(compact ? 66 : 76, Math.floor((availableForCards - cardGap * (step.bullets.length - 1)) / step.bullets.length)));
+    let cursorY = viewport.y + metrics.leadTop + metrics.leadHeight + 16;
     step.bullets.forEach((bullet, index) => {
-      const cardRect = { x: body.x, y: cardTop + index * (cardHeight + cardGap), w: body.w, h: cardHeight };
+      const cardRect = { x: viewport.x, y: cursorY, w: contentWidth, h: metrics.bulletHeights[index] };
       Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
-      Core.drawRoundedRect(ctx, cardRect.x + 10, cardRect.y + 10, 24, 24, 12, "rgba(202, 111, 54, 0.16)");
+      Core.drawRoundedRect(ctx, cardRect.x + 10, cardRect.y + 10, metrics.bulletBadgeSize, metrics.bulletBadgeSize, metrics.bulletBadgeSize / 2, "rgba(202, 111, 54, 0.16)");
       ctx.fillStyle = "#b7632c";
       ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(String(index + 1), cardRect.x + 22, cardRect.y + 22);
-      Core.drawWrappedText(ctx, bullet, cardRect.x + 44, cardRect.y + 10, cardRect.w - 56, compact ? 14 : 16, {
-        font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      ctx.fillText(String(index + 1), cardRect.x + 10 + metrics.bulletBadgeSize / 2, cardRect.y + 10 + metrics.bulletBadgeSize / 2);
+      Core.drawWrappedText(ctx, bullet, cardRect.x + 44, cardRect.y + metrics.bulletPadY, cardRect.w - 56, metrics.bulletLineHeight, {
+        font: metrics.bulletFont,
         color: "#4a3524",
-        maxLines: 3
+        maxLines: 4
       });
+      cursorY += cardRect.h + metrics.bulletGap;
     });
 
-    const reminderRect = { x: body.x, y: body.y + body.h - (compact ? 104 : 110), w: body.w, h: reminderHeight };
+    const reminderRect = { x: viewport.x, y: cursorY + 2, w: contentWidth, h: metrics.reminderHeight };
     Core.drawRoundedRect(ctx, reminderRect.x, reminderRect.y, reminderRect.w, reminderRect.h, 18, "rgba(233, 243, 224, 0.98)", "rgba(95, 141, 101, 0.22)", 1.1);
     ctx.fillStyle = "#3f6b47";
     ctx.font = compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText("Keep in mind", reminderRect.x + 12, reminderRect.y + 10);
-    Core.drawWrappedText(ctx, step.reminder, reminderRect.x + 12, reminderRect.y + 28, reminderRect.w - 24, compact ? 14 : 16, {
-      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    ctx.fillText("Keep in mind", reminderRect.x + 12, reminderRect.y + metrics.reminderPadY);
+    Core.drawWrappedText(ctx, step.reminder, reminderRect.x + 12, reminderRect.y + metrics.reminderPadY + 20, reminderRect.w - 24, metrics.reminderLineHeight, {
+      font: metrics.reminderFont,
       color: "#456049",
-      maxLines: 2
+      maxLines: 4
     });
+
+    ctx.restore();
+
+    runtime.frontScroll = null;
+    if (maxScroll > 0) {
+      const trackRect = { x: viewport.x + viewport.w - 8, y: viewport.y + 4, w: 6, h: viewport.h - 8 };
+      const thumbHeight = Math.max(30, Math.round(trackRect.h * (viewport.h / metrics.contentHeight)));
+      const thumbY = trackRect.y + (scrollY / maxScroll) * Math.max(0, trackRect.h - thumbHeight);
+      const thumbRect = { x: trackRect.x, y: thumbY, w: trackRect.w, h: thumbHeight };
+
+      Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, "rgba(108,80,54,0.1)");
+      Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, "rgba(202, 111, 54, 0.72)");
+
+      runtime.frontScroll = {
+        kind: "howto",
+        rect: viewport,
+        maxScroll,
+        trackRect,
+        thumbRect
+      };
+    }
+
+    return { maxScroll, scrollY };
   }
 
   function renderHowToScreen() {
-    const compact = runtime.layout.mode === "mobile-portrait";
+    const compact = isFrontScreenCompact();
     const step = HOW_TO_STEPS[game.ui.howToStep];
     const { shell, body } = drawFrontScreenShell("How to Play", "A quick guided walkthrough of the real turn flow, placement rules, scoring, and the mistakes new groups usually make.", {
       onClose: closeHowToScreen,
       scopeKey: "howto"
     });
-    drawTutorialStepCards(body, step);
+    const navHeight = compact ? 48 : 54;
+    const navInset = compact ? 16 : 18;
+    const contentViewport = {
+      x: body.x,
+      y: body.y,
+      w: body.w,
+      h: Math.max(140, shell.y + shell.h - navInset - navHeight - 12 - body.y)
+    };
+    const scrollState = drawTutorialStepCards(contentViewport, step, compact);
+    if (game.ui.howToScroll !== scrollState.scrollY) game.ui.howToScroll = scrollState.scrollY;
 
     const backWidth = compact ? 92 : 120;
     const nextWidth = compact ? 110 : 150;
-    const navY = shell.y + shell.h - (compact ? 62 : 68);
-    drawScreenButton({ x: shell.x + 22, y: navY, w: backWidth, h: compact ? 40 : 44 }, "Back", () => {
+    const navY = shell.y + shell.h - navInset - navHeight;
+    drawScreenButton({ x: shell.x + 22, y: navY, w: backWidth, h: navHeight }, "Back", () => {
       game.ui.howToStep = Math.max(0, game.ui.howToStep - 1);
+      game.ui.howToScroll = 0;
     }, {
       id: "howto-back",
       enabled: game.ui.howToStep > 0
     });
-    drawScreenButton({ x: shell.x + shell.w - nextWidth - 22, y: navY, w: nextWidth, h: compact ? 40 : 44 }, game.ui.howToStep === HOW_TO_STEPS.length - 1 ? "Done" : "Next", () => {
+    drawScreenButton({ x: shell.x + shell.w - nextWidth - 22, y: navY, w: nextWidth, h: navHeight }, game.ui.howToStep === HOW_TO_STEPS.length - 1 ? "Done" : "Next", () => {
       if (game.ui.howToStep === HOW_TO_STEPS.length - 1) closeHowToScreen();
-      else game.ui.howToStep = Math.min(HOW_TO_STEPS.length - 1, game.ui.howToStep + 1);
+      else {
+        game.ui.howToStep = Math.min(HOW_TO_STEPS.length - 1, game.ui.howToStep + 1);
+        game.ui.howToScroll = 0;
+      }
     }, {
       id: "howto-next",
       variant: "primary"
@@ -3413,7 +3642,7 @@
   }
 
   function renderAboutScreen() {
-    const compact = runtime.layout.mode === "mobile-portrait";
+    const compact = isFrontScreenCompact();
     const { shell, body } = drawFrontScreenShell("About Smore to Explore", "A local pass-and-play campground building game for 2 to 5 players.", {
       onClose: closeAboutScreen,
       scopeKey: "about"
@@ -3855,6 +4084,7 @@
     runtime.now = now;
     runtime.layout = computeLayout(controller.state.width, controller.state.height);
     runtime.targets = [];
+    runtime.frontScroll = null;
     cleanupTransientState();
     if (!game.directorRevealed && game.ui.objectiveTab === "director") game.ui.objectiveTab = "shared";
 

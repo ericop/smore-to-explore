@@ -184,7 +184,8 @@
     onPointerMove,
     onPointerDown,
     onPointerUp,
-    onPointerLeave
+    onPointerLeave,
+    onWheel
   }) {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Smore to Explore needs a 2D canvas context.");
@@ -244,6 +245,12 @@
       if (onPointerLeave) onPointerLeave(toCanvasPoint(event), event);
     }
 
+    function handleWheel(event) {
+      if (onWheel && onWheel(toCanvasPoint(event), event)) {
+        event.preventDefault();
+      }
+    }
+
     async function toggleFullscreen(target = canvas) {
       if (!document.fullscreenEnabled) return false;
       if (document.fullscreenElement) {
@@ -259,6 +266,7 @@
     canvas.addEventListener("pointerup", handlePointerUp);
     canvas.addEventListener("pointerleave", handlePointerLeave);
     canvas.addEventListener("pointercancel", handlePointerLeave);
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
     canvas.addEventListener("contextmenu", (event) => event.preventDefault());
     window.addEventListener("resize", updateSize);
     window.addEventListener("orientationchange", updateSize);
@@ -279,6 +287,7 @@
         canvas.removeEventListener("pointerup", handlePointerUp);
         canvas.removeEventListener("pointerleave", handlePointerLeave);
         canvas.removeEventListener("pointercancel", handlePointerLeave);
+        canvas.removeEventListener("wheel", handleWheel);
         window.removeEventListener("resize", updateSize);
         window.removeEventListener("orientationchange", updateSize);
         document.removeEventListener("fullscreenchange", updateSize);
