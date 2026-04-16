@@ -3001,7 +3001,7 @@
     const maxHeight = runtime.layout.height - runtime.layout.pad * 2;
     const panelWidth = Math.min(runtime.layout.width - runtime.layout.pad * 2, isPortrait ? runtime.layout.width - runtime.layout.pad * 2 : 760);
     let panelHeight = game.overlay.kind === "start"
-      ? (isPortrait ? 336 : 312)
+      ? (isPortrait ? 292 : 272)
       : game.overlay.kind === "handoff"
         ? (isPortrait ? 322 : 290)
         : game.overlay.kind === "pause-menu"
@@ -3075,12 +3075,20 @@
       align: "center",
       maxLines: isPortrait ? 4 : 3
     });
-    const chooserTop = introY + introMetrics.height + (isPortrait ? 14 : 12);
+    const chooserTop = introY + introMetrics.height + (isPortrait ? 16 : 14);
+    const rowGap = isPortrait ? 12 : 14;
+    const rowX = rect.x + (isPortrait ? 26 : 44);
+    const rowW = rect.w - (isPortrait ? 52 : 88);
+    const buttonWidth = Math.max(
+      isPortrait ? 118 : 184,
+      Math.min(isPortrait ? 142 : 220, Math.round(rowW * (isPortrait ? 0.34 : 0.34)))
+    );
+    const rowHeight = isPortrait ? 82 : 74;
     const chooserRect = {
-      x: rect.x + (isPortrait ? 26 : 44),
+      x: rowX,
       y: chooserTop,
-      w: rect.w - (isPortrait ? 52 : 88),
-      h: isPortrait ? 82 : 74
+      w: rowW - buttonWidth - rowGap,
+      h: rowHeight
     };
     Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
     ctx.fillStyle = "#4a3524";
@@ -3108,13 +3116,15 @@
     ctx.textBaseline = "middle";
     ctx.fillText(String(game.ui.configuredPlayerCount), chooserRect.x + chooserRect.w / 2, chooserRect.y + (isPortrait ? 52 : 46));
 
-    const buttonY = Math.min(rect.y + rect.h - 66, chooserRect.y + chooserRect.h + 16);
-    drawButton({ x: rect.x + (isPortrait ? 26 : 80), y: buttonY, w: rect.w - (isPortrait ? 52 : 160), h: 46 }, "Start Campground", () => {
+    drawButton({ x: chooserRect.x + chooserRect.w + rowGap, y: chooserRect.y, w: buttonWidth, h: rowHeight }, "Start Campground", () => {
       beginPlaySession(game.ui.configuredPlayerCount);
     }, {
       id: "overlay-start-game",
       scope: "overlay",
-      variant: "primary"
+      variant: "primary",
+      font: isPortrait
+        ? "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        : "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
   }
 
