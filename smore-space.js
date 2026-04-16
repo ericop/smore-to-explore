@@ -3001,7 +3001,7 @@
     const maxHeight = runtime.layout.height - runtime.layout.pad * 2;
     const panelWidth = Math.min(runtime.layout.width - runtime.layout.pad * 2, isPortrait ? runtime.layout.width - runtime.layout.pad * 2 : 760);
     let panelHeight = game.overlay.kind === "start"
-      ? (isPortrait ? 378 : 340)
+      ? (isPortrait ? 336 : 312)
       : game.overlay.kind === "handoff"
         ? (isPortrait ? 322 : 290)
         : game.overlay.kind === "pause-menu"
@@ -3065,15 +3065,23 @@
 
   function renderStartOverlay(rect) {
     const isPortrait = runtime.layout.mode === "mobile-portrait";
-    ctx.fillText("Smore to Explore", rect.x + rect.w / 2, rect.y + 22);
-    Core.drawWrappedText(ctx, "Single-canvas pass-and-play for 2 to 5 players. Each player builds a separate campground, while the contractor market and seasonal goals stay shared.", rect.x + rect.w / 2, rect.y + 70, rect.w - 48, 18, {
+    const titleY = rect.y + (isPortrait ? 20 : 18);
+    const introY = titleY + 48;
+    const horizontalInset = isPortrait ? 26 : 40;
+    ctx.fillText("Smore to Explore", rect.x + rect.w / 2, titleY);
+    const introMetrics = Core.drawWrappedText(ctx, "Build the best campground over three summer rounds as each player shapes a separate board on the same device. Draft from the shared contractor market, chase seasonal goals, and pass the game to the next player after each turn.", rect.x + rect.w / 2, introY, rect.w - horizontalInset * 2, isPortrait ? 17 : 18, {
       font: "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.86)",
       align: "center",
-      maxLines: 4
+      maxLines: isPortrait ? 4 : 3
     });
-
-    const chooserRect = { x: rect.x + (isPortrait ? 26 : 52), y: rect.y + 166, w: rect.w - (isPortrait ? 52 : 104), h: isPortrait ? 82 : 74 };
+    const chooserTop = introY + introMetrics.height + (isPortrait ? 14 : 12);
+    const chooserRect = {
+      x: rect.x + (isPortrait ? 26 : 44),
+      y: chooserTop,
+      w: rect.w - (isPortrait ? 52 : 88),
+      h: isPortrait ? 82 : 74
+    };
     Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
     ctx.fillStyle = "#4a3524";
     ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -3100,7 +3108,8 @@
     ctx.textBaseline = "middle";
     ctx.fillText(String(game.ui.configuredPlayerCount), chooserRect.x + chooserRect.w / 2, chooserRect.y + (isPortrait ? 52 : 46));
 
-    drawButton({ x: rect.x + (isPortrait ? 26 : 80), y: rect.y + rect.h - 78, w: rect.w - (isPortrait ? 52 : 160), h: 46 }, "Start Campground", () => {
+    const buttonY = Math.min(rect.y + rect.h - 66, chooserRect.y + chooserRect.h + 16);
+    drawButton({ x: rect.x + (isPortrait ? 26 : 80), y: buttonY, w: rect.w - (isPortrait ? 52 : 160), h: 46 }, "Start Campground", () => {
       beginPlaySession(game.ui.configuredPlayerCount);
     }, {
       id: "overlay-start-game",
