@@ -298,7 +298,9 @@
     targets: [],
     hoveredTargetId: null,
     frontScroll: null,
-    frontScrollDrag: null
+    frontScrollDrag: null,
+    overlayScroll: null,
+    overlayScrollDrag: null
   };
 
   const controller = Core.createCanvasController({
@@ -334,6 +336,7 @@
       howToOpen: false,
       howToStep: 0,
       howToScroll: 0,
+      overlayScroll: 0,
       aboutOpen: false,
       mobileTab: "board",
       boardView: "hand",
@@ -1281,6 +1284,9 @@
       title: `${player.name}'s Turn`,
       lines
     };
+    if (gameState.ui) gameState.ui.overlayScroll = 0;
+    runtime.overlayScroll = null;
+    runtime.overlayScrollDrag = null;
   }
 
   function frontScreenActive() {
@@ -1368,6 +1374,16 @@
     game.ui.howToScroll = Core.clamp(Math.round(nextScroll), 0, Math.max(0, Math.round(maxScroll)));
   }
 
+  function resetOverlayScroll() {
+    game.ui.overlayScroll = 0;
+    runtime.overlayScroll = null;
+    runtime.overlayScrollDrag = null;
+  }
+
+  function clampOverlayScroll(nextScroll, maxScroll = runtime.overlayScroll?.maxScroll || 0) {
+    game.ui.overlayScroll = Core.clamp(Math.round(nextScroll), 0, Math.max(0, Math.round(maxScroll)));
+  }
+
   function adjustConfiguredPlayerCount(delta) {
     game.ui.configuredPlayerCount = Core.clamp((game.ui.configuredPlayerCount || 2) + delta, 2, 5);
   }
@@ -1387,6 +1403,7 @@
 
   function openPauseMenu() {
     nameEditor?.close();
+    resetOverlayScroll();
     game.overlay = {
       kind: "pause-menu",
       blocking: true
@@ -1394,6 +1411,7 @@
   }
 
   function openRenamePlayersOverlay() {
+    resetOverlayScroll();
     game.overlay = {
       kind: "rename-players",
       blocking: true
@@ -1403,6 +1421,7 @@
 
   function openRestartConfirmOverlay() {
     nameEditor?.close();
+    resetOverlayScroll();
     game.overlay = {
       kind: "restart-confirm",
       blocking: true
@@ -1755,6 +1774,7 @@
 
   function closeOverlay() {
     nameEditor?.close();
+    resetOverlayScroll();
     game.overlay = null;
   }
 
@@ -1805,7 +1825,28 @@
     return true;
   }
 
+  function handleOverlayScrollDrag(point) {
+    const scrollState = runtime.overlayScroll;
+    const dragState = runtime.overlayScrollDrag;
+    if (!scrollState || !dragState || dragState.kind !== "overlay") return false;
+
+    if (dragState.mode === "thumb" && scrollState.trackRect && scrollState.thumbRect) {
+      const trackTravel = Math.max(1, scrollState.trackRect.h - scrollState.thumbRect.h);
+      const nextScroll = dragState.startScroll + (point.y - dragState.startY) / trackTravel * scrollState.maxScroll;
+      clampOverlayScroll(nextScroll, scrollState.maxScroll);
+      return true;
+    }
+
+    clampOverlayScroll(dragState.startScroll - (point.y - dragState.startY), scrollState.maxScroll);
+    return true;
+  }
+
   function handlePointerMove(point) {
+    if (runtime.overlayScrollDrag && handleOverlayScrollDrag(point)) {
+      runtime.hoveredTargetId = null;
+      game.ui.hoveredCell = null;
+      return;
+    }
     if (runtime.frontScrollDrag && handleFrontScrollDrag(point)) {
       runtime.hoveredTargetId = null;
       game.ui.hoveredCell = null;
@@ -1817,6 +1858,39 @@
   }
 
   function handlePointerDown(point) {
+    const overlayScrollState = runtime.overlayScroll;
+    if (overlayScrollState?.kind === "overlay" && overlayScrollState.maxScroll > 0) {
+      if (overlayScrollState.thumbRect && Core.pointInRect(point, overlayScrollState.thumbRect)) {
+        runtime.overlayScrollDrag = {
+          kind: "overlay",
+          mode: "thumb",
+          startY: point.y,
+          startScroll: game.ui.overlayScroll
+        };
+        return;
+      }
+      if (overlayScrollState.trackRect && Core.pointInRect(point, overlayScrollState.trackRect)) {
+        const trackTravel = Math.max(1, overlayScrollState.trackRect.h - overlayScrollState.thumbRect.h);
+        const relativeY = Core.clamp(point.y - overlayScrollState.trackRect.y - overlayScrollState.thumbRect.h / 2, 0, trackTravel);
+        clampOverlayScroll((relativeY / trackTravel) * overlayScrollState.maxScroll, overlayScrollState.maxScroll);
+        runtime.overlayScrollDrag = {
+          kind: "overlay",
+          mode: "thumb",
+          startY: point.y,
+          startScroll: game.ui.overlayScroll
+        };
+        return;
+      }
+      if (Core.pointInRect(point, overlayScrollState.rect)) {
+        runtime.overlayScrollDrag = {
+          kind: "overlay",
+          mode: "content",
+          startY: point.y,
+          startScroll: game.ui.overlayScroll
+        };
+      }
+    }
+
     const scrollState = runtime.frontScroll;
     if (scrollState?.kind === "howto" && scrollState.maxScroll > 0) {
       if (scrollState.thumbRect && Core.pointInRect(point, scrollState.thumbRect)) {
@@ -1856,10 +1930,19 @@
   }
 
   function handlePointerUp() {
+    runtime.overlayScrollDrag = null;
     runtime.frontScrollDrag = null;
   }
 
   function handleWheel(point, event) {
+    const overlayScrollState = runtime.overlayScroll;
+    if (overlayScrollState && overlayScrollState.kind === "overlay" && overlayScrollState.maxScroll > 0) {
+      if (Core.pointInRect(point, overlayScrollState.rect) || (overlayScrollState.trackRect && Core.pointInRect(point, overlayScrollState.trackRect))) {
+        clampOverlayScroll(game.ui.overlayScroll + event.deltaY, overlayScrollState.maxScroll);
+        return true;
+      }
+    }
+
     const scrollState = runtime.frontScroll;
     if (!scrollState || scrollState.kind !== "howto" || scrollState.maxScroll <= 0) return false;
     if (!Core.pointInRect(point, scrollState.rect) && (!scrollState.trackRect || !Core.pointInRect(point, scrollState.trackRect))) return false;
@@ -1870,6 +1953,7 @@
   function handlePointerLeave() {
     runtime.hoveredTargetId = null;
     game.ui.hoveredCell = null;
+    runtime.overlayScrollDrag = null;
     runtime.frontScrollDrag = null;
   }
 
@@ -3248,6 +3332,60 @@
     return runtime.layout.mode !== "desktop" && rect.h <= 250;
   }
 
+  function beginOverlayScrollViewport(viewport, contentHeight) {
+    const needsScrollbar = contentHeight > viewport.h;
+    const gutter = needsScrollbar ? 16 : 0;
+    const clipRect = {
+      x: viewport.x,
+      y: viewport.y,
+      w: Math.max(24, viewport.w - gutter),
+      h: viewport.h
+    };
+    const maxScroll = Math.max(0, Math.ceil(contentHeight - viewport.h));
+    const scrollY = Core.clamp(game.ui.overlayScroll || 0, 0, maxScroll);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(clipRect.x, clipRect.y, clipRect.w, clipRect.h);
+    ctx.clip();
+
+    return {
+      clipRect,
+      contentWidth: clipRect.w,
+      scrollY,
+      maxScroll
+    };
+  }
+
+  function endOverlayScrollViewport(viewport, scrollMeta) {
+    ctx.restore();
+    runtime.overlayScroll = null;
+
+    if (scrollMeta.maxScroll <= 0) return;
+
+    const trackRect = {
+      x: viewport.x + viewport.w - 8,
+      y: viewport.y + 4,
+      w: 6,
+      h: Math.max(20, viewport.h - 8)
+    };
+    const thumbHeight = Math.max(30, Math.round(trackRect.h * (viewport.h / (viewport.h + scrollMeta.maxScroll))));
+    const travel = Math.max(0, trackRect.h - thumbHeight);
+    const thumbY = trackRect.y + (scrollMeta.scrollY / scrollMeta.maxScroll) * travel;
+    const thumbRect = { x: trackRect.x, y: thumbY, w: trackRect.w, h: thumbHeight };
+
+    Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, "rgba(108,80,54,0.1)");
+    Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, "rgba(202, 111, 54, 0.72)");
+
+    runtime.overlayScroll = {
+      kind: "overlay",
+      rect: viewport,
+      maxScroll: scrollMeta.maxScroll,
+      trackRect,
+      thumbRect
+    };
+  }
+
   function drawCompactOverlayRows(rect, rows, options = {}) {
     const startY = options.startY ?? rect.y + 92;
     const buttonTop = options.buttonTop ?? rect.y + rect.h - 50;
@@ -3701,6 +3839,7 @@
 
   function renderOverlay() {
     if (!game.overlay) return;
+    runtime.overlayScroll = null;
     ctx.fillStyle = "rgba(47, 34, 23, 0.58)";
     ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
 
@@ -3726,10 +3865,13 @@
                   ? 164 + ((game.overlay.rows?.length || 0) * (isPortrait ? 54 : 60)) + 78
                   : (isPortrait ? 430 : 460);
     panelHeight = Math.min(maxHeight, isMobileOverlay ? 250 : panelHeight);
+    const compact = isMobileOverlay && panelHeight <= 250;
     const rect = isPortrait
       ? {
           x: runtime.layout.pad,
-          y: runtime.layout.height - runtime.layout.pad - panelHeight,
+          y: compact
+            ? Math.max(runtime.layout.pad, Math.round((runtime.layout.height - panelHeight) / 2))
+            : runtime.layout.height - runtime.layout.pad - panelHeight,
           w: panelWidth,
           h: panelHeight
         }
@@ -3844,6 +3986,45 @@
   function renderHandoffOverlay(rect) {
     const compact = isCompactOverlayRect(rect);
     const player = getPlayer();
+    if (compact) {
+      const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
+      const badgeText = `${getCurrentRound().name} | ${getPhaseLabel()}`;
+      const linesText = game.overlay.lines.join("\n\n");
+      const bodyHeight = measureWrappedTextHeight(linesText, viewport.w, 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        maxLines: 8
+      });
+      const buttonTop = viewport.y + 114 + bodyHeight;
+      const contentHeight = (buttonTop - viewport.y) + 34 + 8;
+      const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+      const oy = (value) => value - scrollMeta.scrollY;
+
+      ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
+      const badgeRect = { x: rect.x + 32, y: oy(viewport.y + 34), w: rect.w - 64, h: 30 };
+      Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, "rgba(222, 162, 102, 0.20)", "rgba(177, 111, 54, 0.34)", 1.4);
+      ctx.fillStyle = "#6c4325";
+      ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(badgeText, badgeRect.x + badgeRect.w / 2, badgeRect.y + badgeRect.h / 2 + 1);
+
+      Core.drawWrappedText(ctx, linesText, rect.x + rect.w / 2, oy(viewport.y + 76), scrollMeta.contentWidth, 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.84)",
+        align: "center",
+        maxLines: 8
+      });
+
+      drawButton({ x: rect.x + Math.max(24, (rect.w - 180) / 2), y: oy(buttonTop), w: Math.min(180, rect.w - 48), h: 34 }, "Ready", closeOverlay, {
+        id: "overlay-ready",
+        scope: "overlay",
+        variant: "primary"
+      });
+
+      endOverlayScrollViewport(viewport, scrollMeta);
+      return;
+    }
+
     ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 24));
     const badgeText = `${getCurrentRound().name} | ${getPhaseLabel()}`;
     ctx.save();
@@ -3885,32 +4066,43 @@
 
   function renderPauseMenuOverlay(rect) {
     const compact = isCompactOverlayRect(rect);
-    ctx.fillText("Pause Menu", rect.x + rect.w / 2, rect.y + (compact ? 14 : 20));
-    Core.drawWrappedText(ctx, "Open roster tools, read about the prototype, or restart the current session.", rect.x + rect.w / 2, rect.y + (compact ? 44 : 62), rect.w - (compact ? 40 : 72), compact ? 14 : 18, {
-      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
-      align: "center",
-      maxLines: compact ? 2 : 3
-    });
-
-    const buttons = [
-      { label: "Resume", onClick: closeOverlay, variant: "primary", id: "overlay-resume" },
-      { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
-      { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
-      { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
-      { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
-    ];
     if (compact) {
+      const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
+      const introWidth = viewport.w;
+      const introHeight = measureWrappedTextHeight("Open roster tools, read about the prototype, or restart the current session.", introWidth, 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        maxLines: 4
+      });
+      const buttons = [
+        { label: "Resume", onClick: closeOverlay, variant: "primary", id: "overlay-resume" },
+        { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
+        { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
+        { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
+        { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
+      ];
       const cols = 2;
       const gap = 8;
-      const startY = rect.y + 82;
-      const buttonWidth = (rect.w - 48 - gap) / cols;
+      const buttonWidth = (viewport.w - gap) / cols;
+      const rows = Math.ceil(buttons.length / cols);
+      const buttonAreaTop = viewport.y + 68 + introHeight;
+      const contentHeight = (buttonAreaTop - viewport.y) + rows * 32 + Math.max(0, rows - 1) * gap + 8;
+      const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+      const oy = (value) => value - scrollMeta.scrollY;
+
+      ctx.fillText("Pause Menu", rect.x + rect.w / 2, oy(viewport.y + 2));
+      Core.drawWrappedText(ctx, "Open roster tools, read about the prototype, or restart the current session.", rect.x + rect.w / 2, oy(viewport.y + 34), scrollMeta.contentWidth, 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.84)",
+        align: "center",
+        maxLines: 4
+      });
+
       buttons.forEach((button, index) => {
         const col = index % cols;
         const row = Math.floor(index / cols);
         drawButton({
-          x: rect.x + 20 + col * (buttonWidth + gap),
-          y: startY + row * (32 + gap),
+          x: viewport.x + col * (buttonWidth + gap),
+          y: oy(buttonAreaTop + row * (32 + gap)),
           w: buttonWidth,
           h: 32
         }, button.label, button.onClick, {
@@ -3920,8 +4112,26 @@
           font: "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
         });
       });
+
+      endOverlayScrollViewport(viewport, scrollMeta);
       return;
     }
+
+    ctx.fillText("Pause Menu", rect.x + rect.w / 2, rect.y + 20);
+    Core.drawWrappedText(ctx, "Open roster tools, read about the prototype, or restart the current session.", rect.x + rect.w / 2, rect.y + 62, rect.w - 72, 18, {
+      font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      align: "center",
+      maxLines: 3
+    });
+
+    const buttons = [
+      { label: "Resume", onClick: closeOverlay, variant: "primary", id: "overlay-resume" },
+      { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
+      { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
+      { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
+      { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
+    ];
     const buttonWidth = Math.min(rect.w - 112, 280);
     const startY = rect.y + 100;
     const gap = 10;
@@ -3942,6 +4152,37 @@
   function renderRestartConfirmOverlay(rect) {
     const isPortrait = runtime.layout.mode === "mobile-portrait";
     const compact = isCompactOverlayRect(rect);
+    if (compact) {
+      const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
+      const bodyHeight = measureWrappedTextHeight("Are you sure? This will clear the current campground boards and return to the start screen.", viewport.w, 16, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        maxLines: 6
+      });
+      const cancelTop = viewport.y + 66 + bodyHeight;
+      const contentHeight = (cancelTop - viewport.y) + 30 + 8 + 30 + 8;
+      const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+      const oy = (value) => value - scrollMeta.scrollY;
+
+      ctx.fillText("Restart game?", rect.x + rect.w / 2, oy(viewport.y + 4));
+      Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, oy(viewport.y + 38), scrollMeta.contentWidth, 16, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.84)",
+        align: "center",
+        maxLines: 6
+      });
+      drawButton({ x: rect.x + 24, y: oy(cancelTop), w: rect.w - 48, h: 30 }, "Cancel", openPauseMenu, {
+        id: "overlay-restart-cancel",
+        scope: "overlay"
+      });
+      drawButton({ x: rect.x + 24, y: oy(cancelTop + 38), w: rect.w - 48, h: 30 }, "Restart", restartToStartScreen, {
+        id: "overlay-restart-accept",
+        scope: "overlay",
+        variant: "danger"
+      });
+      endOverlayScrollViewport(viewport, scrollMeta);
+      return;
+    }
+
     ctx.fillText("Restart game?", rect.x + rect.w / 2, rect.y + (compact ? 16 : 24));
     Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, rect.y + (compact ? 50 : 78), rect.w - (compact ? 40 : 72), compact ? 16 : 20, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
@@ -3976,6 +4217,34 @@
 
   function renderAboutOverlay(rect) {
     const compact = isCompactOverlayRect(rect);
+    if (compact) {
+      const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
+      const text = "This game was made by EOP and his wife with the help of Codex to test out a board game idea in the browser. Hope you enjoy testing it with them ;)";
+      const bodyHeight = measureWrappedTextHeight(text, viewport.w, 16, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        maxLines: 10
+      });
+      const buttonTop = viewport.y + 44 + bodyHeight + 12;
+      const contentHeight = (buttonTop - viewport.y) + 30 + 8;
+      const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+      const oy = (value) => value - scrollMeta.scrollY;
+
+      ctx.fillText("About", rect.x + rect.w / 2, oy(viewport.y + 2));
+      Core.drawWrappedText(ctx, text, rect.x + rect.w / 2, oy(viewport.y + 34), scrollMeta.contentWidth, 16, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.84)",
+        align: "center",
+        maxLines: 10
+      });
+      drawButton({ x: rect.x + 24, y: oy(buttonTop), w: rect.w - 48, h: 30 }, "Back", openPauseMenu, {
+        id: "overlay-about-back",
+        scope: "overlay",
+        variant: "primary"
+      });
+      endOverlayScrollViewport(viewport, scrollMeta);
+      return;
+    }
+
     ctx.fillText("About", rect.x + rect.w / 2, rect.y + (compact ? 14 : 22));
     Core.drawWrappedText(ctx, "This game was made by EOP and his wife with the help of Codex to test out a board game idea in the browser. Hope you enjoy testing it with them ;)", rect.x + rect.w / 2, rect.y + (compact ? 48 : 78), rect.w - (compact ? 40 : 72), compact ? 16 : 22, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
@@ -3992,6 +4261,57 @@
 
   function renderRoundSummaryOverlay(rect) {
     const compact = isCompactOverlayRect(rect);
+    if (compact) {
+      const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
+      const summaryText = game.overlay.lines.join("\n");
+      const summaryHeight = measureWrappedTextHeight(summaryText, viewport.w, 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        maxLines: 6
+      });
+      const rowStart = viewport.y + 70 + summaryHeight;
+      const rowHeight = 32;
+      const rowGap = 6;
+      const rowsHeight = (game.overlay.rows.length * rowHeight) + Math.max(0, game.overlay.rows.length - 1) * rowGap;
+      const buttonTop = rowStart + rowsHeight + 12;
+      const contentHeight = (buttonTop - viewport.y) + 30 + 8;
+      const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+      const oy = (value) => value - scrollMeta.scrollY;
+
+      ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
+      Core.drawWrappedText(ctx, summaryText, rect.x + rect.w / 2, oy(viewport.y + 30), scrollMeta.contentWidth, 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.84)",
+        align: "center",
+        maxLines: 6
+      });
+
+      game.overlay.rows.forEach((row, index) => {
+        const rowRect = { x: viewport.x, y: oy(rowStart + index * (rowHeight + rowGap)), w: scrollMeta.contentWidth, h: rowHeight };
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
+        ctx.fillStyle = row.player.color.text;
+        ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
+        ctx.fillStyle = "#432e1e";
+        ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
+        ctx.textAlign = "right";
+        ctx.fillText(fitText(row.right, 78, ctx.font), rowRect.x + rowRect.w - 10, rowRect.y + 10);
+      });
+
+      drawButton({ x: rect.x + 24, y: oy(buttonTop), w: rect.w - 48, h: 30 }, `Start ${ROUND_DEFS[game.roundIndex + 1].name}`, startNextRound, {
+        id: "overlay-next-round",
+        scope: "overlay",
+        variant: "primary"
+      });
+
+      endOverlayScrollViewport(viewport, scrollMeta);
+      return;
+    }
+
     ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 20));
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + (compact ? 42 : 60), rect.w - (compact ? 36 : 64), compact ? 14 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
@@ -3999,9 +4319,7 @@
       align: "center",
       maxLines: compact ? 2 : 3
     });
-    if (compact) {
-      drawCompactOverlayRows(rect, game.overlay.rows, { startY: rect.y + 80, buttonTop: rect.y + rect.h - 42 });
-    } else {
+    {
       const rowsY = rect.y + 122;
       const rowHeight = 54;
       game.overlay.rows.forEach((row, index) => {
@@ -4027,7 +4345,6 @@
         ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 17);
       });
     }
-
     drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : 90), y: rect.y + rect.h - (compact ? 38 : 68), w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : rect.w - 180, h: compact ? 30 : 42 }, `Start ${ROUND_DEFS[game.roundIndex + 1].name}`, startNextRound, {
       id: "overlay-next-round",
       scope: "overlay",
@@ -4037,6 +4354,57 @@
 
   function renderFinalOverlay(rect) {
     const compact = isCompactOverlayRect(rect);
+    if (compact) {
+      const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
+      const summaryText = game.overlay.lines.join("\n");
+      const summaryHeight = measureWrappedTextHeight(summaryText, viewport.w, 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        maxLines: 6
+      });
+      const rowStart = viewport.y + 70 + summaryHeight;
+      const rowHeight = 32;
+      const rowGap = 6;
+      const rowsHeight = (game.overlay.rows.length * rowHeight) + Math.max(0, game.overlay.rows.length - 1) * rowGap;
+      const buttonTop = rowStart + rowsHeight + 12;
+      const contentHeight = (buttonTop - viewport.y) + 30 + 8;
+      const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+      const oy = (value) => value - scrollMeta.scrollY;
+
+      ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
+      Core.drawWrappedText(ctx, summaryText, rect.x + rect.w / 2, oy(viewport.y + 30), scrollMeta.contentWidth, 14, {
+        font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.84)",
+        align: "center",
+        maxLines: 6
+      });
+
+      game.overlay.rows.forEach((row, index) => {
+        const rowRect = { x: viewport.x, y: oy(rowStart + index * (rowHeight + rowGap)), w: scrollMeta.contentWidth, h: rowHeight };
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
+        ctx.fillStyle = row.player.color.text;
+        ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
+        ctx.fillStyle = "#432e1e";
+        ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
+        ctx.textAlign = "right";
+        ctx.fillText(fitText(row.right, 78, ctx.font), rowRect.x + rowRect.w - 10, rowRect.y + 10);
+      });
+
+      drawButton({ x: rect.x + 24, y: oy(buttonTop), w: rect.w - 48, h: 30 }, "Back to Start", restartToStartScreen, {
+        id: "overlay-restart",
+        scope: "overlay",
+        variant: "primary"
+      });
+
+      endOverlayScrollViewport(viewport, scrollMeta);
+      return;
+    }
+
     ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 18));
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + (compact ? 42 : 56), rect.w - (compact ? 36 : 60), compact ? 14 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
@@ -4044,9 +4412,7 @@
       align: "center",
       maxLines: compact ? 2 : 3
     });
-    if (compact) {
-      drawCompactOverlayRows(rect, game.overlay.rows, { startY: rect.y + 80, buttonTop: rect.y + rect.h - 42 });
-    } else {
+    {
       const rowsY = rect.y + 116;
       const rowHeight = 52;
       game.overlay.rows.forEach((row, index) => {
@@ -4072,7 +4438,6 @@
         ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 16);
       });
     }
-
     drawButton({ x: rect.x + (runtime.layout.mode === "mobile-portrait" ? 24 : 90), y: rect.y + rect.h - (compact ? 38 : 66), w: runtime.layout.mode === "mobile-portrait" ? rect.w - 48 : rect.w - 180, h: compact ? 30 : 42 }, "Back to Start", restartToStartScreen, {
       id: "overlay-restart",
       scope: "overlay",
@@ -4085,6 +4450,7 @@
     runtime.layout = computeLayout(controller.state.width, controller.state.height);
     runtime.targets = [];
     runtime.frontScroll = null;
+    runtime.overlayScroll = null;
     cleanupTransientState();
     if (!game.directorRevealed && game.ui.objectiveTab === "director") game.ui.objectiveTab = "shared";
 
