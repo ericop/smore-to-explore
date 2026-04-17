@@ -1322,6 +1322,10 @@
     return runtime.layout.mode !== "desktop" || runtime.layout.height < 780;
   }
 
+  function isVeryShortViewport() {
+    return runtime.layout.height <= 430;
+  }
+
   function measureWrappedTextHeight(text, maxWidth, lineHeight, options = {}) {
     const font = options.font || "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     const maxLines = options.maxLines || Number.POSITIVE_INFINITY;
@@ -3437,12 +3441,29 @@
 
   function drawFrontScreenShell(title, subtitle = "", options = {}) {
     const compact = isFrontScreenCompact();
+    const short = isVeryShortViewport();
     const shell = {
       x: runtime.layout.pad,
       y: runtime.layout.pad,
       w: runtime.layout.width - runtime.layout.pad * 2,
       h: runtime.layout.height - runtime.layout.pad * 2
     };
+    const titleY = shell.y + (short ? 14 : 20);
+    const titleFont = options.titleFont || (short
+      ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : compact
+      ? "800 24px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 34px 'Avenir Next', 'Trebuchet MS', sans-serif");
+    const subtitleY = titleY + (short ? 28 : 42);
+    const subtitleLineHeight = short ? 16 : compact ? 18 : 20;
+    const subtitleFont = short
+      ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : compact
+      ? "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const subtitleLines = short ? 2 : compact ? 3 : 2;
+    const bodyTop = shell.y + (subtitle ? (short ? 88 : 120) : (short ? 64 : 82));
+    const bodyBottomInset = subtitle ? (short ? 96 : 142) : (short ? 78 : 104);
     Core.drawRoundedRect(ctx, shell.x, shell.y, shell.w, shell.h, 30, "rgba(255, 248, 239, 0.97)", "rgba(108,80,54,0.18)", 1.6);
     Core.drawRoundedRect(ctx, shell.x + 1, shell.y + 1, shell.w - 2, shell.h - 2, 29, null, "rgba(255,255,255,0.22)", 1);
 
@@ -3455,25 +3476,21 @@
     ctx.fill();
 
     ctx.fillStyle = "#3d2d20";
-    ctx.font = options.titleFont || (compact
-      ? "800 24px 'Avenir Next', 'Trebuchet MS', sans-serif"
-      : "800 34px 'Avenir Next', 'Trebuchet MS', sans-serif");
+    ctx.font = titleFont;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(title, shell.x + 22, shell.y + 20);
+    ctx.fillText(title, shell.x + 22, titleY);
 
     if (subtitle) {
-      Core.drawWrappedText(ctx, subtitle, shell.x + 22, shell.y + 62, Math.min(shell.w - 44, runtime.layout.mode === "desktop" ? 620 : shell.w - 44), compact ? 18 : 20, {
-        font: compact
-          ? "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
-          : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      Core.drawWrappedText(ctx, subtitle, shell.x + 22, subtitleY, Math.min(shell.w - 44, runtime.layout.mode === "desktop" ? 620 : shell.w - 44), subtitleLineHeight, {
+        font: subtitleFont,
         color: "rgba(82, 61, 44, 0.84)",
-        maxLines: compact ? 3 : 2
+        maxLines: subtitleLines
       });
     }
 
     if (options.onClose) {
-      drawScreenButton({ x: shell.x + shell.w - 62, y: shell.y + 18, w: 40, h: 40 }, "X", options.onClose, {
+      drawScreenButton({ x: shell.x + shell.w - (short ? 56 : 62), y: shell.y + (short ? 12 : 18), w: short ? 36 : 40, h: short ? 36 : 40 }, "X", options.onClose, {
         id: `${options.scopeKey || "screen"}-close`,
         font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
@@ -3483,9 +3500,9 @@
       shell,
       body: {
         x: shell.x + 22,
-        y: shell.y + (subtitle ? 120 : 82),
+        y: bodyTop,
         w: shell.w - 44,
-        h: shell.h - (subtitle ? 142 : 104)
+        h: shell.h - bodyBottomInset
       }
     };
   }
@@ -3741,24 +3758,25 @@
 
   function renderHowToScreen() {
     const compact = isFrontScreenCompact();
+    const short = isVeryShortViewport();
     const step = HOW_TO_STEPS[game.ui.howToStep];
     const { shell, body } = drawFrontScreenShell("How to Play", "A quick guided walkthrough of the real turn flow, placement rules, scoring, and the mistakes new groups usually make.", {
       onClose: closeHowToScreen,
       scopeKey: "howto"
     });
-    const navHeight = compact ? 48 : 54;
-    const navInset = compact ? 16 : 18;
+    const navHeight = short ? 38 : compact ? 48 : 54;
+    const navInset = short ? 12 : compact ? 16 : 18;
     const contentViewport = {
       x: body.x,
       y: body.y,
       w: body.w,
-      h: Math.max(140, shell.y + shell.h - navInset - navHeight - 12 - body.y)
+      h: Math.max(short ? 92 : 140, shell.y + shell.h - navInset - navHeight - (short ? 8 : 12) - body.y)
     };
     const scrollState = drawTutorialStepCards(contentViewport, step, compact);
     if (game.ui.howToScroll !== scrollState.scrollY) game.ui.howToScroll = scrollState.scrollY;
 
-    const backWidth = compact ? 92 : 120;
-    const nextWidth = compact ? 110 : 150;
+    const backWidth = short ? 82 : compact ? 92 : 120;
+    const nextWidth = short ? 96 : compact ? 110 : 150;
     const navY = shell.y + shell.h - navInset - navHeight;
     drawScreenButton({ x: shell.x + 22, y: navY, w: backWidth, h: navHeight }, "Back", () => {
       game.ui.howToStep = Math.max(0, game.ui.howToStep - 1);
