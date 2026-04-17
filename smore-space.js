@@ -638,6 +638,10 @@
     return Core.sum(inventory, (entry) => entry.count);
   }
 
+  function clearLandscapeInventory(inventory) {
+    inventory.splice(0, inventory.length);
+  }
+
   function decrementLandscapeInventory(inventory, typeId) {
     const entry = inventory.find((item) => item.typeId === typeId);
     if (!entry) return;
@@ -678,6 +682,18 @@
   function getPendingMarketPurchaseRemaining() {
     if (!hasPendingMarketPurchase()) return 0;
     return game.turn.marketPurchaseStack.length - game.turn.marketPurchaseIndex;
+  }
+
+  function getLandscapePhaseValidationErrors(player) {
+    if (!player) return ["No player is active."];
+    return validateFinishedLandscapePhase(player);
+  }
+
+  function isLandscapePhaseReadyToContinue() {
+    const player = getPlayer();
+    if (!player || game.phase !== "setupLandscape") return false;
+    if (!game.turn.actionTaken) return false;
+    return getLandscapePhaseValidationErrors(player).length === 0;
   }
 
   function setMessage(gameState, tone, title, body) {
@@ -1280,13 +1296,13 @@
     if (gameState.phase === "setupLandscape" && gameState.roundIndex === 0) {
       lines = [
         `${player.name} is building the opening road skeleton.`,
-        "Place all 10 starting landscape tiles, keep the network connected, and fold the Camp Office into the road.",
+        "Place as many starting landscape tiles as you want, but keep the network connected and fold the Camp Office into the road before you continue.",
         "Hand the device over after pressing Ready."
       ];
     } else if (gameState.phase === "setupLandscape") {
       lines = [
         `${player.name} is placing the ${round.name} expansion tiles.`,
-        `Place all 8 new landscape tiles before the contractor market reopens for ${round.name}.`,
+        `Place any ${round.name} expansion tiles you want, then continue once the current road layout is valid.`,
         "Hand the device over after pressing Ready."
       ];
     } else if (gameState.phase === "build") {
@@ -1473,6 +1489,25 @@
     return countRemainingLandscapeTiles(player.landscapeInventory) === 0 && validateFinishedLandscapePhase(player).length === 0;
   }
 
+  function passRemainingLandscapeTiles() {
+    const player = getPlayer();
+    if (!player || game.phase !== "setupLandscape" || game.turn.actionTaken) return;
+    const errors = getLandscapePhaseValidationErrors(player);
+    if (errors.length) {
+      setMessage(game, "error", "Layout still needs work", `${errors[0]} You can only pass on the rest of the landscape tiles after the current layout is valid.`);
+      return;
+    }
+
+    const skippedCount = countRemainingLandscapeTiles(player.landscapeInventory);
+    clearLandscapeInventory(player.landscapeInventory);
+    clearSelection();
+    game.ui.lastAttempt = null;
+    game.turn.actionTaken = true;
+    game.turn.actionType = "landscape-pass";
+    setMessage(game, "warning", "Layout locked early", `${player.name} skipped ${skippedCount} remaining landscape tile${skippedCount === 1 ? "" : "s"} and can continue.`);
+    pushFeed(game, "info", `${player.name} passed on remaining landscape`, `${player.name} ended ${getCurrentRound().name} layout early with ${skippedCount} unused landscape tile${skippedCount === 1 ? "" : "s"}.`);
+  }
+
   function markAttempt(row, col, reasons) {
     game.ui.lastAttempt = {
       row,
@@ -1580,7 +1615,7 @@
     if (!player.landscapeInventory.some((entry) => entry.typeId === game.ui.selection.typeId)) clearSelection();
 
     if (countRemainingLandscapeTiles(player.landscapeInventory) === 0) {
-      const errors = validateFinishedLandscapePhase(player);
+      const errors = getLandscapePhaseValidationErrors(player);
       if (errors.length) {
         setMessage(game, "error", "Layout still needs work", `${errors[0]} Undo the latest tile if you need to re-route the road network.`);
         return;
@@ -1665,7 +1700,7 @@
 
   function continueLandscapeFlow() {
     const player = getPlayer();
-    if (!player || !isCurrentLandscapePhaseComplete()) return;
+    if (!player || !isLandscapePhaseReadyToContinue()) return;
     clearTurnUi();
     game.turn = createTurnState();
     if (game.currentPlayerIndex < game.players.length - 1) {
@@ -2617,7 +2652,9 @@
         : { tone: "success", title: "Turn complete", body: "End the turn to hand the device to the next player." };
     }
     if (game.turn.actionTaken && game.phase === "setupLandscape") {
-      return { tone: "success", title: "Layout complete", body: "Continue to the next player or open the contractor market." };
+      return countRemainingLandscapeTiles(player.landscapeInventory) > 0
+        ? { tone: "warning", title: "Layout locked early", body: "Unused landscape tiles were skipped. Continue to the next player or open the contractor market." }
+        : { tone: "success", title: "Layout complete", body: "Continue to the next player or open the contractor market." };
     }
     if (game.ui.inspectedCell) {
       const cell = getCell(player.board, game.ui.inspectedCell.row, game.ui.inspectedCell.col);
@@ -2647,7 +2684,10 @@
         actions.push({ label: "Rotate Right", onClick: () => rotateSelectedLandscape(1) });
       }
       if (game.ui.selection.source) actions.push({ label: "Clear", onClick: clearSelection });
-      if (isCurrentLandscapePhaseComplete()) actions.push({ label: "Continue", onClick: continueLandscapeFlow, variant: "primary" });
+      if (!game.turn.actionTaken && countRemainingLandscapeTiles(player.landscapeInventory) > 0) {
+        actions.push({ label: "Pass Tiles", onClick: passRemainingLandscapeTiles, variant: "warning" });
+      }
+      if (isLandscapePhaseReadyToContinue()) actions.push({ label: "Continue", onClick: continueLandscapeFlow, variant: "primary" });
       return actions;
     }
     if (game.phase === "build") {
