@@ -50,10 +50,10 @@
       lead: "Each season has a landscape setup phase and a build phase. The game moves in a practical rhythm once you know which phase you are in.",
       bullets: [
         "During landscape setup, place every tile in your current hand before the market opens.",
-        "During build, buy one visible contractor tile and place it, or pass for the rest of the round.",
+        "During build, hire the top contractor in a column or buy deeper into one column and take that whole stack.",
         "When every player has passed, the round scores and the next season begins."
       ],
-      reminder: "A build turn is only one buy-and-place action, so check the board before you spend."
+      reminder: "If you buy deeper in a column, you pay for every contractor above it and must place them in top-down order."
     },
     {
       title: "Board And Placement Rules",
@@ -70,8 +70,8 @@
       lead: "Contractor tiles come from the shared market, and every contractor costs $10,000. The market is public, so everyone can plan around the same options.",
       bullets: [
         "The market shows two amenity columns and four camp columns while the build phase is open.",
-        "When you buy a contractor, that market slot refills immediately.",
-        "You cannot reserve a tile for later and you cannot place a contractor you cannot afford."
+        "Taking a deeper contractor means buying every contractor above it in that same column for the same turn.",
+        "You pay for the full stack up front, then place those contractors starting from the top tile first."
       ],
       reminder: "Check the parcel first, then spend the money. A tile can be affordable and still be illegal to place."
     },
@@ -358,7 +358,12 @@
   function createTurnState() {
     return {
       actionTaken: false,
-      actionType: null
+      actionType: null,
+      marketPurchaseStack: [],
+      marketPurchaseIndex: 0,
+      marketPurchaseColumnIndex: null,
+      marketPurchaseDepth: null,
+      marketPurchaseTotalCost: 0
     };
   }
 
@@ -659,6 +664,20 @@
     game.ui.inspectedCell = null;
     game.ui.hoveredCell = null;
     game.ui.lastAttempt = null;
+  }
+
+  function hasPendingMarketPurchase() {
+    return game.phase === "build" && Array.isArray(game.turn.marketPurchaseStack) && game.turn.marketPurchaseStack.length > 0 && game.turn.marketPurchaseIndex < game.turn.marketPurchaseStack.length;
+  }
+
+  function getPendingMarketPurchaseEntry() {
+    if (!hasPendingMarketPurchase()) return null;
+    return game.turn.marketPurchaseStack[game.turn.marketPurchaseIndex];
+  }
+
+  function getPendingMarketPurchaseRemaining() {
+    if (!hasPendingMarketPurchase()) return 0;
+    return game.turn.marketPurchaseStack.length - game.turn.marketPurchaseIndex;
   }
 
   function setMessage(gameState, tone, title, body) {
@@ -1273,7 +1292,7 @@
     } else if (gameState.phase === "build") {
       lines = [
         `${player.name} is taking a ${round.name} build turn.`,
-        "Buy one visible contractor tile, place it on your own board, then end your turn or pass for the round.",
+        "Hire the top contractor in a column, or take a deeper stack and place it from the top down on your own board.",
         "Hand the device over after pressing Ready."
       ];
     }
@@ -1482,20 +1501,43 @@
 
   function selectMarketTile(columnIndex, slotIndex) {
     const player = getPlayer();
-    if (!player || game.phase !== "build" || game.turn.actionTaken) return;
+    if (!player || game.phase !== "build" || game.turn.actionTaken || hasPendingMarketPurchase()) return;
     const same = game.ui.selection.source === "market" && game.ui.selection.columnIndex === columnIndex && game.ui.selection.slotIndex === slotIndex;
-    game.ui.selection = same
-      ? createSelection()
-      : { source: "market", typeId: game.market.columns[columnIndex].slots[slotIndex].typeId, rotation: 0, columnIndex, slotIndex };
+    if (same) {
+      game.ui.selection = createSelection();
+      game.ui.inspectedCell = null;
+      game.ui.lastAttempt = null;
+      setMessage(game, "info", "Selection cleared", "Choose another contractor or inspect your board.");
+      return;
+    }
+
+    const stack = game.market.columns[columnIndex].slots.slice(0, slotIndex + 1).map((slot, index) => ({
+      typeId: slot.typeId,
+      slotIndex: index
+    }));
+    const totalCost = stack.reduce((sum, entry) => sum + getCampDef(entry.typeId).cost, 0);
+    if (player.money < totalCost) {
+      setMessage(game, "error", "Not enough cash", `${Core.formatMoney(totalCost)} is needed to hire ${stack.length} contractor${stack.length === 1 ? "" : "s"} from this column.`);
+      return;
+    }
+
+    player.money -= totalCost;
+    game.turn.marketPurchaseStack = stack;
+    game.turn.marketPurchaseIndex = 0;
+    game.turn.marketPurchaseColumnIndex = columnIndex;
+    game.turn.marketPurchaseDepth = slotIndex;
+    game.turn.marketPurchaseTotalCost = totalCost;
+    game.ui.selection = { source: "market", typeId: stack[0].typeId, rotation: 0, columnIndex, slotIndex: 0 };
     game.ui.inspectedCell = null;
     game.ui.lastAttempt = null;
-    if (same) {
-      setMessage(game, "info", "Selection cleared", "Choose another contractor or inspect your board.");
+    const firstDef = getCampDef(stack[0].typeId);
+    const columnLabel = game.market.columns[columnIndex].label;
+    if (stack.length === 1) {
+      setMessage(game, "info", "Contractor selected", `${firstDef.name} was hired for ${Core.formatMoney(totalCost)}. Tap a valid parcel to place it.`);
     } else {
-      const def = getCampDef(game.ui.selection.typeId);
-      setMessage(game, "info", "Contractor selected", `${def.name} costs ${Core.formatMoney(def.cost)}. The phone switches back to the board so you can tap a valid parcel to place it.`);
-      if (runtime.layout?.mode === "mobile-portrait") game.ui.mobileTab = "board";
+      setMessage(game, "info", "Column stack hired", `${stack.length} contractors were hired from ${columnLabel} for ${Core.formatMoney(totalCost)}. Place ${firstDef.name} first, then continue downward.`);
     }
+    if (runtime.layout?.mode === "mobile-portrait") game.ui.mobileTab = "board";
   }
 
   function rotateSelectedLandscape(delta) {
@@ -1556,37 +1598,63 @@
 
   function attemptCampPlacement(row, col) {
     const player = getPlayer();
-    if (!player || game.phase !== "build" || game.ui.selection.source !== "market" || game.turn.actionTaken) return;
-    const reasons = getCampTilePlacementReasons(game, player, row, col, game.ui.selection.typeId);
+    if (!player || game.phase !== "build" || game.ui.selection.source !== "market" || game.turn.actionTaken || !hasPendingMarketPurchase()) return;
+    const pending = getPendingMarketPurchaseEntry();
+    const reasons = getCampTilePlacementReasons(game, player, row, col, pending.typeId);
     markAttempt(row, col, reasons);
     if (reasons.length) {
       setMessage(game, "error", "Invalid camp placement", reasons[0]);
       return;
     }
 
-    const selection = { ...game.ui.selection };
     const cell = getCell(player.board, row, col);
-    const campDef = getCampDef(selection.typeId);
-    cell.campTile = { typeId: selection.typeId };
-    player.money -= campDef.cost;
+    const campDef = getCampDef(pending.typeId);
+    cell.campTile = { typeId: pending.typeId };
     player.roundCampPlacements[game.roundIndex] += 1;
     player.passedThisRound = false;
     game.ui.inspectedCell = { row, col };
+
+    const bonuses = scoreAdjacencyBonuses(game, player, row, col, pending.typeId);
+    game.ui.lastAttempt = null;
+    game.turn.marketPurchaseIndex += 1;
+
+    const remaining = getPendingMarketPurchaseRemaining();
+    if (remaining > 0) {
+      const nextPending = getPendingMarketPurchaseEntry();
+      game.ui.selection = {
+        source: "market",
+        typeId: nextPending.typeId,
+        rotation: 0,
+        columnIndex: game.turn.marketPurchaseColumnIndex,
+        slotIndex: nextPending.slotIndex
+      };
+      setMessage(game, "success", "Contractor placed", `${campDef.name} was built.${bonuses.lines.length ? ` ${bonuses.lines[0]}` : ""} ${remaining} contractor${remaining === 1 ? "" : "s"} remain from this column purchase. Place ${getCampDef(nextPending.typeId).name} next.`);
+      pushFeed(game, "success", `${player.name} built ${campDef.name}`, `${player.name} is still resolving a ${game.turn.marketPurchaseStack.length}-tile market stack from ${game.market.columns[game.turn.marketPurchaseColumnIndex].label}.`);
+      return;
+    }
+
+    const completedCount = game.turn.marketPurchaseStack.length;
+    const completedCost = game.turn.marketPurchaseTotalCost;
+    const completedColumnLabel = game.market.columns[game.turn.marketPurchaseColumnIndex].label;
+    for (let refillIndex = 0; refillIndex <= game.turn.marketPurchaseDepth; refillIndex += 1) {
+      refillMarketSlot(game, game.turn.marketPurchaseColumnIndex, refillIndex);
+    }
+    game.turn.marketPurchaseStack = [];
+    game.turn.marketPurchaseIndex = 0;
+    game.turn.marketPurchaseColumnIndex = null;
+    game.turn.marketPurchaseDepth = null;
+    game.turn.marketPurchaseTotalCost = 0;
     game.turn.actionTaken = true;
     game.turn.actionType = "build";
-
-    const bonuses = scoreAdjacencyBonuses(game, player, row, col, selection.typeId);
-    refillMarketSlot(game, selection.columnIndex, selection.slotIndex);
     clearSelection();
-    game.ui.lastAttempt = null;
 
-    setMessage(game, "success", "Contractor placed", `${campDef.name} was built for ${Core.formatMoney(campDef.cost)}.${bonuses.lines.length ? ` ${bonuses.lines[0]}` : ""}`);
-    pushFeed(game, "success", `${player.name} built ${campDef.name}`, `${player.name} spent ${Core.formatMoney(campDef.cost)} during ${getCurrentRound().name}.`);
+    setMessage(game, "success", "Contractor stack complete", `${completedCount} contractor${completedCount === 1 ? "" : "s"} from ${completedColumnLabel} were built for ${Core.formatMoney(completedCost)}.${bonuses.lines.length ? ` ${bonuses.lines[0]}` : ""} End the turn when you are ready.`);
+    pushFeed(game, "success", `${player.name} finished a market stack`, `${player.name} built ${completedCount} contractor${completedCount === 1 ? "" : "s"} from ${completedColumnLabel} during ${getCurrentRound().name}.`);
   }
 
   function passCurrentPlayerForRound() {
     const player = getPlayer();
-    if (!player || game.phase !== "build" || game.turn.actionTaken) return;
+    if (!player || game.phase !== "build" || game.turn.actionTaken || hasPendingMarketPurchase()) return;
     player.passedThisRound = true;
     clearSelection();
     game.turn.actionTaken = true;
@@ -1614,8 +1682,8 @@
       entry.passedThisRound = false;
     });
     refreshMarket(game);
-    setMessage(game, "info", `${getCurrentRound().name} build`, "Select a contractor from the market, place it on your own board, then end your turn.");
-    pushFeed(game, "info", `${getCurrentRound().name} market opened`, "All players finished landscape placement and the shared contractor market is open.");
+    setMessage(game, "info", `${getCurrentRound().name} build`, "Hire the top contractor in any column, or take a deeper stack and place it from the top down before ending your turn.");
+    pushFeed(game, "info", `${getCurrentRound().name} market opened`, "All players finished landscape placement and the shared contractor market is open for top-card hires or full column stacks.");
     openHandoffOverlay(game);
   }
 
@@ -2537,7 +2605,9 @@
       return {
         tone: "info",
         title: `${def.name} selected`,
-        body: `${Core.formatMoney(def.cost)} | ${def.rulesText}`
+        body: hasPendingMarketPurchase()
+          ? `${getPendingMarketPurchaseRemaining()} contractor${getPendingMarketPurchaseRemaining() === 1 ? "" : "s"} left in this paid stack | ${def.rulesText}`
+          : `${Core.formatMoney(def.cost)} for the top card, or ${Core.formatMoney((game.ui.selection.slotIndex + 1) * def.cost)} for this full stack | ${def.rulesText}`
       };
     }
 
@@ -2581,6 +2651,7 @@
       return actions;
     }
     if (game.phase === "build") {
+      if (hasPendingMarketPurchase()) return actions;
       if (game.ui.selection.source) actions.push({ label: "Clear", onClick: clearSelection });
       if (!game.turn.actionTaken) actions.push({ label: "Pass Round", onClick: passCurrentPlayerForRound, variant: "warning" });
       if (game.turn.actionTaken) {
@@ -3036,8 +3107,13 @@
   function renderMarketPanel(rect) {
     const player = getPlayer();
     const isPortrait = runtime.layout.mode === "mobile-portrait";
-    const buildOpen = game.phase === "build" && !game.turn.actionTaken;
-    const subtitle = buildOpen ? "Two amenity columns plus four campsite columns stay face-up. Each contractor costs $10,000." : "Contractors stay visible between turns, but hiring only works during the build phase.";
+    const buildOpen = game.phase === "build" && !game.turn.actionTaken && !hasPendingMarketPurchase();
+    const pendingEntry = getPendingMarketPurchaseEntry();
+    const subtitle = hasPendingMarketPurchase()
+      ? `Stack already hired. Place ${getCampDef(pendingEntry.typeId).name} next, then continue down that column.`
+      : buildOpen
+      ? "Tap the top contractor for a single hire, or tap deeper in a column to buy that full stack and place it from the top down."
+      : "Contractors stay visible between turns, but hiring only works during the build phase.";
     const content = drawPanel(rect, "Contractor Market", subtitle);
     if (!player) return;
 
@@ -3103,12 +3179,23 @@
         const slotRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap + visibleSlotIndex * (rowHeight + rowGap), w: colRect.w, h: rowHeight };
         const globalColumnIndex = startIndex + visibleIndex;
         const selected = game.ui.selection.source === "market" && game.ui.selection.columnIndex === globalColumnIndex && game.ui.selection.slotIndex === slotIndex;
+        const queued = hasPendingMarketPurchase() && game.turn.marketPurchaseColumnIndex === globalColumnIndex && slotIndex <= game.turn.marketPurchaseDepth;
         registerTarget(slotRect, buildOpen ? () => selectMarketTile(globalColumnIndex, slotIndex) : null, {
           id: `market-${globalColumnIndex}-${slotIndex}`,
           enabled: buildOpen,
           kind: "market-slot"
         });
-        Core.drawRoundedRect(ctx, slotRect.x, slotRect.y, slotRect.w, slotRect.h, 16, selected ? "rgba(255, 232, 204, 0.98)" : "rgba(250, 243, 233, 0.98)", selected ? "#cc7a3f" : "rgba(108,80,54,0.16)", selected ? 2 : 1.1);
+        Core.drawRoundedRect(
+          ctx,
+          slotRect.x,
+          slotRect.y,
+          slotRect.w,
+          slotRect.h,
+          16,
+          selected ? "rgba(255, 232, 204, 0.98)" : queued ? "rgba(255, 243, 223, 0.98)" : "rgba(250, 243, 233, 0.98)",
+          selected ? "#cc7a3f" : queued ? "rgba(204,122,63,0.42)" : "rgba(108,80,54,0.16)",
+          selected ? 2 : queued ? 1.5 : 1.1
+        );
         const iconSize = Math.max(16, slotRect.h - 10);
         const miniRect = { x: slotRect.x + 6, y: slotRect.y + (slotRect.h - iconSize) / 2, w: iconSize, h: iconSize };
         drawCampTileVisual(miniRect, { typeId: def.id });
@@ -3137,6 +3224,13 @@
           ctx.fillStyle = buildOpen ? "#442f20" : "rgba(68,47,32,0.52)";
           ctx.textAlign = "right";
           ctx.fillText("$10k", priceX, slotRect.y + 7);
+        }
+        if (queued) {
+          ctx.fillStyle = selected ? "#b7632c" : "rgba(183,99,44,0.76)";
+          ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
+          ctx.textAlign = "right";
+          ctx.textBaseline = "bottom";
+          ctx.fillText(selected ? "PLACE NOW" : "IN STACK", slotRect.x + slotRect.w - 8, slotRect.y + slotRect.h - 6);
         }
       });
     });
