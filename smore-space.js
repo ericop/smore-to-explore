@@ -22,6 +22,13 @@
   const ACTIVE_DIRECTOR_OBJECTIVE_COUNT = 3;
   const MAX_FEED_ITEMS = 6;
   const PLAYER_NAME_STORAGE_KEY = "smore-to-explore-player-names-v1";
+  const APP_SCREENS = {
+    start: "startScreen",
+    setup: "setupGame",
+    howTo: "howToPlay",
+    about: "about",
+    inGame: "inGame"
+  };
   const GAME_PITCH = "Build the smartest campground through three summer rounds, score shared goals, and win the final Camp Director review.";
   const GAME_INTRO = "Pass one device around the table and grow your own campground one turn at a time.";
   const HOW_TO_STEPS = [
@@ -331,6 +338,8 @@
   function createUiState(playerCount = 2) {
     return {
       configuredPlayerCount: playerCount,
+      appScreen: APP_SCREENS.start,
+      returnScreen: APP_SCREENS.start,
       showStartScreen: true,
       gameActive: false,
       howToOpen: false,
@@ -338,6 +347,9 @@
       howToScroll: 0,
       overlayScroll: 0,
       aboutOpen: false,
+      activeScene: "board",
+      activePanel: null,
+      playersPanelExpanded: false,
       mobileTab: "board",
       boardView: "hand",
       sideTab: "objectives",
@@ -552,6 +564,8 @@
       overlay: null,
       ui: {
         ...createUiState(playerCount),
+        appScreen: APP_SCREENS.inGame,
+        returnScreen: APP_SCREENS.inGame,
         showStartScreen: false,
         gameActive: true
       },
@@ -668,6 +682,36 @@
     game.ui.inspectedCell = null;
     game.ui.hoveredCell = null;
     game.ui.lastAttempt = null;
+  }
+
+  function setActiveScene(scene) {
+    game.ui.activeScene = scene;
+    game.ui.activePanel = scene === "board" ? null : scene;
+    game.ui.mobileTab = scene === "goals" ? "objectives" : scene;
+    game.ui.sideTab = scene === "goals" ? "objectives" : scene === "board" ? "objectives" : scene;
+  }
+
+  function setAppScreen(screen) {
+    game.ui.appScreen = screen;
+    game.ui.showStartScreen = screen === APP_SCREENS.start || screen === APP_SCREENS.setup;
+    game.ui.howToOpen = screen === APP_SCREENS.howTo;
+    game.ui.aboutOpen = screen === APP_SCREENS.about;
+    game.ui.gameActive = screen === APP_SCREENS.inGame;
+    if (screen !== APP_SCREENS.howTo) {
+      game.ui.howToScroll = 0;
+      runtime.frontScroll = null;
+      runtime.frontScrollDrag = null;
+    }
+  }
+
+  function getDefaultSceneForGameState(gameState = game) {
+    const pendingPurchase = gameState.phase === "build"
+      && Array.isArray(gameState.turn?.marketPurchaseStack)
+      && gameState.turn.marketPurchaseStack.length > 0
+      && gameState.turn.marketPurchaseIndex < gameState.turn.marketPurchaseStack.length;
+    if (gameState.phase === "build") return pendingPurchase ? "board" : "market";
+    if (gameState.phase === "gameOver") return "score";
+    return "board";
   }
 
   function hasPendingMarketPurchase() {
@@ -1292,7 +1336,15 @@
     const player = gameState.players[gameState.currentPlayerIndex];
     const round = getCurrentRound(gameState);
     let lines = [];
-    if (gameState.ui) gameState.ui.boardView = gameState.phase === "setupLandscape" ? "hand" : "board";
+    if (gameState.ui) {
+      const defaultScene = getDefaultSceneForGameState(gameState);
+      gameState.ui.boardView = gameState.phase === "setupLandscape" ? "hand" : "board";
+      gameState.ui.activeScene = defaultScene;
+      gameState.ui.activePanel = null;
+      gameState.ui.mobileTab = defaultScene === "goals" ? "objectives" : defaultScene;
+      gameState.ui.sideTab = defaultScene === "goals" ? "objectives" : defaultScene === "board" ? "objectives" : defaultScene;
+      gameState.ui.playersPanelExpanded = false;
+    }
     if (gameState.phase === "setupLandscape" && gameState.roundIndex === 0) {
       lines = [
         `${player.name} is building the opening road skeleton.`,
@@ -1325,32 +1377,29 @@
   }
 
   function frontScreenActive() {
-    return !!(game.ui.showStartScreen || game.ui.howToOpen || game.ui.aboutOpen);
+    return game.ui.appScreen !== APP_SCREENS.inGame;
   }
 
   function openHowToScreen(step = 0) {
     nameEditor?.close();
-    game.ui.howToOpen = true;
-    game.ui.aboutOpen = false;
+    game.ui.returnScreen = game.ui.appScreen === APP_SCREENS.inGame ? APP_SCREENS.inGame : APP_SCREENS.start;
+    setAppScreen(APP_SCREENS.howTo);
     game.ui.howToStep = Core.clamp(step, 0, HOW_TO_STEPS.length - 1);
     game.ui.howToScroll = 0;
   }
 
   function closeHowToScreen() {
-    game.ui.howToOpen = false;
-    game.ui.howToScroll = 0;
-    runtime.frontScroll = null;
-    runtime.frontScrollDrag = null;
+    setAppScreen(game.ui.returnScreen === APP_SCREENS.inGame && game.players.length ? APP_SCREENS.inGame : APP_SCREENS.start);
   }
 
   function openAboutScreen() {
     nameEditor?.close();
-    game.ui.aboutOpen = true;
-    game.ui.howToOpen = false;
+    game.ui.returnScreen = game.ui.appScreen === APP_SCREENS.inGame ? APP_SCREENS.inGame : APP_SCREENS.start;
+    setAppScreen(APP_SCREENS.about);
   }
 
   function closeAboutScreen() {
-    game.ui.aboutOpen = false;
+    setAppScreen(game.ui.returnScreen === APP_SCREENS.inGame && game.players.length ? APP_SCREENS.inGame : APP_SCREENS.start);
   }
 
   function isFrontScreenCompact() {
@@ -1433,6 +1482,7 @@
 
   function beginPlaySession(playerCount) {
     game = createGameState(playerCount);
+    setActiveScene(getDefaultSceneForGameState(game));
   }
 
   function restartToStartScreen() {
@@ -1572,7 +1622,7 @@
     } else {
       setMessage(game, "info", "Column stack hired", `${stack.length} contractors were hired from ${columnLabel} for ${Core.formatMoney(totalCost)}. Place ${firstDef.name} first, then continue downward.`);
     }
-    if (runtime.layout?.mode === "mobile-portrait") game.ui.mobileTab = "board";
+    setActiveScene("board");
   }
 
   function rotateSelectedLandscape(delta) {
@@ -1703,6 +1753,7 @@
     if (!player || !isLandscapePhaseReadyToContinue()) return;
     clearTurnUi();
     game.turn = createTurnState();
+    setActiveScene("board");
     if (game.currentPlayerIndex < game.players.length - 1) {
       game.currentPlayerIndex += 1;
       openHandoffOverlay(game);
@@ -1713,6 +1764,7 @@
     game.currentPlayerIndex = 0;
     game.turn = createTurnState();
     clearTurnUi();
+    setActiveScene("market");
     game.players.forEach((entry) => {
       entry.passedThisRound = false;
     });
@@ -1753,6 +1805,7 @@
     }
     game.currentPlayerIndex = nextIndex;
     if (nextIndex === currentIndex) {
+      setActiveScene(getDefaultSceneForGameState(game));
       setMessage(game, "info", "Another turn", `${getPlayer().name} is the only player still building this round.`);
       return;
     }
@@ -1841,6 +1894,7 @@
 
     pushFeed(game, "success", "Final scoring", "Camp Director goals have been added and the final standings are ready.");
     game.phase = "gameOver";
+    game.ui.activeScene = "score";
     game.overlay = {
       kind: "final",
       blocking: true,
@@ -1874,6 +1928,7 @@
       player.passedThisRound = false;
     });
     refreshMarket(game);
+    setActiveScene(getDefaultSceneForGameState(game));
     setMessage(game, "info", `${getCurrentRound().name} expansion`, `Every player received ${Core.formatMoney(SEASON_BUDGET_GRANT)} and 8 expansion landscape tiles.`);
     pushFeed(game, "info", `${getCurrentRound().name} begins`, "Season expansion tiles were dealt and the next layout phase is ready.");
     openHandoffOverlay(game);
@@ -2080,69 +2135,46 @@
   }
 
   function computeLayout(width, height) {
-    const pad = Core.clamp(Math.round(Math.min(width, height) * 0.014), 8, 18);
-    const gap = Core.clamp(Math.round(Math.min(width, height) * 0.01), 8, 14);
+    const pad = Core.clamp(Math.round(Math.min(width, height) * 0.01), 6, 14);
+    const gap = Core.clamp(Math.round(Math.min(width, height) * 0.008), 6, 10);
     const mode = getLayoutMode(width, height);
-
-    if (mode === "desktop") {
-      const topBarHeight = 116;
-      const bottomBarHeight = 102;
-      const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
-      const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
-      const content = {
-        x: pad,
-        y: topBar.y + topBar.h + gap,
-        w: width - pad * 2,
-        h: bottomBar.y - (topBar.y + topBar.h + gap) - gap
-      };
-      const marketHeight = Core.clamp(Math.round(content.h * 0.42), 290, 380);
-      const topAreaHeight = content.h - marketHeight - gap;
-      const boardWidth = Math.round(content.w * 0.62);
-      const boardPanel = { x: content.x, y: content.y, w: boardWidth, h: topAreaHeight };
-      const sidePanel = { x: boardPanel.x + boardPanel.w + gap, y: content.y, w: content.w - boardWidth - gap, h: topAreaHeight };
-      const infoHeight = 156;
-      const sideTabs = { x: sidePanel.x, y: sidePanel.y + infoHeight + gap, w: sidePanel.w, h: 42 };
-      const sideBody = { x: sidePanel.x, y: sideTabs.y + sideTabs.h + gap, w: sidePanel.w, h: sidePanel.h - infoHeight - sideTabs.h - gap * 2 };
-      const marketPanel = { x: content.x, y: content.y + topAreaHeight + gap, w: content.w, h: marketHeight };
-      return { mode, pad, gap, width, height, topBar, bottomBar, boardPanel, infoPanel: { x: sidePanel.x, y: sidePanel.y, w: sidePanel.w, h: infoHeight }, sideTabs, sideBody, marketPanel };
-    }
-
-    if (mode === "mobile-landscape") {
-      const topBarHeight = 100;
-      const bottomBarHeight = 94;
-      const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
-      const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
-      const content = {
-        x: pad,
-        y: topBar.y + topBar.h + gap,
-        w: width - pad * 2,
-        h: bottomBar.y - (topBar.y + topBar.h + gap) - gap
-      };
-      const boardWidth = Math.round(content.w * 0.56);
-      const boardPanel = { x: content.x, y: content.y, w: boardWidth, h: content.h };
-      const sidePanel = { x: boardPanel.x + boardPanel.w + gap, y: content.y, w: content.w - boardWidth - gap, h: content.h };
-      const infoHeight = 108;
-      const sideTabs = { x: sidePanel.x, y: sidePanel.y + infoHeight + gap, w: sidePanel.w, h: 40 };
-      const sideBody = { x: sidePanel.x, y: sideTabs.y + sideTabs.h + gap, w: sidePanel.w, h: sidePanel.h - infoHeight - sideTabs.h - gap * 2 };
-      return { mode, pad, gap, width, height, topBar, bottomBar, boardPanel, infoPanel: { x: sidePanel.x, y: sidePanel.y, w: sidePanel.w, h: infoHeight }, sideTabs, sideBody };
-    }
-
-    const playerCount = Math.max(2, game.players.length || game.ui.configuredPlayerCount || 2);
-    const extraRosterRows = playerCount > 4 ? 1 : 0;
-    const selectionHeavy = game.ui.selection.source === "landscape" || game.ui.selection.source === "market";
-    const topBarHeight = game.players.length ? 182 + extraRosterRows * 34 : 120;
-    const bottomBarHeight = selectionHeavy ? 176 : game.phase === "setupLandscape" ? 154 : 142;
+    const selectionHeavy = game.ui.selection.source === "landscape" || game.ui.selection.source === "market" || hasPendingMarketPurchase();
+    const short = height <= 430;
+    const topBarHeight = mode === "desktop" ? 70 : mode === "mobile-landscape" ? 64 : short ? 60 : 72;
+    const sceneBarHeight = mode === "desktop" ? 34 : 38;
+    const playersDrawerHeight = game.players.length > 1 && game.ui.playersPanelExpanded
+      ? (mode === "desktop" ? 84 : mode === "mobile-landscape" ? 72 : short ? 82 : 98)
+      : 0;
+    const bottomBarHeight = mode === "desktop"
+      ? 84
+      : mode === "mobile-landscape"
+      ? 86
+      : selectionHeavy
+      ? 114
+      : 84;
     const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
+    const sceneBar = { x: pad, y: topBar.y + topBar.h + gap, w: width - pad * 2, h: sceneBarHeight };
+    const playersDrawer = playersDrawerHeight
+      ? { x: pad, y: sceneBar.y + sceneBar.h + gap, w: width - pad * 2, h: playersDrawerHeight }
+      : null;
     const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
+    const contentTop = (playersDrawer ? playersDrawer.y + playersDrawer.h : sceneBar.y + sceneBar.h) + gap;
     const content = {
       x: pad,
-      y: topBar.y + topBar.h + gap,
+      y: contentTop,
       w: width - pad * 2,
-      h: bottomBar.y - (topBar.y + topBar.h + gap) - gap
+      h: bottomBar.y - contentTop - gap
     };
-    const tabBar = { x: content.x, y: content.y, w: content.w, h: 52 };
-    const mainPanel = { x: content.x, y: tabBar.y + tabBar.h + gap, w: content.w, h: content.h - tabBar.h - gap };
-    return { mode, pad, gap, width, height, topBar, bottomBar, tabBar, mainPanel };
+
+    if (mode === "desktop" || mode === "mobile-landscape") {
+      const boardRatio = mode === "desktop" ? 0.63 : 0.58;
+      const boardPane = { x: content.x, y: content.y, w: Math.round(content.w * boardRatio), h: content.h };
+      const contextPane = { x: boardPane.x + boardPane.w + gap, y: content.y, w: content.w - boardPane.w - gap, h: content.h };
+      return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, boardPane, contextPane };
+    }
+
+    const mainPane = { x: content.x, y: content.y, w: content.w, h: content.h };
+    return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, mainPane };
   }
 
   function getBoardGeometry(panelRect) {
@@ -2194,42 +2226,42 @@
 
   function getVisibleMarketPageSize() {
     if (!runtime.layout) return 6;
-    if (runtime.layout.mode === "desktop") return 6;
+    if (runtime.layout.mode === "desktop") return 3;
     if (runtime.layout.mode === "mobile-landscape") return 3;
     return runtime.layout.width < 410 ? 1 : 2;
   }
 
   function getObjectiveCardsPerPage() {
     if (!runtime.layout) return 4;
-    if (runtime.layout.mode === "desktop") return 4;
+    if (runtime.layout.mode === "desktop") return 2;
     return 1;
   }
 
   function drawPanel(rect, title, subtitle) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 22, "rgba(255, 249, 240, 0.96)", "rgba(108, 80, 54, 0.16)", 1.4);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(255, 251, 245, 0.94)", "rgba(108, 80, 54, 0.18)", 1);
     ctx.fillStyle = "#3f2d20";
     const isPortrait = runtime.layout.mode === "mobile-portrait";
     ctx.font = isPortrait
-      ? "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif"
-      : "700 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ? "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(title, rect.x + 12, rect.y + 10);
+    ctx.fillText(title, rect.x + 10, rect.y + 6);
     if (subtitle) {
-      Core.drawWrappedText(ctx, subtitle, isPortrait ? rect.x + 12 : rect.x + rect.w - 12, rect.y + (isPortrait ? 30 : 12), isPortrait ? rect.w - 24 : Math.max(110, rect.w * 0.54), isPortrait ? 12 : 13, {
+      Core.drawWrappedText(ctx, subtitle, isPortrait ? rect.x + 10 : rect.x + rect.w - 10, rect.y + (isPortrait ? 22 : 6), isPortrait ? rect.w - 20 : Math.max(110, rect.w * 0.54), isPortrait ? 11 : 12, {
         font: isPortrait
-          ? "600 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
-          : "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
+          ? "600 9px 'Avenir Next', 'Trebuchet MS', sans-serif"
+          : "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
         align: isPortrait ? "left" : "right",
         color: "rgba(82, 61, 44, 0.72)",
         maxLines: isPortrait ? 2 : 2
       });
     }
     return {
-      x: rect.x + 10,
-      y: rect.y + (isPortrait ? 56 : 42),
-      w: rect.w - 20,
-      h: rect.h - (isPortrait ? 66 : 52)
+      x: rect.x + 8,
+      y: rect.y + (isPortrait ? 40 : 30),
+      w: rect.w - 16,
+      h: rect.h - (isPortrait ? 48 : 38)
     };
   }
 
@@ -2265,7 +2297,7 @@
     const palette = getButtonPalette(options.variant, enabled, options.selected);
     const hovered = runtime.hoveredTargetId === id;
     const yOffset = hovered && enabled ? -1 : 0;
-    const radius = options.radius || (runtime.layout?.mode === "mobile-portrait" ? 18 : 16);
+    const radius = options.radius || (runtime.layout?.mode === "mobile-portrait" ? 8 : 6);
 
     if (onClick) {
       registerTarget(rect, onClick, { id, enabled, scope: options.scope || "main", kind: "button" });
@@ -2348,6 +2380,220 @@
     ctx.beginPath();
     ctx.arc(runtime.layout.width * 0.86, runtime.layout.height * 0.14, runtime.layout.width * 0.12, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  function getShellScenes() {
+    return [
+      { id: "board", label: "Board" },
+      { id: "market", label: "Market" },
+      { id: "goals", label: "Goals" },
+      { id: "score", label: "Score" }
+    ];
+  }
+
+  function renderShellSurface(rect, options = {}) {
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, options.radius || 8, options.fill || "rgba(255, 250, 244, 0.94)", options.stroke || "rgba(108, 80, 54, 0.16)", options.lineWidth || 1);
+  }
+
+  function renderGameTopBar(rect) {
+    const player = getPlayer();
+    const compact = runtime.layout.mode !== "desktop";
+    const short = isVeryShortViewport();
+    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.95)" });
+
+    ctx.fillStyle = "#3b2c20";
+    ctx.font = compact ? "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(compact ? "Smore to Explore" : "Smore to Explore", rect.x + 12, rect.y + 8);
+
+    const rightButtonY = rect.y + 8;
+    const menuRect = { x: rect.x + rect.w - 34, y: rightButtonY, w: 24, h: 24 };
+    const fullRect = { x: menuRect.x - 56, y: rightButtonY, w: 50, h: 24 };
+    if (game.players.length > 1) {
+      drawButton({ x: fullRect.x - 64, y: rightButtonY, w: 58, h: 24 }, game.ui.playersPanelExpanded ? "Hide" : "Players", () => {
+        game.ui.playersPanelExpanded = !game.ui.playersPanelExpanded;
+        game.ui.activePanel = game.ui.playersPanelExpanded ? "players" : null;
+      }, {
+        id: "shell-players-toggle",
+        font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    }
+    drawButton(fullRect, controller.state.isFullscreen ? "Exit" : "Full", async () => {
+      if (!controller.state.fullscreenSupported) {
+        setMessage(game, "warning", "Fullscreen unavailable", "This browser is managing fullscreen itself on the current device.");
+        return;
+      }
+      try {
+        await controller.toggleFullscreen(appShell);
+      } catch (_error) {
+        setMessage(game, "warning", "Fullscreen unavailable", "The browser refused fullscreen for this tap.");
+      }
+    }, {
+      id: "shell-fullscreen",
+      enabled: controller.state.fullscreenSupported,
+      font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
+    drawMenuButton(menuRect, openPauseMenu, { id: "shell-menu", radius: 8 });
+
+    const roundText = game.players.length ? getCurrentRound().name : "Pass-and-Play";
+    if (short) {
+      ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+      ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(`${roundText} | ${getPhaseLabel()}`, rect.x + 12, rect.y + 27);
+    } else {
+      const pillY = rect.y + (compact ? 30 : 34);
+      const roundFill = "rgba(239, 226, 202, 0.96)";
+      const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
+      const roundWidth = drawPill(rect.x + 12, pillY, roundText, roundFill, "#5f4731", {
+        height: compact ? 18 : 20,
+        paddingX: 10,
+        radius: 8,
+        font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      drawPill(rect.x + 16 + roundWidth, pillY, getPhaseLabel(), phaseFill, "#fff9f3", {
+        height: compact ? 18 : 20,
+        paddingX: 10,
+        radius: 8,
+        font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    }
+
+    if (!player) return;
+
+    const statusRect = {
+      x: rect.x + 12,
+      y: rect.y + rect.h - (short ? 22 : compact ? 28 : 30),
+      w: rect.w - 24,
+      h: short ? 16 : compact ? 20 : 22
+    };
+    Core.drawRoundedRect(ctx, statusRect.x, statusRect.y, statusRect.w, statusRect.h, 8, "rgba(244, 236, 224, 0.92)", "rgba(108,80,54,0.14)", 1);
+    ctx.fillStyle = player.color.fill;
+    ctx.fillRect(statusRect.x, statusRect.y, 4, statusRect.h);
+    ctx.fillStyle = "#4a3524";
+    ctx.font = short ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`Current: ${player.name}`, statusRect.x + 10, statusRect.y + statusRect.h / 2 + 0.5);
+    ctx.textAlign = "right";
+    const statusSuffix = game.phase === "build" && player.passedThisRound ? " | passed" : game.turn.actionTaken ? " | done" : "";
+    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts${statusSuffix}`, statusRect.x + statusRect.w - 8, statusRect.y + statusRect.h / 2 + 0.5);
+  }
+
+  function renderShellSceneTabs(rect) {
+    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.92)" });
+    const tabs = getShellScenes();
+    const gap = 4;
+    const width = (rect.w - 8 - gap * (tabs.length - 1)) / tabs.length;
+    tabs.forEach((tab, index) => {
+      drawButton({
+        x: rect.x + 4 + index * (width + gap),
+        y: rect.y + 4,
+        w: width,
+        h: rect.h - 8
+      }, tab.label, () => setActiveScene(tab.id), {
+        id: `scene-tab-${tab.id}`,
+        selected: (game.ui.activeScene || "board") === tab.id,
+        font: "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        textYOffset: 0.5
+      });
+    });
+  }
+
+  function renderPlayersDrawer(rect) {
+    if (!rect || game.players.length <= 1) return;
+    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.92)" });
+    ctx.fillStyle = "#4a3524";
+    ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("Players", rect.x + 10, rect.y + 8);
+
+    const content = { x: rect.x + 8, y: rect.y + 24, w: rect.w - 16, h: rect.h - 32 };
+    const compact = runtime.layout.mode !== "desktop";
+    const columns = runtime.layout.mode === "mobile-portrait" ? Math.min(2, game.players.length) : Math.min(2, game.players.length);
+    const gap = 4;
+    const rowHeight = compact ? 20 : 24;
+    const itemWidth = (content.w - gap * (columns - 1)) / columns;
+    game.players.forEach((entry, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      const rowRect = { x: content.x + col * (itemWidth + gap), y: content.y + row * (rowHeight + gap), w: itemWidth, h: rowHeight };
+      const active = index === game.currentPlayerIndex;
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 8, active ? "rgba(255, 238, 219, 0.98)" : "rgba(249, 243, 235, 0.98)", active ? "#cc7a3f" : "rgba(108,80,54,0.12)", active ? 1.2 : 1);
+      ctx.fillStyle = entry.color.fill;
+      ctx.fillRect(rowRect.x, rowRect.y, 4, rowRect.h);
+      ctx.fillStyle = "#4a3524";
+      ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      const suffix = game.phase === "build" && entry.passedThisRound ? " | passed" : "";
+      ctx.fillText(fitText(`${entry.name}${suffix}`, rowRect.w - 94, ctx.font), rowRect.x + 10, rowRect.y + rowRect.h / 2 + 0.5);
+      ctx.textAlign = "right";
+      ctx.fillText(`${entry.score} pts`, rowRect.x + rowRect.w - 6, rowRect.y + rowRect.h / 2 + 0.5);
+    });
+  }
+
+  function renderFocusScene(rect) {
+    const player = getPlayer();
+    const content = drawPanel(rect, "Turn Focus", player ? `${player.name} | ${getPhaseLabel()}` : "Setup");
+    const summary = getBottomSummary();
+    const noteRect = { x: content.x, y: content.y, w: content.w, h: Math.min(76, content.h) };
+    Core.drawRoundedRect(ctx, noteRect.x, noteRect.y, noteRect.w, noteRect.h, 10, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
+    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(fitText(summary.title, noteRect.w - 20, ctx.font), noteRect.x + 10, noteRect.y + 8);
+    Core.drawWrappedText(ctx, summary.body, noteRect.x + 10, noteRect.y + 26, noteRect.w - 20, 13, {
+      font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "rgba(82, 61, 44, 0.84)",
+      maxLines: 3
+    });
+
+    const hintsY = noteRect.y + noteRect.h + 10;
+    ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+    ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText("Use the scene tabs to switch focus.", content.x, hintsY);
+    ctx.fillText(runtime.layout.mode === "desktop"
+      ? "Board stays visible while the right panel changes."
+      : "Only one primary scene is shown at a time on mobile.", content.x, hintsY + 16);
+  }
+
+  function renderContextScene(rect) {
+    const scene = game.ui.activeScene || "board";
+    if (scene === "market") {
+      renderMarketPanel(rect);
+      return;
+    }
+    if (scene === "goals") {
+      renderObjectivesPanel(rect);
+      return;
+    }
+    if (scene === "score") {
+      renderScorePanel(rect);
+      return;
+    }
+    renderFocusScene(rect);
+  }
+
+  function renderPrimaryScene(rect) {
+    const scene = game.ui.activeScene || "board";
+    if (scene === "market") {
+      renderMarketPanel(rect);
+      return;
+    }
+    if (scene === "goals") {
+      renderObjectivesPanel(rect);
+      return;
+    }
+    if (scene === "score") {
+      renderScorePanel(rect);
+      return;
+    }
+    renderBoardPanel(rect);
   }
 
   function renderPortraitTopBar(rect, player) {
@@ -2738,22 +2984,22 @@
   }
 
   function drawSelectionTray(rect, summary) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-    const previewRect = { x: rect.x + 8, y: rect.y + 8, w: 52, h: 52 };
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+    const previewRect = { x: rect.x + 8, y: rect.y + 8, w: 44, h: 44 };
     if (game.ui.selection.source === "landscape") {
       drawLandscapeTileVisual(previewRect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
     } else if (game.ui.selection.source === "market") {
       drawCampTileVisual(previewRect, { typeId: game.ui.selection.typeId });
     }
     ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : "#4a3524";
-    ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     const textX = previewRect.x + previewRect.w + 10;
     const textWidth = rect.w - (textX - rect.x) - 10;
     ctx.fillText(fitText(summary.title, textWidth, ctx.font), textX, rect.y + 10);
-    Core.drawWrappedText(ctx, summary.body, textX, rect.y + 28, textWidth, 13, {
-      font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
+    Core.drawWrappedText(ctx, summary.body, textX, rect.y + 24, textWidth, 12, {
+      font: "600 10px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.84)",
       maxLines: 2
     });
@@ -2761,7 +3007,7 @@
 
   function renderBottomBar(rect) {
     const player = getPlayer();
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 22, "rgba(255, 248, 239, 0.97)", "rgba(108, 80, 54, 0.16)", 1.4);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(255, 248, 239, 0.97)", "rgba(108, 80, 54, 0.16)", 1);
     const summary = getBottomSummary();
     const actions = getBottomActions(player);
 
@@ -2769,21 +3015,21 @@
       const inner = Core.insetRect(rect, 10);
       let actionRect;
       if (game.ui.selection.source) {
-        const trayRect = { x: inner.x, y: inner.y, w: inner.w, h: 68 };
+        const trayRect = { x: inner.x, y: inner.y, w: inner.w, h: 54 };
         drawSelectionTray(trayRect, summary);
         actionRect = { x: inner.x, y: trayRect.y + trayRect.h + 8, w: inner.w, h: rect.y + rect.h - (trayRect.y + trayRect.h + 18) };
       } else {
-        const summaryRect = { x: inner.x, y: inner.y, w: inner.w, h: 54 };
-        Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        const summaryRect = { x: inner.x, y: inner.y, w: inner.w, h: 42 };
+        Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 8, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
         ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
-        ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.fillText(fitText(summary.title, summaryRect.w - 20, ctx.font), summaryRect.x + 10, summaryRect.y + 8);
-        Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 24, summaryRect.w - 20, 12, {
-          font: "600 10px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 22, summaryRect.w - 20, 11, {
+          font: "600 9px 'Avenir Next', 'Trebuchet MS', sans-serif",
           color: "rgba(82, 61, 44, 0.86)",
-          maxLines: 2
+          maxLines: 1
         });
         actionRect = { x: inner.x, y: summaryRect.y + summaryRect.h + 8, w: inner.w, h: rect.y + rect.h - (summaryRect.y + summaryRect.h + 18) };
       }
@@ -2795,7 +3041,7 @@
     const summaryRect = { x: rect.x + 10, y: rect.y + 10, w: rect.w * 0.54, h: rect.h - 20 };
     const buttonRect = { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 10, w: rect.w - summaryRect.w - gap - 20, h: rect.h - 20 };
 
-    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 10, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
     ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
     ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
@@ -2837,7 +3083,7 @@
   }
 
   function renderSegmentTabs(rect, tabs, activeId, onSelect, scopePrefix) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 18, "rgba(249, 242, 232, 0.96)", "rgba(108,80,54,0.14)", 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(249, 242, 232, 0.96)", "rgba(108,80,54,0.14)", 1);
     const gap = runtime.layout.mode === "mobile-portrait" ? 5 : 4;
     const width = (rect.w - gap * (tabs.length - 1) - 8) / tabs.length;
     tabs.forEach((tab, index) => {
@@ -3560,9 +3806,9 @@
   }
 
   function getFrontScreenKind() {
-    if (game.ui.howToOpen) return "howto";
-    if (game.ui.aboutOpen) return "about";
-    if (game.ui.showStartScreen) return "menu";
+    if (game.ui.appScreen === APP_SCREENS.howTo) return "howto";
+    if (game.ui.appScreen === APP_SCREENS.about) return "about";
+    if (game.ui.appScreen === APP_SCREENS.start || game.ui.appScreen === APP_SCREENS.setup) return "menu";
     return null;
   }
 
@@ -4607,40 +4853,22 @@
     if (!game.directorRevealed && game.ui.objectiveTab === "director") game.ui.objectiveTab = "shared";
 
     renderBackground();
-    if (!game.ui.gameActive || frontScreenActive()) {
+    if (game.ui.appScreen !== APP_SCREENS.inGame || frontScreenActive()) {
       renderFrontScreen();
       requestAnimationFrame(renderFrame);
       return;
     }
-    renderTopBar(runtime.layout.topBar);
+    renderGameTopBar(runtime.layout.topBar);
+    renderShellSceneTabs(runtime.layout.sceneBar);
+    if (runtime.layout.playersDrawer) renderPlayersDrawer(runtime.layout.playersDrawer);
 
-    if (runtime.layout.mode === "desktop") {
-      renderBoardPanel(runtime.layout.boardPanel);
-      renderDesktopOrLandscapeSide();
-      renderMarketPanel(runtime.layout.marketPanel);
-      renderBottomBar(runtime.layout.bottomBar);
-    } else if (runtime.layout.mode === "mobile-landscape") {
-      renderBoardPanel(runtime.layout.boardPanel);
-      renderInfoPanel(runtime.layout.infoPanel);
-      renderSegmentTabs(runtime.layout.sideTabs, [
-        { id: "objectives", label: "Goals" },
-        { id: "score", label: "Score" },
-        { id: "market", label: "Market" }
-      ], game.ui.sideTab, (value) => {
-        game.ui.sideTab = value;
-      }, "landscape-side-tab");
-      if (game.ui.sideTab === "market") renderMarketPanel(runtime.layout.sideBody);
-      else if (game.ui.sideTab === "score") renderScorePanel(runtime.layout.sideBody);
-      else renderObjectivesPanel(runtime.layout.sideBody);
-      renderBottomBar(runtime.layout.bottomBar);
+    if (runtime.layout.mode === "desktop" || runtime.layout.mode === "mobile-landscape") {
+      renderBoardPanel(runtime.layout.boardPane);
+      renderContextScene(runtime.layout.contextPane);
     } else {
-      renderPortraitTabBar(runtime.layout.tabBar);
-      if (game.ui.mobileTab === "board") renderBoardPanel(runtime.layout.mainPanel);
-      else if (game.ui.mobileTab === "market") renderMarketPanel(runtime.layout.mainPanel);
-      else if (game.ui.mobileTab === "score") renderScorePanel(runtime.layout.mainPanel);
-      else renderObjectivesPanel(runtime.layout.mainPanel);
-      renderBottomBar(runtime.layout.bottomBar);
+      renderPrimaryScene(runtime.layout.mainPane);
     }
+    renderBottomBar(runtime.layout.bottomBar);
 
     renderOverlay();
     requestAnimationFrame(renderFrame);
