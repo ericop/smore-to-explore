@@ -3149,29 +3149,101 @@ function computeLayout(width, height) {
     }
   }
 
+  function getRoadAnchorPoint(rect, side, inset = Math.max(6, rect.w * 0.08)) {
+    const centerX = rect.x + rect.w / 2;
+    const centerY = rect.y + rect.h / 2;
+    if (side === "north") return { x: centerX, y: rect.y + inset };
+    if (side === "east") return { x: rect.x + rect.w - inset, y: centerY };
+    if (side === "south") return { x: centerX, y: rect.y + rect.h - inset };
+    return { x: rect.x + inset, y: centerY };
+  }
+
+  function getRoadTurnControlPoint(rect, sideA, sideB) {
+    const inset = Math.max(16, rect.w * 0.24);
+    let x = rect.x + rect.w / 2;
+    let y = rect.y + rect.h / 2;
+    if (sideA === "west" || sideB === "west") x = rect.x + inset;
+    if (sideA === "east" || sideB === "east") x = rect.x + rect.w - inset;
+    if (sideA === "north" || sideB === "north") y = rect.y + inset;
+    if (sideA === "south" || sideB === "south") y = rect.y + rect.h - inset;
+    return { x, y };
+  }
+
+  function strokeRoadPath(pathBuilder, outerWidth, innerWidth) {
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#8f5f37";
+    ctx.lineWidth = outerWidth;
+    ctx.beginPath();
+    pathBuilder();
+    ctx.stroke();
+    ctx.strokeStyle = "#d8b27a";
+    ctx.lineWidth = innerWidth;
+    ctx.beginPath();
+    pathBuilder();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawRoadEdges(rect, info) {
     const centerX = rect.x + rect.w / 2;
     const centerY = rect.y + rect.h / 2;
-    ctx.strokeStyle = "#d6b07a";
-    ctx.lineWidth = Math.max(8, rect.w * 0.15);
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    let hasRoad = false;
-    for (const side of SIDES) {
-      if (info.edges[side] !== "road") continue;
-      hasRoad = true;
-      ctx.moveTo(centerX, centerY);
-      if (side === "north") ctx.lineTo(centerX, rect.y + 8);
-      if (side === "east") ctx.lineTo(rect.x + rect.w - 8, centerY);
-      if (side === "south") ctx.lineTo(centerX, rect.y + rect.h - 8);
-      if (side === "west") ctx.lineTo(rect.x + 8, centerY);
-    }
-    ctx.stroke();
-    if (hasRoad) {
-      ctx.fillStyle = "#c99e62";
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, Math.max(7, rect.w * 0.12), 0, Math.PI * 2);
-      ctx.fill();
+    const center = { x: centerX, y: centerY };
+    const roadSides = SIDES.filter((side) => info.edges[side] === "road" || info.edges[side] === "entrance");
+    const outerWidth = Math.max(10, rect.w * 0.22);
+    const innerWidth = Math.max(6, outerWidth * 0.62);
+    const hasNorthSouth = roadSides.includes("north") && roadSides.includes("south");
+    const hasEastWest = roadSides.includes("east") && roadSides.includes("west");
+    if (roadSides.length === 1) {
+      const anchor = getRoadAnchorPoint(rect, roadSides[0]);
+      strokeRoadPath(() => {
+        ctx.moveTo(center.x, center.y);
+        ctx.lineTo(anchor.x, anchor.y);
+      }, outerWidth, innerWidth);
+    } else if (roadSides.length === 2) {
+      const [sideA, sideB] = roadSides;
+      const pointA = getRoadAnchorPoint(rect, sideA);
+      const pointB = getRoadAnchorPoint(rect, sideB);
+      const opposite = OPPOSITE[sideA] === sideB;
+      if (opposite) {
+        strokeRoadPath(() => {
+          ctx.moveTo(pointA.x, pointA.y);
+          ctx.lineTo(pointB.x, pointB.y);
+        }, outerWidth, innerWidth);
+      } else {
+        const control = getRoadTurnControlPoint(rect, sideA, sideB);
+        strokeRoadPath(() => {
+          ctx.moveTo(pointA.x, pointA.y);
+          ctx.quadraticCurveTo(control.x, control.y, pointB.x, pointB.y);
+        }, outerWidth, innerWidth);
+      }
+    } else {
+      if (hasNorthSouth) {
+        const north = getRoadAnchorPoint(rect, "north");
+        const south = getRoadAnchorPoint(rect, "south");
+        strokeRoadPath(() => {
+          ctx.moveTo(north.x, north.y);
+          ctx.lineTo(south.x, south.y);
+        }, outerWidth, innerWidth);
+      }
+      if (hasEastWest) {
+        const east = getRoadAnchorPoint(rect, "east");
+        const west = getRoadAnchorPoint(rect, "west");
+        strokeRoadPath(() => {
+          ctx.moveTo(west.x, west.y);
+          ctx.lineTo(east.x, east.y);
+        }, outerWidth, innerWidth);
+      }
+      for (const side of roadSides) {
+        if ((side === "north" || side === "south") && hasNorthSouth) continue;
+        if ((side === "east" || side === "west") && hasEastWest) continue;
+        const anchor = getRoadAnchorPoint(rect, side);
+        strokeRoadPath(() => {
+          ctx.moveTo(center.x, center.y);
+          ctx.lineTo(anchor.x, anchor.y);
+        }, outerWidth, innerWidth);
+      }
     }
     for (const side of SIDES) {
       if (info.edges[side] !== "entrance") continue;
