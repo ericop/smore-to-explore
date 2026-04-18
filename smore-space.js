@@ -2135,48 +2135,59 @@
   }
 
   function computeLayout(width, height) {
-    const pad = Core.clamp(Math.round(Math.min(width, height) * 0.01), 6, 14);
-    const gap = Core.clamp(Math.round(Math.min(width, height) * 0.008), 6, 10);
-    const mode = getLayoutMode(width, height);
-    const selectionHeavy = game.ui.selection.source === "landscape" || game.ui.selection.source === "market" || hasPendingMarketPurchase();
-    const short = height <= 430;
-    const topBarHeight = mode === "desktop" ? 70 : mode === "mobile-landscape" ? 64 : short ? 60 : 72;
-    const sceneBarHeight = mode === "desktop" ? 34 : 38;
-    const playersDrawerHeight = game.players.length > 1 && game.ui.playersPanelExpanded
-      ? (mode === "desktop" ? 84 : mode === "mobile-landscape" ? 72 : short ? 82 : 98)
-      : 0;
-    const bottomBarHeight = mode === "desktop"
-      ? 84
-      : mode === "mobile-landscape"
-      ? 86
-      : selectionHeavy
-      ? 114
-      : 84;
-    const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
-    const sceneBar = { x: pad, y: topBar.y + topBar.h + gap, w: width - pad * 2, h: sceneBarHeight };
-    const playersDrawer = playersDrawerHeight
-      ? { x: pad, y: sceneBar.y + sceneBar.h + gap, w: width - pad * 2, h: playersDrawerHeight }
-      : null;
-    const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
-    const contentTop = (playersDrawer ? playersDrawer.y + playersDrawer.h : sceneBar.y + sceneBar.h) + gap;
-    const content = {
-      x: pad,
-      y: contentTop,
-      w: width - pad * 2,
-      h: bottomBar.y - contentTop - gap
-    };
+  const pad = Core.clamp(Math.round(Math.min(width, height) * 0.01), 6, 14);
+  const gap = Core.clamp(Math.round(Math.min(width, height) * 0.008), 6, 10);
+  const mode = getLayoutMode(width, height);
+  const selectionHeavy = game.ui.selection.source === "landscape" || game.ui.selection.source === "market" || hasPendingMarketPurchase();
+  const short = height <= 430;
 
-    if (mode === "desktop" || mode === "mobile-landscape") {
-      const boardRatio = mode === "desktop" ? 0.63 : 0.58;
-      const boardPane = { x: content.x, y: content.y, w: Math.round(content.w * boardRatio), h: content.h };
-      const contextPane = { x: boardPane.x + boardPane.w + gap, y: content.y, w: content.w - boardPane.w - gap, h: content.h };
-      return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, boardPane, contextPane };
-    }
+  const topBarHeight = mode === "desktop"
+    ? 70
+    : mode === "mobile-landscape"
+    ? 60
+    : short
+    ? 54
+    : 64;
 
-    const mainPane = { x: content.x, y: content.y, w: content.w, h: content.h };
-    return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, mainPane };
+  const sceneBarHeight = mode === "desktop" ? 34 : 34;
+
+  const playersDrawerHeight = game.players.length > 1 && game.ui.playersPanelExpanded
+    ? (mode === "desktop" ? 84 : mode === "mobile-landscape" ? 64 : short ? 68 : 80)
+    : 0;
+
+  const bottomBarHeight = mode === "desktop"
+    ? 84
+    : mode === "mobile-landscape"
+    ? 72
+    : selectionHeavy
+    ? 96
+    : 68;
+
+  const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
+  const sceneBar = { x: pad, y: topBar.y + topBar.h + gap, w: width - pad * 2, h: sceneBarHeight };
+  const playersDrawer = playersDrawerHeight
+    ? { x: pad, y: sceneBar.y + sceneBar.h + gap, w: width - pad * 2, h: playersDrawerHeight }
+    : null;
+  const bottomBar = { x: pad, y: height - pad - bottomBarHeight, w: width - pad * 2, h: bottomBarHeight };
+  const contentTop = (playersDrawer ? playersDrawer.y + playersDrawer.h : sceneBar.y + sceneBar.h) + gap;
+  const content = {
+    x: pad,
+    y: contentTop,
+    w: width - pad * 2,
+    h: bottomBar.y - contentTop - gap
+  };
+
+  if (mode === "desktop" || mode === "mobile-landscape") {
+    const boardRatio = mode === "desktop" ? 0.63 : 0.58;
+    const boardPane = { x: content.x, y: content.y, w: Math.round(content.w * boardRatio), h: content.h };
+    const contextPane = { x: boardPane.x + boardPane.w + gap, y: content.y, w: content.w - boardPane.w - gap, h: content.h };
+    return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, boardPane, contextPane };
   }
 
+  const mainPane = { x: content.x, y: content.y, w: content.w, h: content.h };
+  return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, mainPane };
+}
+  
   function getBoardGeometry(panelRect) {
     const headerHeight = runtime.layout.mode === "mobile-portrait" ? 58 : 34;
     const inner = Core.insetRect(panelRect, 12);
