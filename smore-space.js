@@ -2134,7 +2134,7 @@
     return "mobile-landscape";
   }
 
-  function computeLayout(width, height) {
+function computeLayout(width, height) {
   const pad = Core.clamp(Math.round(Math.min(width, height) * 0.01), 6, 14);
   const gap = Core.clamp(Math.round(Math.min(width, height) * 0.008), 6, 10);
   const mode = getLayoutMode(width, height);
@@ -2146,22 +2146,26 @@
     : mode === "mobile-landscape"
     ? 60
     : short
-    ? 54
-    : 64;
+    ? 56
+    : 62;
 
-  const sceneBarHeight = mode === "desktop" ? 34 : 34;
+  const sceneBarHeight = mode === "desktop"
+    ? 34
+    : mode === "mobile-landscape"
+    ? 34
+    : 30;
 
   const playersDrawerHeight = game.players.length > 1 && game.ui.playersPanelExpanded
-    ? (mode === "desktop" ? 84 : mode === "mobile-landscape" ? 64 : short ? 68 : 80)
+    ? (mode === "desktop" ? 84 : mode === "mobile-landscape" ? 64 : short ? 66 : 76)
     : 0;
 
   const bottomBarHeight = mode === "desktop"
     ? 84
     : mode === "mobile-landscape"
-    ? 72
+    ? 82
     : selectionHeavy
-    ? 96
-    : 68;
+    ? 152
+    : 124;
 
   const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
   const sceneBar = { x: pad, y: topBar.y + topBar.h + gap, w: width - pad * 2, h: sceneBarHeight };
