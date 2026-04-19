@@ -3203,7 +3203,7 @@ function computeLayout(width, height) {
     return { x: rect.x + inset, y: centerY };
   }
 
-  function getRoadTurnControlPoint(rect, sideA, sideB) {
+  function getRoadTurnCornerPoint(rect, sideA, sideB) {
     const inset = Math.max(16, rect.w * 0.24);
     let x = rect.x + rect.w / 2;
     let y = rect.y + rect.h / 2;
@@ -3212,6 +3212,21 @@ function computeLayout(width, height) {
     if (sideA === "north" || sideB === "north") y = rect.y + inset;
     if (sideA === "south" || sideB === "south") y = rect.y + rect.h - inset;
     return { x, y };
+  }
+
+  function drawRoadTurnPath(pointA, pointB, corner, sideA) {
+    const sideAIsVertical = sideA === "north" || sideA === "south";
+    if (sideAIsVertical) {
+      ctx.moveTo(pointA.x, pointA.y);
+      ctx.lineTo(pointA.x, corner.y);
+      ctx.lineTo(pointB.x, corner.y);
+      ctx.lineTo(pointB.x, pointB.y);
+      return;
+    }
+    ctx.moveTo(pointA.x, pointA.y);
+    ctx.lineTo(corner.x, pointA.y);
+    ctx.lineTo(corner.x, pointB.y);
+    ctx.lineTo(pointB.x, pointB.y);
   }
 
   function strokeRoadPath(pathBuilder, outerWidth, innerWidth) {
@@ -3257,10 +3272,9 @@ function computeLayout(width, height) {
           ctx.lineTo(pointB.x, pointB.y);
         }, outerWidth, innerWidth);
       } else {
-        const control = getRoadTurnControlPoint(rect, sideA, sideB);
+        const corner = getRoadTurnCornerPoint(rect, sideA, sideB);
         strokeRoadPath(() => {
-          ctx.moveTo(pointA.x, pointA.y);
-          ctx.quadraticCurveTo(control.x, control.y, pointB.x, pointB.y);
+          drawRoadTurnPath(pointA, pointB, corner, sideA);
         }, outerWidth, innerWidth);
       }
     } else {
