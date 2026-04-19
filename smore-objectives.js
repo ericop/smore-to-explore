@@ -105,13 +105,14 @@
       makeObjective({
         id: "early-02",
         round: "early",
-        name: "First Weekend Rush",
-        description: "Score for having at least 5 total campsite tiles placed.",
+        name: "Glamor Guests",
+        description: "Score for placing 1 premium guest stay tile: a Cabin, RV Site, or Waterfront Site.",
         points: 4,
         evaluate: (context) => {
-          return context.campsiteCount >= 5
-            ? passed(4, "Five or more campsite or lodging tiles are ready for opening weekend.")
-            : failed(`${context.campsiteCount}/5 campsite or lodging tiles placed.`);
+          const premiumGuestReady = ["cabin", "rv_full_hookups", "waterfront_site"].some((typeId) => getTypeCount(context, typeId) >= 1);
+          return premiumGuestReady
+            ? passed(4, "A premium guest stay is already ready for campers.")
+            : failed("Place a Cabin, RV Site, or Waterfront Site.");
         }
       }),
       makeObjective({
@@ -252,13 +253,16 @@
       makeObjective({
         id: "early-14",
         round: "early",
-        name: "Smooth Arrival",
-        description: "Score for Entrance feeding into a clean connected road spine.",
+        name: "Welcome Row",
+        description: "Score for having 2 campsite or lodging tiles connected to the Entrance road network.",
         points: 4,
         evaluate: (context) => {
-          return context.entranceSpineLength >= 4
-            ? passed(4, `The entrance road stays clean for ${context.entranceSpineLength} tiles before branching.`)
-            : failed(`${context.entranceSpineLength}/4 tiles in the current entrance road spine.`);
+          const connectedCampCount = context.campCells.filter((cell) =>
+            isCampsiteCell(cell) && isCellConnectedToMainRoad(context, cell.row, cell.col)
+          ).length;
+          return connectedCampCount >= 2
+            ? passed(4, `${connectedCampCount} guest stays already connect to the Entrance road network.`)
+            : failed(`${connectedCampCount}/2 campsite or lodging tiles currently connect to the Entrance road network.`);
         }
       }),
       makeObjective({
@@ -292,13 +296,13 @@
       makeObjective({
         id: "early-17",
         round: "early",
-        name: "Weekend Setup",
-        description: "Score for placing at least 6 total camp tiles this round.",
+        name: "Opening Weekend",
+        description: "Score for placing at least 3 camp tiles this round.",
         points: 5,
         evaluate: (context) => {
-          return context.placementsThisRound >= 6
+          return context.placementsThisRound >= 3
             ? passed(5, `${context.placementsThisRound} camp tiles were placed this round.`)
-            : failed(`${context.placementsThisRound}/6 camp tiles placed this round.`);
+            : failed(`${context.placementsThisRound}/3 camp tiles placed this round.`);
         }
       }),
       makeObjective({
@@ -901,6 +905,30 @@
           return score > 0
             ? passed(score, `Balanced final campground score: ${score}/12.`)
             : failed("Build variety, amenities, premium appeal, and a strong connected road spine to score this signature card.");
+        }
+      }),
+      makeObjective({
+        id: "late-21",
+        round: "late",
+        name: "Grand Arrival Drive",
+        description: "Score for keeping a 4-tile entrance road spine: one unbranched road path starting at the Entrance before the first split or dead end.",
+        points: 6,
+        evaluate: (context) => {
+          return context.entranceSpineLength >= 4
+            ? passed(6, `The Entrance feeds a single unbranched road for ${context.entranceSpineLength} tiles before the first split or dead end.`)
+            : failed(`${context.entranceSpineLength}/4 tiles in a single unbranched road path starting at the Entrance.`);
+        }
+      }),
+      makeObjective({
+        id: "late-22",
+        round: "late",
+        name: "Season Finale Sprint",
+        description: "Score for placing at least 6 camp tiles during Late Summer.",
+        points: 6,
+        evaluate: (context) => {
+          return context.placementsThisRound >= 6
+            ? passed(6, `${context.placementsThisRound} camp tiles were placed during the final push.`)
+            : failed(`${context.placementsThisRound}/6 camp tiles placed during Late Summer.`);
         }
       })
     ];

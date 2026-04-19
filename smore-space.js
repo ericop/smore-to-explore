@@ -2364,6 +2364,51 @@ function computeLayout(width, height) {
     return width;
   }
 
+  function createObjectiveCardFill(cardRect, complete) {
+    const gradient = ctx.createLinearGradient(0, cardRect.y, 0, cardRect.y + cardRect.h);
+    gradient.addColorStop(0, complete ? "rgba(171, 213, 234, 0.98)" : "rgba(191, 220, 236, 0.98)");
+    gradient.addColorStop(0.34, complete ? "rgba(138, 184, 127, 0.98)" : "rgba(153, 188, 139, 0.98)");
+    gradient.addColorStop(0.74, complete ? "rgba(196, 163, 118, 0.98)" : "rgba(210, 176, 132, 0.98)");
+    gradient.addColorStop(1, complete ? "rgba(132, 138, 145, 0.98)" : "rgba(152, 156, 161, 0.98)");
+    return gradient;
+  }
+
+  function drawLogSlice(x, y, radius) {
+    ctx.save();
+    ctx.fillStyle = "#8c5d35";
+    ctx.strokeStyle = "#5f3d23";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(222, 183, 124, 0.75)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.56, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawLogFrame(rect) {
+    const radius = runtime.layout?.mode === "mobile-portrait" ? 7 : 9;
+    const spacing = radius * 1.95;
+    const railThickness = radius * 1.8;
+    Core.drawRoundedRect(ctx, rect.x - railThickness * 0.8, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, "rgba(122, 80, 45, 0.96)");
+    Core.drawRoundedRect(ctx, rect.x + rect.w - railThickness * 0.2, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, "rgba(122, 80, 45, 0.96)");
+    Core.drawRoundedRect(ctx, rect.x + 12, rect.y - railThickness * 0.8, rect.w - 24, railThickness, railThickness / 2, "rgba(122, 80, 45, 0.96)");
+    Core.drawRoundedRect(ctx, rect.x + 12, rect.y + rect.h - railThickness * 0.2, rect.w - 24, railThickness, railThickness / 2, "rgba(122, 80, 45, 0.96)");
+
+    for (let x = rect.x + 18; x <= rect.x + rect.w - 18; x += spacing) {
+      drawLogSlice(x, rect.y - 4, radius);
+      drawLogSlice(x, rect.y + rect.h + 4, radius);
+    }
+    for (let y = rect.y + 18; y <= rect.y + rect.h - 18; y += spacing) {
+      drawLogSlice(rect.x - 4, y, radius);
+      drawLogSlice(rect.x + rect.w + 4, y, radius);
+    }
+  }
+
   function fitText(text, maxWidth, font) {
     const value = String(text || "");
     ctx.save();
@@ -3627,8 +3672,8 @@ function computeLayout(width, height) {
     visibleResults.forEach((entry, index) => {
       const cardRect = { x: rect.x, y: rect.y + index * (cardHeight + gap), w: rect.w, h: cardHeight };
       const complete = entry.result.points >= entry.objective.points;
-      const fill = complete ? "rgba(232, 246, 228, 0.98)" : "rgba(250, 242, 232, 0.98)";
-      const stroke = complete ? "rgba(86, 132, 93, 0.48)" : "rgba(108,80,54,0.16)";
+      const fill = createObjectiveCardFill(cardRect, complete);
+      const stroke = complete ? "rgba(63, 104, 73, 0.54)" : "rgba(84, 77, 68, 0.26)";
       const inset = runtime.layout.mode === "mobile-portrait" ? 10 : 14;
       const titleFont = runtime.layout.mode === "mobile-portrait"
         ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -3644,6 +3689,9 @@ function computeLayout(width, height) {
       const detailLineHeight = runtime.layout.mode === "mobile-portrait" ? 13 : 15;
       const footerHeight = runtime.layout.mode === "desktop" ? 42 : 48;
       Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 16, fill, stroke, 1.1);
+      Core.drawRoundedRect(ctx, cardRect.x + 4, cardRect.y + 4, cardRect.w - 8, Math.max(34, cardRect.h * 0.26), 14, "rgba(255, 255, 255, 0.10)");
+      const footerBandY = cardRect.y + cardRect.h - footerHeight - 4;
+      Core.drawRoundedRect(ctx, cardRect.x + 6, footerBandY, cardRect.w - 12, footerHeight - 6, 14, "rgba(90, 98, 105, 0.20)");
       const pillText = `${entry.result.points}/${entry.objective.points}`;
       const pillWidth = (() => {
         ctx.save();
@@ -3658,7 +3706,7 @@ function computeLayout(width, height) {
         color: "#452f1e",
         maxLines: 2
       });
-      drawPill(cardRect.x + cardRect.w - pillWidth - inset, cardRect.y + inset, pillText, complete ? "#5f8d65" : variant === "director" ? "#8e6a9f" : "#c6783c", "#fff9f3", {
+      drawPill(cardRect.x + cardRect.w - pillWidth - inset, cardRect.y + inset, pillText, complete ? "#496f4f" : variant === "director" ? "#607789" : "#7b6852", "#fff9f3", {
         paddingX: 12,
         height: runtime.layout.mode === "mobile-portrait" ? 26 : 30,
         font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -3668,11 +3716,11 @@ function computeLayout(width, height) {
       const footerY = cardRect.y + cardRect.h - footerHeight;
       Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + inset, descriptionY, cardRect.w - inset * 2, bodyLineHeight, {
         font: bodyFont,
-        color: "rgba(82, 61, 44, 0.86)",
+        color: "rgba(56, 48, 39, 0.88)",
         maxLines: runtime.layout.mode === "desktop" ? 3 : 5
       });
 
-      ctx.strokeStyle = "rgba(108,80,54,0.12)";
+      ctx.strokeStyle = "rgba(82, 90, 96, 0.24)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(cardRect.x + inset, footerY - 8);
@@ -3681,7 +3729,7 @@ function computeLayout(width, height) {
 
       Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + inset, footerY, cardRect.w - inset * 2, detailLineHeight, {
         font: detailFont,
-        color: complete ? "#3f6b47" : "#7d5a37",
+        color: complete ? "#2f5342" : "#465158",
         maxLines: runtime.layout.mode === "mobile-portrait" ? 2 : 2
       });
     });
@@ -4367,7 +4415,12 @@ function computeLayout(width, height) {
           h: panelHeight
         };
 
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 28, "rgba(255, 248, 239, 0.98)", "rgba(108,80,54,0.18)", 1.6);
+    drawLogFrame(rect);
+    const panelFill = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+    panelFill.addColorStop(0, "rgba(255, 250, 244, 0.98)");
+    panelFill.addColorStop(0.5, "rgba(248, 238, 223, 0.98)");
+    panelFill.addColorStop(1, "rgba(236, 222, 202, 0.98)");
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 28, panelFill, "rgba(108,80,54,0.20)", 1.8);
     ctx.fillStyle = "#3d2d20";
     ctx.font = "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
