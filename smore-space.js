@@ -2348,6 +2348,33 @@ function computeLayout(width, height) {
     });
   }
 
+  function drawFullscreenButton(rect, onClick, options = {}) {
+    drawButton(rect, "", onClick, options);
+    const stroke = options.selected ? "#fff9f3" : "#4a3524";
+    const inset = rect.w * 0.26;
+    const short = rect.w * 0.14;
+    const left = rect.x + inset;
+    const right = rect.x + rect.w - inset;
+    const top = rect.y + inset;
+    const bottom = rect.y + rect.h - inset;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2.1;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(left + short, top); ctx.lineTo(left, top); ctx.lineTo(left, top + short);
+    ctx.moveTo(right - short, top); ctx.lineTo(right, top); ctx.lineTo(right, top + short);
+    ctx.moveTo(left + short, bottom); ctx.lineTo(left, bottom); ctx.lineTo(left, bottom - short);
+    ctx.moveTo(right - short, bottom); ctx.lineTo(right, bottom); ctx.lineTo(right, bottom - short);
+    ctx.stroke();
+    if (!options.minimize) return;
+    ctx.beginPath();
+    ctx.moveTo(left + short * 1.3, top + short * 1.3); ctx.lineTo(left + short * 2.1, top + short * 1.3);
+    ctx.moveTo(right - short * 1.3, top + short * 1.3); ctx.lineTo(right - short * 2.1, top + short * 1.3);
+    ctx.moveTo(left + short * 1.3, bottom - short * 1.3); ctx.lineTo(left + short * 2.1, bottom - short * 1.3);
+    ctx.moveTo(right - short * 1.3, bottom - short * 1.3); ctx.lineTo(right - short * 2.1, bottom - short * 1.3);
+    ctx.stroke();
+  }
+
   function drawPill(x, y, text, fill, textColor, options = {}) {
     const paddingX = options.paddingX || 12;
     const height = options.height || 24;
@@ -2373,26 +2400,26 @@ function computeLayout(width, height) {
   function drawCurrentPlayerStump(geometry, player) {
     if (!player || !geometry?.boardArea) return;
     const stumpWidth = runtime.layout.mode === "mobile-portrait"
-      ? Math.min(162, geometry.boardArea.w * 0.35)
-      : Math.min(208, geometry.boardArea.w * 0.3);
-    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 58 : 66;
+      ? Math.min(126, geometry.boardArea.w * 0.28)
+      : Math.min(152, geometry.boardArea.w * 0.22);
+    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 42 : 48;
     const rect = {
-      x: geometry.boardArea.x + 8,
-      y: geometry.boardArea.y + geometry.boardArea.h - stumpHeight - 8,
+      x: geometry.boardArea.x + 6,
+      y: geometry.boardArea.y + geometry.boardArea.h - stumpHeight - 4,
       w: stumpWidth,
       h: stumpHeight
     };
-    const topHeight = Math.max(24, rect.h * 0.5);
+    const topHeight = Math.max(20, rect.h * 0.54);
     const barkFill = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y);
     barkFill.addColorStop(0, "#7a4d2a");
     barkFill.addColorStop(0.5, "#8b5d33");
     barkFill.addColorStop(1, "#6c4326");
 
     ctx.save();
-    Core.drawRoundedRect(ctx, rect.x + 10, rect.y + topHeight * 0.72, rect.w - 20, rect.h - topHeight * 0.86, 14, barkFill, "rgba(73, 45, 24, 0.36)", 1.6);
-    Core.drawRoundedRect(ctx, rect.x + 16, rect.y + topHeight * 0.92, 7, rect.h - topHeight - 4, 4, "rgba(168, 118, 73, 0.18)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.5, rect.y + topHeight * 0.98, 6, rect.h - topHeight - 6, 4, "rgba(168, 118, 73, 0.15)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w - 22, rect.y + topHeight * 0.9, 6, rect.h - topHeight - 5, 4, "rgba(168, 118, 73, 0.16)");
+    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + topHeight * 0.84, rect.w - 16, rect.h - topHeight * 0.9, 12, barkFill, "rgba(73, 45, 24, 0.36)", 1.4);
+    Core.drawRoundedRect(ctx, rect.x + 14, rect.y + topHeight * 0.98, 5, rect.h - topHeight - 3, 3, "rgba(168, 118, 73, 0.16)");
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.52, rect.y + topHeight * 1.02, 4, rect.h - topHeight - 4, 3, "rgba(168, 118, 73, 0.14)");
+    Core.drawRoundedRect(ctx, rect.x + rect.w - 18, rect.y + topHeight * 0.98, 4, rect.h - topHeight - 3, 3, "rgba(168, 118, 73, 0.14)");
 
     ctx.fillStyle = "#d9b383";
     ctx.beginPath();
@@ -2415,21 +2442,23 @@ function computeLayout(width, height) {
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.font = runtime.layout.mode === "mobile-portrait"
-      ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
-      : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    const textLeft = rect.x + 14;
-    const line1Y = rect.y + 10;
-    const line2Y = rect.y + 28;
-    const line3Y = rect.y + 43;
-    ctx.fillText(fitText(player.name, rect.w - 28, ctx.font), textLeft, line1Y);
+      ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const textLeft = rect.x + 10;
+    const line1Y = rect.y + 8;
+    const line2Y = rect.y + 21;
+    const line3Y = rect.y + 32;
+    const nameText = fitText(player.name, rect.w - 20, ctx.font);
+    ctx.fillText(nameText, textLeft, line1Y);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, rect.w - 20);
     ctx.strokeStyle = player.color.fill;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(textLeft, line1Y + 17);
-    ctx.lineTo(rect.x + rect.w - 16, line1Y + 17);
+    ctx.moveTo(textLeft, line1Y + 13);
+    ctx.lineTo(textLeft + nameWidth, line1Y + 13);
     ctx.stroke();
-    ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = "700 8px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = "rgba(65, 42, 25, 0.88)";
     ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, textLeft, line2Y);
     ctx.fillText(getTurnReadyLabel(player), textLeft, line3Y);
@@ -2528,6 +2557,7 @@ function computeLayout(width, height) {
   }
 
   function renderGameTopBar(rect) {
+    const player = getPlayer();
     const compact = runtime.layout.mode !== "desktop";
     const short = isVeryShortViewport();
     renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.95)" });
@@ -2540,7 +2570,7 @@ function computeLayout(width, height) {
 
     const rightButtonY = rect.y + 8;
     const menuRect = { x: rect.x + rect.w - 34, y: rightButtonY, w: 24, h: 24 };
-    const fullRect = { x: menuRect.x - 56, y: rightButtonY, w: 50, h: 24 };
+    const fullRect = { x: menuRect.x - 30, y: rightButtonY, w: 24, h: 24 };
     if (game.players.length > 1) {
       drawButton({ x: fullRect.x - 64, y: rightButtonY, w: 58, h: 24 }, game.ui.playersPanelExpanded ? "Hide" : "Players", () => {
         game.ui.playersPanelExpanded = !game.ui.playersPanelExpanded;
@@ -2550,7 +2580,7 @@ function computeLayout(width, height) {
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     }
-    drawButton(fullRect, controller.state.isFullscreen ? "Exit" : "Full", async () => {
+    drawFullscreenButton(fullRect, async () => {
       if (!controller.state.fullscreenSupported) {
         setMessage(game, "warning", "Fullscreen unavailable", "This browser is managing fullscreen itself on the current device.");
         return;
@@ -2563,7 +2593,7 @@ function computeLayout(width, height) {
     }, {
       id: "shell-fullscreen",
       enabled: controller.state.fullscreenSupported,
-      font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      minimize: controller.state.isFullscreen
     });
     drawMenuButton(menuRect, openPauseMenu, { id: "shell-menu", radius: 8 });
 
@@ -2584,12 +2614,20 @@ function computeLayout(width, height) {
         radius: 8,
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
-      drawPill(rect.x + 16 + roundWidth, pillY, getPhaseLabel(), phaseFill, "#fff9f3", {
+      const phaseWidth = drawPill(rect.x + 16 + roundWidth, pillY, getPhaseLabel(), phaseFill, "#fff9f3", {
         height: compact ? 18 : 20,
         paddingX: 10,
         radius: 8,
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
+      if (player) {
+        drawPill(rect.x + 20 + roundWidth + phaseWidth, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
+          height: compact ? 18 : 20,
+          paddingX: 10,
+          radius: 8,
+          font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        });
+      }
     }
   }
 
@@ -2712,7 +2750,7 @@ function computeLayout(width, height) {
     const titleFont = "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif";
     const buttonHeight = 36;
     const menuWidth = 40;
-    const fullWidth = 58;
+    const fullWidth = 40;
     const menuX = rect.x + rect.w - pad - menuWidth;
     const fullscreenX = menuX - 8 - fullWidth;
 
@@ -2722,9 +2760,8 @@ function computeLayout(width, height) {
     ctx.textBaseline = "top";
     ctx.fillText("Smore to Explore", rect.x + pad, rect.y + 12);
 
-    drawButton(
+    drawFullscreenButton(
       { x: fullscreenX, y: rect.y + 10, w: fullWidth, h: buttonHeight },
-      controller.state.isFullscreen ? "Exit" : "Full",
       async () => {
         if (!controller.state.fullscreenSupported) {
           setMessage(game, "warning", "Fullscreen unavailable", "This browser is managing fullscreen itself on the current device.");
@@ -2739,7 +2776,7 @@ function computeLayout(width, height) {
       {
         id: "top-fullscreen",
         enabled: controller.state.fullscreenSupported,
-        font: "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        minimize: controller.state.isFullscreen
       }
     );
     drawMenuButton(
@@ -2767,7 +2804,12 @@ function computeLayout(width, height) {
       paddingX: 12,
       font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
-    drawPill(rect.x + pad + roundWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+    const phaseWidth = drawPill(rect.x + pad + roundWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+      height: 24,
+      paddingX: 12,
+      font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
+    drawPill(rect.x + pad + roundWidth + phaseWidth + 16, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
       height: 24,
       paddingX: 12,
       font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -2789,18 +2831,6 @@ function computeLayout(width, height) {
     ctx.fillText("Current player", heroRect.x + 14, heroRect.y + 8);
     ctx.font = "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillText(fitText(player.name, heroRect.w * 0.48, ctx.font), heroRect.x + 14, heroRect.y + 24);
-
-    const statusText = game.phase === "build" && player.passedThisRound
-      ? "Passed"
-      : game.turn.actionTaken
-        ? "Turn done"
-        : "Ready now";
-    drawPill(heroRect.x + heroRect.w - 96, heroRect.y + 9, statusText, "rgba(255,255,255,0.24)", player.color.text, {
-      height: 20,
-      paddingX: 10,
-      font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      stroke: "rgba(255,255,255,0.2)"
-    });
 
     ctx.textAlign = "right";
     ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -2867,21 +2897,27 @@ function computeLayout(width, height) {
       paddingX: 13,
       font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
-    drawPill(rect.x + 18 + roundPillWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+    const phasePillWidth = drawPill(rect.x + 18 + roundPillWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
       height: 26,
       paddingX: 13,
       font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
+    if (player) {
+      drawPill(rect.x + 18 + roundPillWidth + phasePillWidth + 16, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
+        height: 26,
+        paddingX: 13,
+        font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    }
 
-    const buttonWidth = runtime.layout.mode === "mobile-portrait" ? 72 : 84;
     const buttonHeight = runtime.layout.mode === "mobile-portrait" ? 32 : 30;
+    const buttonWidth = buttonHeight;
     const menuWidth = buttonHeight;
     const buttonGap = 8;
     const menuX = rect.x + rect.w - menuWidth - 18;
     const fullscreenX = menuX - buttonGap - buttonWidth;
-    drawButton(
+    drawFullscreenButton(
       { x: fullscreenX, y: rect.y + 14, w: buttonWidth, h: buttonHeight },
-      controller.state.isFullscreen ? "Exit Full" : "Fullscreen",
       async () => {
         if (!controller.state.fullscreenSupported) {
           setMessage(game, "warning", "Fullscreen unavailable", "This browser is managing fullscreen itself on the current device.");
@@ -2896,7 +2932,7 @@ function computeLayout(width, height) {
       {
         id: "top-fullscreen",
         enabled: controller.state.fullscreenSupported,
-        font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        minimize: controller.state.isFullscreen
       }
     );
     drawMenuButton(
