@@ -2400,8 +2400,8 @@ function computeLayout(width, height) {
   function drawCurrentPlayerStump(geometry, player) {
     if (!player || !geometry?.boardArea) return;
     const stumpWidth = runtime.layout.mode === "mobile-portrait"
-      ? Math.min(126, geometry.boardArea.w * 0.28)
-      : Math.min(152, geometry.boardArea.w * 0.22);
+      ? Math.min(64, geometry.boardArea.w * 0.14)
+      : Math.min(76, geometry.boardArea.w * 0.11);
     const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 42 : 48;
     const rect = {
       x: geometry.boardArea.x + 6,
@@ -2439,29 +2439,27 @@ function computeLayout(width, height) {
     ctx.stroke();
 
     ctx.fillStyle = "#4a2e1b";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.font = runtime.layout.mode === "mobile-portrait"
       ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    const textLeft = rect.x + 10;
-    const line1Y = rect.y + 8;
-    const line2Y = rect.y + 21;
-    const line3Y = rect.y + 32;
-    const nameText = fitText(player.name, rect.w - 20, ctx.font);
-    ctx.fillText(nameText, textLeft, line1Y);
-    const nameWidth = Math.min(ctx.measureText(nameText).width, rect.w - 20);
+    const textCenterX = rect.x + rect.w / 2;
+    const line1Y = rect.y + rect.h * 0.39;
+    const line2Y = rect.y + rect.h * 0.62;
+    const nameText = fitText(player.name, rect.w - 14, ctx.font);
+    ctx.fillText(nameText, textCenterX, line1Y);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, rect.w - 14);
     ctx.strokeStyle = player.color.fill;
     ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(textLeft, line1Y + 13);
-    ctx.lineTo(textLeft + nameWidth, line1Y + 13);
+    ctx.moveTo(textCenterX - nameWidth / 2, line1Y + 8);
+    ctx.lineTo(textCenterX + nameWidth / 2, line1Y + 8);
     ctx.stroke();
     ctx.font = "700 8px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = "rgba(65, 42, 25, 0.88)";
-    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, textLeft, line2Y);
-    ctx.fillText(getTurnReadyLabel(player), textLeft, line3Y);
+    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, textCenterX, line2Y);
     ctx.restore();
   }
 
@@ -3290,31 +3288,38 @@ function computeLayout(width, height) {
     return { x: rect.x + inset, y: centerY };
   }
 
-  function getRoadTurnCornerPoint(rect, sideA, sideB) {
-    const inset = Math.max(16, rect.w * 0.24);
-    let x = rect.x + rect.w / 2;
-    let y = rect.y + rect.h / 2;
-    if (sideA === "west" || sideB === "west") x = rect.x + inset;
-    if (sideA === "east" || sideB === "east") x = rect.x + rect.w - inset;
-    if (sideA === "north" || sideB === "north") y = rect.y + inset;
-    if (sideA === "south" || sideB === "south") y = rect.y + rect.h - inset;
-    return { x, y };
-  }
-
-  function drawRoadTurnPath(pointA, pointB, corner, sideA) {
-    const bendRadius = Math.max(8, Math.min(18, Math.min(Math.abs(corner.x - pointA.x), Math.abs(corner.y - pointB.y), Math.abs(corner.y - pointA.y), Math.abs(corner.x - pointB.x))));
-    const sideAIsVertical = sideA === "north" || sideA === "south";
-    if (sideAIsVertical) {
-      ctx.moveTo(pointA.x, pointA.y);
-      ctx.lineTo(pointA.x, corner.y + (pointA.y < corner.y ? -bendRadius : bendRadius));
-      ctx.arcTo(corner.x, corner.y, pointB.x + (pointB.x < corner.x ? -bendRadius : bendRadius), corner.y, bendRadius);
-      ctx.lineTo(pointB.x, pointB.y);
+  function drawRoadTurnPath(rect, sideA, sideB) {
+    const pair = [sideA, sideB].sort().join("-");
+    const edgeInset = Math.max(6, rect.w * 0.08);
+    const centerInset = Math.max(16, rect.w * 0.24);
+    const radius = Math.max(6, centerInset - edgeInset);
+    if (pair === "east-north") {
+      const cx = rect.x + rect.w - centerInset;
+      const cy = rect.y + centerInset;
+      ctx.moveTo(cx, rect.y + edgeInset);
+      ctx.arc(cx, cy, radius, -Math.PI / 2, 0);
       return;
     }
-    ctx.moveTo(pointA.x, pointA.y);
-    ctx.lineTo(corner.x + (pointA.x < corner.x ? -bendRadius : bendRadius), pointA.y);
-    ctx.arcTo(corner.x, corner.y, corner.x, pointB.y + (pointB.y < corner.y ? -bendRadius : bendRadius), bendRadius);
-    ctx.lineTo(pointB.x, pointB.y);
+    if (pair === "east-south") {
+      const cx = rect.x + rect.w - centerInset;
+      const cy = rect.y + rect.h - centerInset;
+      ctx.moveTo(rect.x + rect.w - edgeInset, cy);
+      ctx.arc(cx, cy, radius, 0, Math.PI / 2);
+      return;
+    }
+    if (pair === "south-west") {
+      const cx = rect.x + centerInset;
+      const cy = rect.y + rect.h - centerInset;
+      ctx.moveTo(cx, rect.y + rect.h - edgeInset);
+      ctx.arc(cx, cy, radius, Math.PI / 2, Math.PI);
+      return;
+    }
+    if (pair === "north-west") {
+      const cx = rect.x + centerInset;
+      const cy = rect.y + centerInset;
+      ctx.moveTo(rect.x + edgeInset, cy);
+      ctx.arc(cx, cy, radius, Math.PI, Math.PI * 1.5);
+    }
   }
 
   function strokeRoadPath(pathBuilder, outerWidth, innerWidth) {
@@ -3360,9 +3365,8 @@ function computeLayout(width, height) {
           ctx.lineTo(pointB.x, pointB.y);
         }, outerWidth, innerWidth);
       } else {
-        const corner = getRoadTurnCornerPoint(rect, sideA, sideB);
         strokeRoadPath(() => {
-          drawRoadTurnPath(pointA, pointB, corner, sideA);
+          drawRoadTurnPath(rect, sideA, sideB);
         }, outerWidth, innerWidth);
       }
     } else {
