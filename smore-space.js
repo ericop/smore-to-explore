@@ -2373,30 +2373,30 @@ function computeLayout(width, height) {
   function drawCurrentPlayerStump(geometry, player) {
     if (!player || !geometry?.boardArea) return;
     const stumpWidth = runtime.layout.mode === "mobile-portrait"
-      ? Math.min(154, geometry.boardArea.w * 0.34)
-      : Math.min(192, geometry.boardArea.w * 0.28);
-    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 72 : 86;
+      ? Math.min(162, geometry.boardArea.w * 0.35)
+      : Math.min(208, geometry.boardArea.w * 0.3);
+    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 58 : 66;
     const rect = {
       x: geometry.boardArea.x + 8,
       y: geometry.boardArea.y + geometry.boardArea.h - stumpHeight - 8,
       w: stumpWidth,
       h: stumpHeight
     };
-    const topHeight = Math.max(18, rect.h * 0.26);
+    const topHeight = Math.max(24, rect.h * 0.5);
     const barkFill = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y);
     barkFill.addColorStop(0, "#7a4d2a");
     barkFill.addColorStop(0.5, "#8b5d33");
     barkFill.addColorStop(1, "#6c4326");
 
     ctx.save();
-    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + topHeight * 0.4, rect.w - 16, rect.h - topHeight, 18, barkFill, "rgba(73, 45, 24, 0.36)", 1.6);
-    Core.drawRoundedRect(ctx, rect.x + 14, rect.y + topHeight * 0.72, 8, rect.h - topHeight - 10, 4, "rgba(168, 118, 73, 0.22)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.46, rect.y + topHeight * 0.8, 7, rect.h - topHeight - 12, 4, "rgba(168, 118, 73, 0.18)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w - 24, rect.y + topHeight * 0.7, 7, rect.h - topHeight - 10, 4, "rgba(168, 118, 73, 0.18)");
+    Core.drawRoundedRect(ctx, rect.x + 10, rect.y + topHeight * 0.72, rect.w - 20, rect.h - topHeight * 0.86, 14, barkFill, "rgba(73, 45, 24, 0.36)", 1.6);
+    Core.drawRoundedRect(ctx, rect.x + 16, rect.y + topHeight * 0.92, 7, rect.h - topHeight - 4, 4, "rgba(168, 118, 73, 0.18)");
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.5, rect.y + topHeight * 0.98, 6, rect.h - topHeight - 6, 4, "rgba(168, 118, 73, 0.15)");
+    Core.drawRoundedRect(ctx, rect.x + rect.w - 22, rect.y + topHeight * 0.9, 6, rect.h - topHeight - 5, 4, "rgba(168, 118, 73, 0.16)");
 
     ctx.fillStyle = "#d9b383";
     ctx.beginPath();
-    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight, rect.w / 2, topHeight, 0, 0, Math.PI * 2);
+    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w / 2, topHeight, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#8c5d35";
     ctx.lineWidth = 2;
@@ -2405,29 +2405,34 @@ function computeLayout(width, height) {
     ctx.strokeStyle = "rgba(118, 78, 40, 0.45)";
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight, rect.w * 0.34, topHeight * 0.56, 0, 0, Math.PI * 2);
+    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w * 0.34, topHeight * 0.56, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.beginPath();
-    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight, rect.w * 0.19, topHeight * 0.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w * 0.19, topHeight * 0.3, 0, 0, Math.PI * 2);
     ctx.stroke();
-
-    ctx.fillStyle = player.color.fill;
-    ctx.beginPath();
-    ctx.arc(rect.x + 20, rect.y + 18, 7, 0, Math.PI * 2);
-    ctx.fill();
 
     ctx.fillStyle = "#4a2e1b";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.font = "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillText("Current player", rect.x + 32, rect.y + 12);
     ctx.font = runtime.layout.mode === "mobile-portrait"
       ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillText(fitText(player.name, rect.w - 28, ctx.font), rect.x + 14, rect.y + 32);
+    const textLeft = rect.x + 14;
+    const line1Y = rect.y + 10;
+    const line2Y = rect.y + 28;
+    const line3Y = rect.y + 43;
+    ctx.fillText(fitText(player.name, rect.w - 28, ctx.font), textLeft, line1Y);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(textLeft, line1Y + 17);
+    ctx.lineTo(rect.x + rect.w - 16, line1Y + 17);
+    ctx.stroke();
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = "rgba(65, 42, 25, 0.88)";
-    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts | ${getTurnReadyLabel(player)}`, rect.x + 14, rect.y + rect.h - 22);
+    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, textLeft, line2Y);
+    ctx.fillText(getTurnReadyLabel(player), textLeft, line3Y);
     ctx.restore();
   }
 
@@ -3261,17 +3266,18 @@ function computeLayout(width, height) {
   }
 
   function drawRoadTurnPath(pointA, pointB, corner, sideA) {
+    const bendRadius = Math.max(8, Math.min(18, Math.min(Math.abs(corner.x - pointA.x), Math.abs(corner.y - pointB.y), Math.abs(corner.y - pointA.y), Math.abs(corner.x - pointB.x))));
     const sideAIsVertical = sideA === "north" || sideA === "south";
     if (sideAIsVertical) {
       ctx.moveTo(pointA.x, pointA.y);
-      ctx.lineTo(pointA.x, corner.y);
-      ctx.lineTo(pointB.x, corner.y);
+      ctx.lineTo(pointA.x, corner.y + (pointA.y < corner.y ? -bendRadius : bendRadius));
+      ctx.arcTo(corner.x, corner.y, pointB.x + (pointB.x < corner.x ? -bendRadius : bendRadius), corner.y, bendRadius);
       ctx.lineTo(pointB.x, pointB.y);
       return;
     }
     ctx.moveTo(pointA.x, pointA.y);
-    ctx.lineTo(corner.x, pointA.y);
-    ctx.lineTo(corner.x, pointB.y);
+    ctx.lineTo(corner.x + (pointA.x < corner.x ? -bendRadius : bendRadius), pointA.y);
+    ctx.arcTo(corner.x, corner.y, corner.x, pointB.y + (pointB.y < corner.y ? -bendRadius : bendRadius), bendRadius);
     ctx.lineTo(pointB.x, pointB.y);
   }
 
@@ -3546,7 +3552,13 @@ function computeLayout(width, height) {
       const selected = game.ui.selection.source === "landscape" && game.ui.selection.typeId === entry.typeId;
       registerTarget(cardRect, () => selectLandscapeTile(entry.typeId), { id: `landscape-${entry.typeId}`, kind: "landscape-card" });
       Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, selected ? "rgba(255, 229, 197, 0.98)" : "rgba(250, 242, 230, 0.98)", selected ? "#cc7a3f" : "rgba(108,80,54,0.16)", selected ? 2 : 1.2);
-      const miniRect = { x: cardRect.x + 10, y: cardRect.y + 10, w: Math.min(runtime.layout.mode === "mobile-portrait" ? 44 : 56, cardRect.h - 20), h: Math.min(runtime.layout.mode === "mobile-portrait" ? 44 : 56, cardRect.h - 20) };
+      const previewSize = Math.max(44, Math.min(cardRect.h - 12, runtime.layout.mode === "mobile-portrait" ? 56 : 68));
+      const miniRect = {
+        x: cardRect.x + 8,
+        y: cardRect.y + Math.round((cardRect.h - previewSize) / 2),
+        w: previewSize,
+        h: previewSize
+      };
       drawLandscapeTileVisual(miniRect, { typeId: entry.typeId, rotation: selected ? game.ui.selection.rotation : 0 });
       const def = getLandscapeDef(entry.typeId);
       ctx.fillStyle = "#452f1e";
@@ -3555,7 +3567,7 @@ function computeLayout(width, height) {
         : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      const textX = miniRect.x + miniRect.w + 10;
+      const textX = miniRect.x + miniRect.w + 12;
       const inlineLabel = `${def.name} x${entry.count}`;
       ctx.fillText(fitText(inlineLabel, cardRect.w - (textX - cardRect.x) - 10, ctx.font), textX, cardRect.y + 12);
       ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
@@ -3564,7 +3576,7 @@ function computeLayout(width, height) {
         : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       if (selected) {
         ctx.fillStyle = "#b9642a";
-        ctx.fillText(`Selected | ${game.ui.selection.rotation * 90} deg`, textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 28 : 32));
+        ctx.fillText(`Selected | ${game.ui.selection.rotation * 90} deg`, textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 30 : 34));
       }
     });
   }
