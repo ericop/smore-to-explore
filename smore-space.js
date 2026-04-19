@@ -3289,37 +3289,27 @@ function computeLayout(width, height) {
   }
 
   function drawRoadTurnPath(rect, sideA, sideB) {
-    const pair = [sideA, sideB].sort().join("-");
-    const edgeInset = Math.max(6, rect.w * 0.08);
-    const centerInset = Math.max(16, rect.w * 0.24);
-    const radius = Math.max(6, centerInset - edgeInset);
-    if (pair === "east-north") {
-      const cx = rect.x + rect.w - centerInset;
-      const cy = rect.y + centerInset;
-      ctx.moveTo(cx, rect.y + edgeInset);
-      ctx.arc(cx, cy, radius, -Math.PI / 2, 0);
+    const pointA = getRoadAnchorPoint(rect, sideA);
+    const pointB = getRoadAnchorPoint(rect, sideB);
+    const centerX = rect.x + rect.w / 2;
+    const centerY = rect.y + rect.h / 2;
+    const radius = Math.max(8, rect.w * 0.2);
+    const sideAIsVertical = sideA === "north" || sideA === "south";
+    if (sideAIsVertical) {
+      const approachY = centerY + (sideA === "north" ? -radius : radius);
+      const exitX = centerX + (sideB === "west" ? -radius : radius);
+      ctx.moveTo(pointA.x, pointA.y);
+      ctx.lineTo(pointA.x, approachY);
+      ctx.arcTo(centerX, centerY, exitX, pointB.y, radius);
+      ctx.lineTo(pointB.x, pointB.y);
       return;
     }
-    if (pair === "east-south") {
-      const cx = rect.x + rect.w - centerInset;
-      const cy = rect.y + rect.h - centerInset;
-      ctx.moveTo(rect.x + rect.w - edgeInset, cy);
-      ctx.arc(cx, cy, radius, 0, Math.PI / 2);
-      return;
-    }
-    if (pair === "south-west") {
-      const cx = rect.x + centerInset;
-      const cy = rect.y + rect.h - centerInset;
-      ctx.moveTo(cx, rect.y + rect.h - edgeInset);
-      ctx.arc(cx, cy, radius, Math.PI / 2, Math.PI);
-      return;
-    }
-    if (pair === "north-west") {
-      const cx = rect.x + centerInset;
-      const cy = rect.y + centerInset;
-      ctx.moveTo(rect.x + edgeInset, cy);
-      ctx.arc(cx, cy, radius, Math.PI, Math.PI * 1.5);
-    }
+    const approachX = centerX + (sideA === "west" ? -radius : radius);
+    const exitY = centerY + (sideB === "north" ? -radius : radius);
+    ctx.moveTo(pointA.x, pointA.y);
+    ctx.lineTo(approachX, pointA.y);
+    ctx.arcTo(centerX, centerY, pointB.x, exitY, radius);
+    ctx.lineTo(pointB.x, pointB.y);
   }
 
   function strokeRoadPath(pathBuilder, outerWidth, innerWidth) {
