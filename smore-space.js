@@ -3349,6 +3349,30 @@ function computeLayout(width, height) {
     ctx.fillText(text, rect.x + rect.w / 2, rect.y + rect.h - 15);
   }
 
+  function drawInvalidPlacementX(rect) {
+    const inset = Math.max(12, rect.w * 0.18);
+    const strokeWidth = Math.max(5, rect.w * 0.11);
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(255, 245, 240, 0.95)";
+    ctx.lineWidth = strokeWidth + 3;
+    ctx.beginPath();
+    ctx.moveTo(rect.x + inset, rect.y + inset);
+    ctx.lineTo(rect.x + rect.w - inset, rect.y + rect.h - inset);
+    ctx.moveTo(rect.x + rect.w - inset, rect.y + inset);
+    ctx.lineTo(rect.x + inset, rect.y + rect.h - inset);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(195, 47, 47, 0.94)";
+    ctx.lineWidth = strokeWidth;
+    ctx.beginPath();
+    ctx.moveTo(rect.x + inset, rect.y + inset);
+    ctx.lineTo(rect.x + rect.w - inset, rect.y + rect.h - inset);
+    ctx.moveTo(rect.x + rect.w - inset, rect.y + inset);
+    ctx.lineTo(rect.x + inset, rect.y + rect.h - inset);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawLandscapeTileVisual(rect, tile) {
     const info = getLandscapeInfoFromTile(tile);
     const fill = info.hasForestTag ? "#9fba7d" : info.hasWaterEdge ? "#c4dee2" : "#c8dca3";
@@ -3425,6 +3449,7 @@ function computeLayout(width, height) {
       const invalid = game.ui.lastAttempt.reasons.length > 0;
       const color = invalid ? "rgba(185, 75, 60, 0.72)" : "rgba(56, 120, 77, 0.72)";
       Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), invalid ? "rgba(185,75,60,0.14)" : "rgba(56,120,77,0.14)", color, 2);
+      if (invalid && game.ui.selection.source === "landscape") drawInvalidPlacementX(rect);
     }
   }
 
@@ -3438,6 +3463,7 @@ function computeLayout(width, height) {
       drawLandscapeTileVisual(rect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
       ctx.restore();
       Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
+      if (reasons.length) drawInvalidPlacementX(rect);
       return;
     }
     const reasons = getCampTilePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId);
