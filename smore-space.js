@@ -2221,7 +2221,7 @@ function computeLayout(width, height) {
     const boardHeight = cellSize * BOARD_ROWS + gap * (BOARD_ROWS - 1);
     const originX = boardArea.x + labelSize + Math.max(0, (availableWidth - boardWidth) / 2);
     const originY = boardArea.y + labelSize + Math.max(0, (availableHeight - boardHeight) / 2);
-    return { headerHeight, labelSize, gap, cellSize, originX, originY, boardWidth, boardHeight, rackRect };
+    return { headerHeight, labelSize, gap, cellSize, originX, originY, boardWidth, boardHeight, rackRect, boardArea };
   }
 
   function getCellRect(geometry, row, col) {
@@ -2364,6 +2364,73 @@ function computeLayout(width, height) {
     return width;
   }
 
+  function getTurnReadyLabel(player) {
+    if (game.phase === "build" && player.passedThisRound) return "Passed";
+    if (game.turn.actionTaken) return "Turn done";
+    return "Ready now";
+  }
+
+  function drawCurrentPlayerStump(geometry, player) {
+    if (!player || !geometry?.boardArea) return;
+    const stumpWidth = runtime.layout.mode === "mobile-portrait"
+      ? Math.min(154, geometry.boardArea.w * 0.34)
+      : Math.min(192, geometry.boardArea.w * 0.28);
+    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 72 : 86;
+    const rect = {
+      x: geometry.boardArea.x + 8,
+      y: geometry.boardArea.y + geometry.boardArea.h - stumpHeight - 8,
+      w: stumpWidth,
+      h: stumpHeight
+    };
+    const topHeight = Math.max(18, rect.h * 0.26);
+    const barkFill = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y);
+    barkFill.addColorStop(0, "#7a4d2a");
+    barkFill.addColorStop(0.5, "#8b5d33");
+    barkFill.addColorStop(1, "#6c4326");
+
+    ctx.save();
+    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + topHeight * 0.4, rect.w - 16, rect.h - topHeight, 18, barkFill, "rgba(73, 45, 24, 0.36)", 1.6);
+    Core.drawRoundedRect(ctx, rect.x + 14, rect.y + topHeight * 0.72, 8, rect.h - topHeight - 10, 4, "rgba(168, 118, 73, 0.22)");
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.46, rect.y + topHeight * 0.8, 7, rect.h - topHeight - 12, 4, "rgba(168, 118, 73, 0.18)");
+    Core.drawRoundedRect(ctx, rect.x + rect.w - 24, rect.y + topHeight * 0.7, 7, rect.h - topHeight - 10, 4, "rgba(168, 118, 73, 0.18)");
+
+    ctx.fillStyle = "#d9b383";
+    ctx.beginPath();
+    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight, rect.w / 2, topHeight, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#8c5d35";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(118, 78, 40, 0.45)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight, rect.w * 0.34, topHeight * 0.56, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight, rect.w * 0.19, topHeight * 0.3, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = player.color.fill;
+    ctx.beginPath();
+    ctx.arc(rect.x + 20, rect.y + 18, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#4a2e1b";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText("Current player", rect.x + 32, rect.y + 12);
+    ctx.font = runtime.layout.mode === "mobile-portrait"
+      ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillText(fitText(player.name, rect.w - 28, ctx.font), rect.x + 14, rect.y + 32);
+    ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = "rgba(65, 42, 25, 0.88)";
+    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts | ${getTurnReadyLabel(player)}`, rect.x + 14, rect.y + rect.h - 22);
+    ctx.restore();
+  }
+
   function createObjectiveCardFill(cardRect, complete) {
     const gradient = ctx.createLinearGradient(0, cardRect.y, 0, cardRect.y + cardRect.h);
     gradient.addColorStop(0, complete ? "rgba(171, 213, 234, 0.98)" : "rgba(191, 220, 236, 0.98)");
@@ -2456,7 +2523,6 @@ function computeLayout(width, height) {
   }
 
   function renderGameTopBar(rect) {
-    const player = getPlayer();
     const compact = runtime.layout.mode !== "desktop";
     const short = isVeryShortViewport();
     renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.95)" });
@@ -2520,26 +2586,6 @@ function computeLayout(width, height) {
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     }
-
-    if (!player) return;
-
-    const statusRect = {
-      x: rect.x + 12,
-      y: rect.y + rect.h - (short ? 22 : compact ? 28 : 30),
-      w: rect.w - 24,
-      h: short ? 16 : compact ? 20 : 22
-    };
-    Core.drawRoundedRect(ctx, statusRect.x, statusRect.y, statusRect.w, statusRect.h, 8, "rgba(244, 236, 224, 0.92)", "rgba(108,80,54,0.14)", 1);
-    ctx.fillStyle = player.color.fill;
-    ctx.fillRect(statusRect.x, statusRect.y, 4, statusRect.h);
-    ctx.fillStyle = "#4a3524";
-    ctx.font = short ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`Current: ${player.name}`, statusRect.x + 10, statusRect.y + statusRect.h / 2 + 0.5);
-    ctx.textAlign = "right";
-    const statusSuffix = game.phase === "build" && player.passedThisRound ? " | passed" : game.turn.actionTaken ? " | done" : "";
-    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts${statusSuffix}`, statusRect.x + statusRect.w - 8, statusRect.y + statusRect.h / 2 + 0.5);
   }
 
   function renderShellSceneTabs(rect) {
@@ -3530,7 +3576,7 @@ function computeLayout(width, height) {
 
   function renderBoardPanel(rect) {
     const player = getPlayer();
-    const subtitle = player ? `${player.name}'s 8x5 campground board` : "Player boards appear once the game begins";
+    const subtitle = player ? "8x5 campground board for road layout and camp planning." : "Player boards appear once the game begins";
     const content = drawPanel(rect, "Campground Board", subtitle);
     if (!player) return;
     if (runtime.layout.mode === "mobile-portrait" && game.phase === "setupLandscape") {
@@ -3551,6 +3597,7 @@ function computeLayout(width, height) {
         for (let col = 0; col < BOARD_COLS; col += 1) drawBoardCell(player.board, geometry, row, col);
       }
       drawPlacementPreview(player, geometry);
+      drawCurrentPlayerStump(geometry, player);
       return;
     }
     const geometry = getBoardGeometry(rect);
@@ -3559,6 +3606,7 @@ function computeLayout(width, height) {
       for (let col = 0; col < BOARD_COLS; col += 1) drawBoardCell(player.board, geometry, row, col);
     }
     drawPlacementPreview(player, geometry);
+    drawCurrentPlayerStump(geometry, player);
     if (geometry.rackRect) renderLandscapeRack(player, geometry.rackRect);
   }
 
