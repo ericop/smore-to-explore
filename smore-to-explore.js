@@ -4962,13 +4962,14 @@ function computeLayout(width, height) {
       onClose: closeHowToScreen,
       scopeKey: "howto"
     });
-    const navHeight = short ? 38 : compact ? 48 : 54;
-    const navInset = short ? 12 : compact ? 16 : 18;
+    const navHeight = short ? 36 : compact ? 44 : 50;
+    const navInset = short ? 18 : compact ? 26 : 34;
+    const navGap = short ? 10 : 14;
     const contentViewport = {
       x: body.x,
       y: body.y,
       w: body.w,
-      h: Math.max(short ? 92 : 140, shell.y + shell.h - navInset - navHeight - (short ? 8 : 12) - body.y)
+      h: Math.max(short ? 92 : 140, shell.y + shell.h - navInset - navHeight - navGap - body.y)
     };
     const scrollState = drawTutorialStepCards(contentViewport, step, compact);
     if (game.ui.howToScroll !== scrollState.scrollY) game.ui.howToScroll = scrollState.scrollY;
