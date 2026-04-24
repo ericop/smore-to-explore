@@ -1170,6 +1170,23 @@
     return Core.unique(reasons);
   }
 
+  function canPlaceCampTileAnywhere(gameState, player, typeId) {
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        if (!getCampTilePlacementReasons(gameState, player, row, col, typeId).length) return true;
+      }
+    }
+    return false;
+  }
+
+  function getBlockedMarketPurchaseReason(gameState, player, stack) {
+    if (!player) return "No player is active.";
+    if (stack.some((entry) => entry.typeId === "waterfront_site") && !canPlaceCampTileAnywhere(gameState, player, "waterfront_site")) {
+      return "You cannot hire Waterfront Sites right now because your campground has no open legal waterfront parcel.";
+    }
+    return "";
+  }
+
   function getLargestCampCluster(board, campCells, predicate) {
     const matching = new Set(campCells.filter(predicate).map((cell) => cellKey(cell.row, cell.col)));
     let best = 0;
@@ -1622,6 +1639,11 @@
       typeId: slot.typeId,
       slotIndex: index
     }));
+    const blockedReason = getBlockedMarketPurchaseReason(game, player, stack);
+    if (blockedReason) {
+      setMessage(game, "warning", "Contractor unavailable", blockedReason);
+      return;
+    }
     const totalCost = stack.reduce((sum, entry) => sum + getCampDef(entry.typeId).cost, 0);
     if (player.money < totalCost) {
       setMessage(game, "error", "Not enough cash", `${Core.formatMoney(totalCost)} is needed to hire ${stack.length} contractor${stack.length === 1 ? "" : "s"} from this column.`);
@@ -3751,6 +3773,9 @@ function computeLayout(width, height) {
         const slotIndex = slotStartIndex + visibleSlotIndex;
         const slotRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap + visibleSlotIndex * (rowHeight + rowGap), w: colRect.w, h: rowHeight };
         const globalColumnIndex = startIndex + visibleIndex;
+        const stack = game.market.columns[globalColumnIndex].slots.slice(0, slotIndex + 1).map((entry, index) => ({ typeId: entry.typeId, slotIndex: index }));
+        const blockedPurchaseReason = buildOpen ? getBlockedMarketPurchaseReason(game, player, stack) : "";
+        const blockedPurchase = !!blockedPurchaseReason;
         const selected = game.ui.selection.source === "market" && game.ui.selection.columnIndex === globalColumnIndex && game.ui.selection.slotIndex === slotIndex;
         const queued = hasPendingMarketPurchase() && game.turn.marketPurchaseColumnIndex === globalColumnIndex && slotIndex <= game.turn.marketPurchaseDepth;
         registerTarget(slotRect, buildOpen ? () => selectMarketTile(globalColumnIndex, slotIndex) : null, {
@@ -3765,15 +3790,18 @@ function computeLayout(width, height) {
           slotRect.w,
           slotRect.h,
           16,
-          selected ? "rgba(255, 232, 204, 0.98)" : queued ? "rgba(255, 243, 223, 0.98)" : "rgba(250, 243, 233, 0.98)",
-          selected ? "#cc7a3f" : queued ? "rgba(204,122,63,0.42)" : "rgba(108,80,54,0.16)",
+          blockedPurchase ? "rgba(240, 231, 225, 0.98)" : selected ? "rgba(255, 232, 204, 0.98)" : queued ? "rgba(255, 243, 223, 0.98)" : "rgba(250, 243, 233, 0.98)",
+          blockedPurchase ? "rgba(143,67,56,0.28)" : selected ? "#cc7a3f" : queued ? "rgba(204,122,63,0.42)" : "rgba(108,80,54,0.16)",
           selected ? 2 : queued ? 1.5 : 1.1
         );
         const iconSize = Math.max(16, slotRect.h - 10);
         const miniRect = { x: slotRect.x + 6, y: slotRect.y + (slotRect.h - iconSize) / 2, w: iconSize, h: iconSize };
+        ctx.save();
+        if (blockedPurchase) ctx.globalAlpha = 0.58;
         drawCampTileVisual(miniRect, { typeId: def.id });
+        ctx.restore();
         const compact = slotRect.h < 54 || slotRect.w < 150;
-        ctx.fillStyle = buildOpen ? "#442f20" : "rgba(68,47,32,0.52)";
+        ctx.fillStyle = !buildOpen ? "rgba(68,47,32,0.52)" : blockedPurchase ? "rgba(92,65,45,0.58)" : "#442f20";
         const textX = miniRect.x + miniRect.w + 8;
         const priceX = slotRect.x + slotRect.w - 10;
         if (compact) {
@@ -3786,15 +3814,20 @@ function computeLayout(width, height) {
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.textAlign = "right";
           ctx.fillText("$10k", priceX, slotRect.y + slotRect.h / 2 + 0.5);
+          if (blockedPurchase) {
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#8f4338";
+            ctx.fillText("No legal water", textX, slotRect.y + slotRect.h - 10);
+          }
         } else {
           ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
           ctx.fillText(fitText(def.name, slotRect.w - miniRect.w - 28, ctx.font), textX, slotRect.y + 7);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
-          ctx.fillStyle = column.category === "amenity" ? "#3f6870" : "#7d5a37";
-          ctx.fillText(column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
-          ctx.fillStyle = buildOpen ? "#442f20" : "rgba(68,47,32,0.52)";
+          ctx.fillStyle = blockedPurchase ? "#8f4338" : column.category === "amenity" ? "#3f6870" : "#7d5a37";
+          ctx.fillText(blockedPurchase ? "No legal water parcel" : column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
+          ctx.fillStyle = !buildOpen ? "rgba(68,47,32,0.52)" : blockedPurchase ? "rgba(92,65,45,0.58)" : "#442f20";
           ctx.textAlign = "right";
           ctx.fillText("$10k", priceX, slotRect.y + 7);
         }
