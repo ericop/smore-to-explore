@@ -54,11 +54,11 @@
     },
     {
       title: "How A Turn Works",
-      lead: "Each season has a landscape setup phase and a build phase. The game moves in a practical rhythm once you know which phase you are in.",
+      lead: "Each summer has three parts: a landscape phase, a market phase, and a scoring phase. The flow gets much easier once you know which part of the summer the table is in.",
       bullets: [
         "During landscape setup, place every tile in your current hand before the market opens.",
-        "During build, hire the top contractor in a column or buy deeper into one column and take that whole stack.",
-        "When every player has passed, the round scores and the next season begins."
+        "During the market phase, hire the top contractor in a column or buy deeper into one column and take that whole stack.",
+        "When every player has passed, the summer scores, Camp Director goals may reveal, and the next season begins."
       ],
       reminder: "If you buy deeper in a column, you pay for every contractor above it and must place them in top-down order."
     },
@@ -78,9 +78,10 @@
       bullets: [
         "The market shows two amenity columns and four camp columns while the build phase is open.",
         "Taking a deeper contractor means buying every contractor above it in that same column for the same turn.",
+        "Big market items use a two-square preview, can rotate between horizontal and vertical, and only place if both parcels are legal.",
         "You pay for the full stack up front, then place those contractors starting from the top tile first."
       ],
-      reminder: "Check the parcel first, then spend the money. A tile can be affordable and still be illegal to place."
+      reminder: "Check the parcel first, then spend the money. If you tapped the wrong stack, you can cancel the purchase before placing any tile from it."
     },
     {
       title: "Goals And Scoring",

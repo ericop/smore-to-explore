@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smore to Explore Printable Rulebook</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 0.55in;
+    }
+
+    :root {
+      --ink: #2f241b;
+      --muted: #6d5846;
+      --paper: #fbf7f1;
+      --accent: #9d5a2f;
+      --accent-soft: #ead8c4;
+      --line: #d7c8b5;
+      --callout: #fff6c9;
+      --callout-border: #d2b14c;
+      --water: #76b8d6;
+      --forest: #88a86c;
+      --road: #ccb28c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #efe8dc;
+      color: var(--ink);
+      font: 15px/1.45 Georgia, "Times New Roman", serif;
+    }
+
+    main {
+      max-width: 8.5in;
+      margin: 0 auto;
+      background: var(--paper);
+      padding: 0.3in;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: "Trebuchet MS", Arial, sans-serif;
+      line-height: 1.15;
+      margin: 0 0 0.2rem;
+      color: #291d14;
+    }
+
+    h1 {
+      font-size: 30px;
+      letter-spacing: 0.03em;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-top: 1rem;
+      padding-top: 0.25rem;
+      border-top: 2px solid var(--accent-soft);
+    }
+
+    h3 {
+      font-size: 17px;
+      margin-top: 0.8rem;
+    }
+
+    h4 {
+      font-size: 15px;
+      margin-top: 0.7rem;
+    }
+
+    p, ul, ol, table, .diagram, .callout {
+      margin: 0.45rem 0 0.7rem;
+    }
+
+    ul, ol {
+      padding-left: 1.2rem;
+    }
+
+    .cover {
+      border: 3px solid var(--accent-soft);
+      border-radius: 22px;
+      padding: 0.35in;
+      background: linear-gradient(180deg, #fdf9f4 0%, #f5ede3 100%);
+      margin-bottom: 0.35in;
+    }
+
+    .cover p {
+      max-width: 6.7in;
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 0.6rem;
+    }
+
+    .badge {
+      padding: 0.18rem 0.45rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid #cfb499;
+      font: 700 11px/1.2 "Trebuchet MS", Arial, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #5a3b27;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .callout {
+      background: var(--callout);
+      border: 1px solid var(--callout-border);
+      border-left-width: 6px;
+      border-radius: 10px;
+      padding: 0.55rem 0.7rem;
+    }
+
+    .callout strong {
+      display: block;
+      font-family: "Trebuchet MS", Arial, sans-serif;
+      margin-bottom: 0.15rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 0.35rem 0.42rem;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f2e8dc;
+      font-family: "Trebuchet MS", Arial, sans-serif;
+      text-align: left;
+    }
+
+    .compact td, .compact th {
+      font-size: 11px;
+      padding: 0.28rem 0.34rem;
+    }
+
+    .diagram {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.45rem;
+      background: #fffdfa;
+      page-break-inside: avoid;
+    }
+
+    .diagram h4 {
+      margin-top: 0;
+    }
+
+    .grid-wrap {
+      display: grid;
+      grid-template-columns: repeat(4, 30px);
+      gap: 4px;
+      margin-top: 0.4rem;
+    }
+
+    .cell {
+      width: 30px;
+      height: 30px;
+      border: 1px solid #a9957d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: 700 10px/1 "Trebuchet MS", Arial, sans-serif;
+      color: #2f241b;
+      background: #f7f0e6;
+    }
+
+    .road {
+      background: linear-gradient(180deg, #f7f0e6 0%, #ead7b7 100%);
+    }
+
+    .forest {
+      background: linear-gradient(180deg, #edf5e8 0%, #cfe1be 100%);
+    }
+
+    .water {
+      background: linear-gradient(180deg, #e8f5fa 0%, #b8dded 100%);
+    }
+
+    .market {
+      background: #f3e4d5;
+    }
+
+    .big {
+      background: #d9ecf6;
+      border-color: #5d8ea8;
+    }
+
+    .blocked {
+      background: #f5d7d2;
+      border-color: #b76d61;
+    }
+
+    .legend {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    .page-break {
+      break-before: page;
+      page-break-before: always;
+    }
+
+    .example-box {
+      border: 1px dashed #c8b39a;
+      border-radius: 10px;
+      padding: 0.5rem 0.6rem;
+      background: #fdf9f4;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      main {
+        margin: 0;
+        max-width: none;
+        padding: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="cover">
+      <h1>Smore to Explore</h1>
+      <p><strong>Printable Rulebook</strong></p>
+      <p>Build the best campground over three summers by expanding your land, hiring the right contractors, and scoring the goals that matter this season. Each player builds a separate board, but everyone drafts from the same public market.</p>
+      <div class="badge-row">
+        <span class="badge">2-5 Players</span>
+        <span class="badge">Pass And Play</span>
+        <span class="badge">8 x 5 Board Per Player</span>
+        <span class="badge">Three Summers</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>1. Components Included</h2>
+      <div class="two-col">
+        <div>
+          <h3>Shared Components</h3>
+          <ul>
+            <li>1 contractor market display with 6 columns and 8 visible spaces in each column</li>
+            <li>20 Early Summer goal cards</li>
+            <li>20 Mid Summer goal cards</li>
+            <li>22 Late Summer goal cards</li>
+            <li>10 Camp Director goal cards</li>
+            <li>Money tokens: <strong>TODO: verify denominations and quantity</strong></li>
+            <li>Score pad or score track: <strong>TODO: verify format</strong></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Per Player</h3>
+          <ul>
+            <li>1 campground board with an 8 x 5 grid</li>
+            <li>$100,000 starting money</li>
+            <li>10 starting landscape tiles</li>
+            <li>1 score marker if using a shared track</li>
+          </ul>
+          <h4>Starting landscape tiles</h4>
+          <ul>
+            <li>1 Entrance to Camp</li>
+            <li>1 Camp Office</li>
+            <li>4 Straight Road</li>
+            <li>2 Road Turn</li>
+            <li>1 Four-Way Cross</li>
+            <li>1 Three-Way Split</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Important</strong>
+        The digital market refills from weighted pools. A printed edition still needs a final decision on exact finite tile counts.
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Game Overview</h2>
+      <p>Each player is designing a campground people actually want to visit. Over three summers you grow roads, forests, scenic spaces, and water parcels, then build campsites, lodging, and amenities that fit that land.</p>
+      <p>The game supports 2 to 5 players. The code uses the same board size, money, and setup for every supported player count.</p>
+    </section>
+
+    <section>
+      <h2>3. Setup</h2>
+      <ol>
+        <li>Give each player a board, $100,000, and the same 10 starting landscape tiles.</li>
+        <li>Shuffle the Early, Mid, Late, and Camp Director goal decks separately.</li>
+        <li>Reveal 4 Early Summer goals.</li>
+        <li>Keep the Camp Director deck face down.</li>
+        <li>Fill the contractor market with 2 amenity columns and 4 camp columns, each 8 spaces tall.</li>
+        <li>Decide player order.</li>
+      </ol>
+      <div class="diagram">
+        <h4>Diagram 1. Starting Setup Example For 3 Players</h4>
+        <svg viewBox="0 0 720 190" width="100%" role="img" aria-label="Starting setup for three players">
+          <rect x="10" y="10" width="180" height="55" rx="12" fill="#f2e8dc" stroke="#c8b39a"/>
+          <text x="100" y="32" text-anchor="middle" font-size="16" font-family="Trebuchet MS">Early Goals x4</text>
+          <text x="100" y="52" text-anchor="middle" font-size="11" font-family="Trebuchet MS">shared public goals</text>
+          <rect x="210" y="10" width="500" height="55" rx="12" fill="#f2e8dc" stroke="#c8b39a"/>
+          <text x="460" y="32" text-anchor="middle" font-size="16" font-family="Trebuchet MS">Contractor Market</text>
+          <text x="460" y="52" text-anchor="middle" font-size="11" font-family="Trebuchet MS">6 columns x 8 visible spaces</text>
+
+          <rect x="20" y="92" width="205" height="78" rx="12" fill="#fbf7f1" stroke="#c8b39a"/>
+          <rect x="257" y="92" width="205" height="78" rx="12" fill="#fbf7f1" stroke="#c8b39a"/>
+          <rect x="494" y="92" width="205" height="78" rx="12" fill="#fbf7f1" stroke="#c8b39a"/>
+          <text x="122" y="118" text-anchor="middle" font-size="16" font-family="Trebuchet MS">Eric</text>
+          <text x="122" y="140" text-anchor="middle" font-size="11" font-family="Trebuchet MS">$100,000 + 10 start tiles</text>
+          <text x="122" y="157" text-anchor="middle" font-size="11" font-family="Trebuchet MS">8 x 5 board</text>
+          <text x="359" y="118" text-anchor="middle" font-size="16" font-family="Trebuchet MS">Chris</text>
+          <text x="359" y="140" text-anchor="middle" font-size="11" font-family="Trebuchet MS">$100,000 + 10 start tiles</text>
+          <text x="359" y="157" text-anchor="middle" font-size="11" font-family="Trebuchet MS">8 x 5 board</text>
+          <text x="596" y="118" text-anchor="middle" font-size="16" font-family="Trebuchet MS">Eliana</text>
+          <text x="596" y="140" text-anchor="middle" font-size="11" font-family="Trebuchet MS">$100,000 + 10 start tiles</text>
+          <text x="596" y="157" text-anchor="middle" font-size="11" font-family="Trebuchet MS">8 x 5 board</text>
+        </svg>
+      </div>
+      <div class="example-box">
+        <strong>Running Example:</strong> In this rulebook Eric is first, Chris is second, and Eliana is third.
+      </div>
+    </section>
+
+    <section>
+      <h2>4. How A Summer Works</h2>
+      <ol>
+        <li><strong>Landscape Tile Phase:</strong> place every landscape tile in your current hand.</li>
+        <li><strong>Market Tile Phase:</strong> buy from the contractor market, place tiles, or pass.</li>
+        <li><strong>Goal Scoring Phase:</strong> score the 4 active public goals for the current Summer.</li>
+      </ol>
+      <p>After Early Summer, reveal 3 Camp Director goals. After Mid Summer and Late Summer, every player also receives $50,000 and 8 new landscape tiles before the next Landscape Tile Phase begins.</p>
+    </section>
+
+    <section class="page-break">
+      <h2>5. Landscape Tile Phase</h2>
+      <p>Landscape tiles create the foundation of your campground. You cannot build campsites or amenities on a square until that square already has a landscape tile.</p>
+      <h3>Legal Placement</h3>
+      <ul>
+        <li>Stay inside the 8 x 5 board.</li>
+        <li>Do not overlap another landscape tile.</li>
+        <li>Your first tile must be the Entrance.</li>
+        <li>The Entrance gate must face the outside edge of the board.</li>
+        <li>Every later tile must touch your current campground orthogonally.</li>
+        <li>Road edges must meet road edges.</li>
+        <li>Open edges cannot crash into road edges.</li>
+        <li>By the end of the phase, the Camp Office must connect to the Entrance by road.</li>
+      </ul>
+      <div class="two-col">
+        <div class="diagram">
+          <h4>Diagram 2. Example Campground Board Layout</h4>
+          <div class="grid-wrap">
+            <div class="cell road">G</div><div class="cell road">R</div><div class="cell forest"></div><div class="cell water"></div>
+            <div class="cell road"></div><div class="cell road">O</div><div class="cell forest"></div><div class="cell water"></div>
+            <div class="cell road"></div><div class="cell forest"></div><div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          </div>
+          <div class="legend">G = Entrance, O = Office, tan = road, green = forest, blue = water-edge parcel</div>
+        </div>
+        <div class="diagram">
+          <h4>Diagram 3. Legal And Illegal Landscape Placement</h4>
+          <svg viewBox="0 0 360 180" width="100%" role="img" aria-label="Landscape placement examples">
+            <text x="70" y="20" text-anchor="middle" font-size="13" font-family="Trebuchet MS">Legal</text>
+            <rect x="18" y="35" width="52" height="52" fill="#ead7b7" stroke="#8f775a"/>
+            <rect x="78" y="35" width="52" height="52" fill="#ead7b7" stroke="#8f775a"/>
+            <line x1="44" y1="35" x2="44" y2="87" stroke="#7b6850" stroke-width="8"/>
+            <line x1="104" y1="35" x2="104" y2="87" stroke="#7b6850" stroke-width="8"/>
+            <text x="250" y="20" text-anchor="middle" font-size="13" font-family="Trebuchet MS">Illegal</text>
+            <rect x="198" y="35" width="52" height="52" fill="#ead7b7" stroke="#8f775a"/>
+            <rect x="258" y="35" width="52" height="52" fill="#dce8c9" stroke="#8f775a"/>
+            <line x1="224" y1="35" x2="224" y2="87" stroke="#7b6850" stroke-width="8"/>
+            <text x="254" y="110" text-anchor="middle" font-size="11" font-family="Trebuchet MS">road hits open edge</text>
+            <text x="82" y="110" text-anchor="middle" font-size="11" font-family="Trebuchet MS">roads match correctly</text>
+            <rect x="105" y="128" width="145" height="34" rx="8" fill="#e8f5fa" stroke="#8cb7cc"/>
+            <text x="177" y="149" text-anchor="middle" font-size="11" font-family="Trebuchet MS">Water-edge tiles create future waterfront spaces</text>
+          </svg>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Important</strong>
+        Road edges may not run off the board. The only special edge that is supposed to face out of the campground is the Entrance gate.
+      </div>
+    </section>
+
+    <section>
+      <h2>6. Market Tile Phase</h2>
+      <p>During the Market Tile Phase, players take turns hiring contractors from the shared market.</p>
+      <h3>Buying From The Market</h3>
+      <ul>
+        <li>Every market tile costs $10,000.</li>
+        <li>If you select a deeper tile in a column, you buy every tile above it too.</li>
+        <li>You pay for the full stack immediately.</li>
+        <li>You must place the stack from top to bottom.</li>
+        <li>If you have not placed any tile from that stack yet, you may cancel the purchase.</li>
+        <li>If every player passes, the Summer ends.</li>
+      </ul>
+      <h3>Big Market Items</h3>
+      <p>These always occupy exactly 2 squares: RV Site with Full Hookups, Group Site, Waterfront Site, Horse Riding, and Event Pavilion.</p>
+      <div class="callout">
+        <strong>Important</strong>
+        A big market item is not legal unless both occupied squares are legal.
+      </div>
+      <div class="two-col">
+        <div class="diagram">
+          <h4>Diagram 4. Market Tile Placement Example</h4>
+          <div class="grid-wrap">
+            <div class="cell market">Top</div><div class="cell market">2</div><div class="cell market">3</div><div class="cell market">4</div>
+            <div class="cell market">5</div><div class="cell market">6</div><div class="cell market">7</div><div class="cell market">8</div>
+          </div>
+          <div class="legend">Selecting the third tile buys Top, 2, and 3 from that column.</div>
+        </div>
+        <div class="diagram">
+          <h4>Diagram 5. Big Item Horizontal Placement</h4>
+          <div class="grid-wrap">
+            <div class="cell road"></div><div class="cell big">RV</div><div class="cell big">RV</div><div class="cell road"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          </div>
+          <div class="legend">Default horizontal preview uses the clicked square plus the square to its left, with right-side fallback at the edge.</div>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="diagram">
+          <h4>Diagram 6. Big Item Vertical Placement</h4>
+          <div class="grid-wrap">
+            <div class="cell road"></div><div class="cell big">Grp</div><div class="cell"></div><div class="cell"></div>
+            <div class="cell road"></div><div class="cell big">Grp</div><div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          </div>
+          <div class="legend">Rotate switches the preview to vertical. The preview uses above by default and below as the edge fallback.</div>
+        </div>
+        <div class="diagram">
+          <h4>Diagram 7. Waterfront Placement Example</h4>
+          <div class="grid-wrap">
+            <div class="cell water"></div><div class="cell big">WF</div><div class="cell big">WF</div><div class="cell road"></div>
+            <div class="cell water"></div><div class="cell"></div><div class="cell"></div><div class="cell road"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          </div>
+          <div class="legend">At least one occupied square must be on a water-edge landscape parcel. Both squares still must be open and legal.</div>
+        </div>
+      </div>
+      <div class="diagram">
+        <h4>Diagram 8. Invalid Overlap Example</h4>
+        <div class="grid-wrap">
+          <div class="cell road"></div><div class="cell">Cab</div><div class="cell blocked">RV</div><div class="cell blocked">RV</div>
+          <div class="cell road"></div><div class="cell"></div><div class="cell"></div><div class="cell">Play</div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+        </div>
+        <div class="legend">The RV Site cannot be placed because one of its squares would overlap an existing camp tile.</div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>7. Goal Scoring Phase</h2>
+      <p>At the end of each Summer, every player checks the 4 active public goals for that season. If a player satisfies a goal, that player scores it. After Early Summer, reveal 3 Camp Director goals. Those 3 final goals score after Late Summer.</p>
+      <div class="example-box">
+        <strong>Example:</strong> If Eliana has 3 Rustic Tent Forest tiles at the end of Early Summer and <em>Tents in the Pines</em> is active, she scores it. Eric and Chris may also score it if they built the same thing.
+      </div>
+
+      <h3>Early Summer Goals</h3>
+      <table class="compact">
+        <thead><tr><th>Goal</th><th>Pts</th><th>Rule</th><th>Clarification</th></tr></thead>
+        <tbody>
+          <tr><td>Scout Arrival</td><td>5</td><td>2 Group Sites connected to the main road network.</td><td>They do not need to touch each other.</td></tr>
+          <tr><td>Glamor Guests</td><td>4</td><td>At least 1 Cabin, RV Site, or Waterfront Site.</td><td>Only those 3 premium guest-stay tiles count.</td></tr>
+          <tr><td>Organized Check-In</td><td>4</td><td>Camp Office connects to the Entrance in 5 road steps or fewer.</td><td>Longer paths fail.</td></tr>
+          <tr><td>Fire Circle Friends</td><td>4</td><td>Firewood next to at least 2 campsite or lodging tiles.</td><td>Orthogonal only.</td></tr>
+          <tr><td>Tents in the Pines</td><td>4</td><td>At least 3 Rustic Tent Forest tiles.</td><td>They can be anywhere.</td></tr>
+          <tr><td>Beginner's Loop</td><td>5</td><td>Any closed road loop.</td><td>One loop is enough.</td></tr>
+          <tr><td>Easy Access</td><td>5</td><td>0 dead-end road tiles.</td><td>Entrance and Office are ignored.</td></tr>
+          <tr><td>Family Meet-Up</td><td>4</td><td>At least 1 Group Site and 1 Playground.</td><td>No adjacency needed.</td></tr>
+          <tr><td>Camp Basics</td><td>4</td><td>At least 2 different amenity types.</td><td>Horse Riding is not an amenity.</td></tr>
+          <tr><td>Trailhead Start</td><td>4</td><td>Hiking Trail within 1 space of Entrance or Office.</td><td>Orthogonal only.</td></tr>
+          <tr><td>Tent Row</td><td>5</td><td>3 campsite/lodging tiles in one straight line with road continuity.</td><td>Types may differ.</td></tr>
+          <tr><td>Busy Office</td><td>4</td><td>Office has 2 connected road sides.</td><td>Printed but disconnected roads do not count.</td></tr>
+          <tr><td>Branching Out</td><td>4</td><td>At least 2 intersection landscape tiles.</td><td>Four-Way Cross and Three-Way Split count.</td></tr>
+          <tr><td>Welcome Row</td><td>4</td><td>At least 2 campsite or lodging tiles tied to the Entrance road network.</td><td>Each tile is checked separately.</td></tr>
+          <tr><td>Wooded Retreat</td><td>4</td><td>Rustic Tent Forest cluster of size 2 or more.</td><td>Orthogonal touching only.</td></tr>
+          <tr><td>Community Spot</td><td>4</td><td>Event Pavilion beside a Group Site or beside at least 2 campsite/lodging tiles.</td><td>One legal Pavilion is enough.</td></tr>
+          <tr><td>Opening Weekend</td><td>5</td><td>Place at least 3 market tiles during Early Summer.</td><td>Round count only.</td></tr>
+          <tr><td>Kid Camp</td><td>6</td><td>Group Site, Playground, and Firewood.</td><td>No adjacency needed.</td></tr>
+          <tr><td>Practical Camping</td><td>5</td><td>1 Tent Electric and 2 Rustic Tent Forest tiles.</td><td>They can be anywhere.</td></tr>
+          <tr><td>Well Planned Grounds</td><td>6</td><td>Connected landscape, all roads tied to Entrance, and connected Office.</td><td>Any island fails.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Mid Summer Goals</h3>
+      <table class="compact">
+        <thead><tr><th>Goal</th><th>Pts</th><th>Rule</th><th>Clarification</th></tr></thead>
+        <tbody>
+          <tr><td>Beat the Heat</td><td>5</td><td>Pool next to at least 2 campsite or lodging tiles.</td><td>Orthogonal only.</td></tr>
+          <tr><td>Sweet Summer Stop</td><td>5</td><td>Ice Cream Vending in the center zone or on a road hub.</td><td>Near-center is not enough.</td></tr>
+          <tr><td>Wheels Ready</td><td>5</td><td>Bike Rental on or beside a connected road component of size 6+.</td><td>The road may be under it or beside it.</td></tr>
+          <tr><td>Paddle Out</td><td>6</td><td>Canoe Rental within 2 spaces of Waterfront Site.</td><td>Manhattan distance.</td></tr>
+          <tr><td>Packed Season</td><td>5</td><td>At least 8 campsite or lodging tiles.</td><td>Amenities do not count.</td></tr>
+          <tr><td>RV Weekend</td><td>6</td><td>At least 2 legal RV Sites.</td><td>Legal means strong road access.</td></tr>
+          <tr><td>Hookup Demand</td><td>5</td><td>At least 2 Tent Site with Electric Hookup tiles.</td><td>Anywhere on the board.</td></tr>
+          <tr><td>Summer Activity Hub</td><td>5</td><td>At least 3 different amenity types.</td><td>Copies do not help.</td></tr>
+          <tr><td>Campers Everywhere</td><td>6</td><td>Developed camp tiles in all 4 quadrants.</td><td>Any market tile counts.</td></tr>
+          <tr><td>Main Road Traffic</td><td>6</td><td>Longest road 8+ and 4 road-served developed camp tiles.</td><td>Road-served can be on or beside a road parcel.</td></tr>
+          <tr><td>Splash and Stay</td><td>6</td><td>Pool within 2 spaces of another premium tile.</td><td>Premium amenities count too.</td></tr>
+          <tr><td>Family Favorite</td><td>6</td><td>Playground within 2 spaces of a Group Site and a tent-based campsite.</td><td>Those two supporting tiles may be different spaces.</td></tr>
+          <tr><td>Popular Pavilion</td><td>5</td><td>Event Pavilion next to at least 2 developed camp tiles.</td><td>Roads do not count.</td></tr>
+          <tr><td>Active Campground</td><td>5</td><td>Bike Rental and Hiking Trail.</td><td>No distance check.</td></tr>
+          <tr><td>Full Swing</td><td>6</td><td>Place at least 7 market tiles during Mid Summer.</td><td>Round count only.</td></tr>
+          <tr><td>Busy Utility Loop</td><td>5</td><td>At least 2 road hubs.</td><td>A hub has 3+ connected road neighbors.</td></tr>
+          <tr><td>Adventure Weekend</td><td>7</td><td>Canoe Rental, Bike Rental, and Hiking Trail.</td><td>No adjacency needed.</td></tr>
+          <tr><td>Big Rig Friendly</td><td>6</td><td>At least 2 RV Sites on strong road-access parcels.</td><td>Same legal test as RV Weekend.</td></tr>
+          <tr><td>Cooling Off</td><td>5</td><td>Any 2 of Pool, Ice Cream Vending, Waterfront Site.</td><td>Any 2 are enough.</td></tr>
+          <tr><td>Peak Season Layout</td><td>7</td><td>At least 4 developed camp tiles in the center zone, with 3 road-served.</td><td>Center density matters.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Late Summer Goals</h3>
+      <table class="compact">
+        <thead><tr><th>Goal</th><th>Pts</th><th>Rule</th><th>Clarification</th></tr></thead>
+        <tbody>
+          <tr><td>Cabin Country</td><td>6</td><td>At least 3 Cabins.</td><td>Anywhere on the board.</td></tr>
+          <tr><td>Lakeside Premium</td><td>6</td><td>At least 2 Waterfront Sites.</td><td>No adjacency needed.</td></tr>
+          <tr><td>Deluxe Weekend</td><td>7</td><td>At least 1 Cabin, 1 Waterfront Site, and amenity support for one of them.</td><td>Only one of the two stay tiles needs support.</td></tr>
+          <tr><td>Luxury Lane</td><td>7</td><td>3 premium tiles in a straight line with road continuity.</td><td>Premium amenities count.</td></tr>
+          <tr><td>End-of-Season Escape</td><td>7</td><td>At least 10 campsite or lodging tiles.</td><td>Amenities do not count.</td></tr>
+          <tr><td>Polished Grounds</td><td>6</td><td>3 or fewer unused supported spaces.</td><td>The code uses a broad empty-developed-space count.</td></tr>
+          <tr><td>Scenic Ride</td><td>6</td><td>Horse Riding connected to the main road network.</td><td>The placement rule still must be legal first.</td></tr>
+          <tr><td>Premium Cluster</td><td>7</td><td>Premium cluster of size 3 or more.</td><td>Orthogonal touching only.</td></tr>
+          <tr><td>Camp for Everyone</td><td>7</td><td>Rustic, Electric, RV, Group, and Cabin all present.</td><td>Waterfront does not replace any required type.</td></tr>
+          <tr><td>Longest Route In</td><td>Up to 8</td><td>Score floor(longest road length / 2), up to 8.</td><td>Partial scoring card.</td></tr>
+          <tr><td>Lakeside Leisure</td><td>6</td><td>Waterfront Site within 2 spaces of Canoe Rental or Ice Cream Vending.</td><td>One legal pair is enough.</td></tr>
+          <tr><td>Refined Retreat</td><td>7</td><td>Cabin near an amenity without tent-based campsites in the immediate ring.</td><td>Tent restriction is only distance 1.</td></tr>
+          <tr><td>Premium Hospitality</td><td>7</td><td>Connected Office, 3 premium tiles, and 2 amenity types.</td><td>All three thresholds are required.</td></tr>
+          <tr><td>End of Summer Event</td><td>6</td><td>Event Pavilion within 2 spaces of at least 4 developed camp tiles.</td><td>Any market tile counts.</td></tr>
+          <tr><td>Horse Country Getaway</td><td>6</td><td>Horse Riding on scenic terrain or within 2 spaces of premium.</td><td>Forest-only is not enough unless premium is nearby.</td></tr>
+          <tr><td>Waterfront Weekend</td><td>7</td><td>2 Waterfront Sites and at least 1 Canoe Rental or Ice Cream Vending.</td><td>Either leisure support tile works.</td></tr>
+          <tr><td>Fully Connected Resort</td><td>8</td><td>Every developed camp tile has practical road access.</td><td>Road can be on or beside the parcel.</td></tr>
+          <tr><td>Built Out Season</td><td>6</td><td>Place at least 7 market tiles during Late Summer.</td><td>Round count only.</td></tr>
+          <tr><td>Destination Campground</td><td>8</td><td>3 amenity types, 4 campsite/lodging types, and 3 premium tiles.</td><td>All thresholds are required.</td></tr>
+          <tr><td>Smore to Explore</td><td>Up to 12</td><td>Score from variety, roads, premium count, center presence, and final balance.</td><td>Partial scoring card.</td></tr>
+          <tr><td>Grand Arrival Drive</td><td>6</td><td>Keep the Entrance road as one unbranched path for at least 4 road tiles.</td><td>The Entrance tile counts.</td></tr>
+          <tr><td>Season Finale Sprint</td><td>6</td><td>Place at least 6 market tiles during Late Summer.</td><td>Can score alongside Built Out Season.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp Director Goals</h3>
+      <table class="compact">
+        <thead><tr><th>Goal</th><th>Pts</th><th>Rule</th><th>Clarification</th></tr></thead>
+        <tbody>
+          <tr><td>Happy Families</td><td>Up to 10</td><td>2 points each for Playground, Group Site, Ice Cream Vending, and Pool, plus 2 bonus if all 4 are present.</td><td>4 attractions score 10.</td></tr>
+          <tr><td>Roughing It Right</td><td>8 or 9</td><td>2 Rustic Tent Forest, Firewood, and Hiking Trail, plus 1 bonus for a Rustic cluster.</td><td>Full score is 9.</td></tr>
+          <tr><td>Full Hookup Favorite</td><td>Up to 9</td><td>3 points per legal RV Site, up to 9.</td><td>Legal means strong road access.</td></tr>
+          <tr><td>The Waterfront Draw</td><td>Up to 10</td><td>5 for Waterfront Site, 3 for Canoe Rental, 2 more for a second Waterfront Site.</td><td>These points stack.</td></tr>
+          <tr><td>Rain or Shine</td><td>6 or 8</td><td>Rustic Tent Forest plus any premium tile, with 2 extra for Cabin or Tent Electric.</td><td>Premium can be any premium-tagged tile.</td></tr>
+          <tr><td>Smooth Traffic Flow</td><td>Up to 9</td><td>3 each for longest road 7+, 2 hubs, and 1 or fewer dead ends.</td><td>Each sub-check stands alone.</td></tr>
+          <tr><td>Summer Traditions</td><td>8 or 10</td><td>Event Pavilion, Firewood, and Group Site, plus bonus if Pavilion is close to both.</td><td>Full score needs the close cluster.</td></tr>
+          <tr><td>Something for Everyone</td><td>Up to 10</td><td>2 points per campsite or lodging type, up to 10.</td><td>Amenities do not count.</td></tr>
+          <tr><td>Comfort Upgrade</td><td>Up to 10</td><td>3 for Cabin, 3 for Tent Electric, 4 for Pool, Ice Cream Vending, or Bathrooms.</td><td>Each sub-check is separate.</td></tr>
+          <tr><td>Destination Status</td><td>Up to 12</td><td>3 each for 4 stay types, 3 amenities, longest road 7+, and 3 premium tiles.</td><td>Each benchmark is all-or-nothing.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="diagram">
+        <h4>Diagram 9. Goal Scoring Example</h4>
+        <svg viewBox="0 0 720 130" width="100%" role="img" aria-label="Goal scoring example">
+          <rect x="20" y="20" width="200" height="84" rx="12" fill="#f2e8dc" stroke="#c8b39a"/>
+          <text x="120" y="42" text-anchor="middle" font-size="16" font-family="Trebuchet MS">Eric</text>
+          <text x="120" y="64" text-anchor="middle" font-size="11" font-family="Trebuchet MS">3 Rustic Tent Forest</text>
+          <text x="120" y="82" text-anchor="middle" font-size="11" font-family="Trebuchet MS">Scores Tents in the Pines</text>
+          <rect x="260" y="20" width="200" height="84" rx="12" fill="#f2e8dc" stroke="#c8b39a"/>
+          <text x="360" y="42" text-anchor="middle" font-size="16" font-family="Trebuchet MS">Chris</text>
+          <text x="360" y="64" text-anchor="middle" font-size="11" font-family="Trebuchet MS">Pool + 2 nearby campsites</text>
+          <text x="360" y="82" text-anchor="middle" font-size="11" font-family="Trebuchet MS">Scores Beat the Heat</text>
+          <rect x="500" y="20" width="200" height="84" rx="12" fill="#f2e8dc" stroke="#c8b39a"/>
+          <text x="600" y="42" text-anchor="middle" font-size="16" font-family="Trebuchet MS">Eliana</text>
+          <text x="600" y="64" text-anchor="middle" font-size="11" font-family="Trebuchet MS">2 Waterfront + Canoe Rental</text>
+          <text x="600" y="82" text-anchor="middle" font-size="11" font-family="Trebuchet MS">Scores Waterfront Weekend</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>8. Detailed Tile Placement Rules</h2>
+      <p>Use this reference when a tile's short market text is not enough.</p>
+      <div class="two-col">
+        <div>
+          <h3>Sites</h3>
+          <p><strong>Rustic Tent Forest:</strong> almost any open parcel. Helps rustic, variety, and tent goals.</p>
+          <p><strong>Tent Site with Electric Hookup:</strong> needs at least 1 road edge. Helps electric, comfort, and variety goals.</p>
+          <p><strong>RV Site with Full Hookups:</strong> big market item. Both halves need at least 2 road edges. Helps premium and RV goals.</p>
+          <p><strong>Group Site:</strong> big market item. Both halves need at least 1 road edge. Helps family and group goals.</p>
+          <p><strong>Cabin:</strong> needs at least 1 road edge. Helps premium and comfort goals.</p>
+          <p><strong>Waterfront Site:</strong> big market item. At least 1 half must be on water-edge terrain. Helps premium and waterfront goals.</p>
+        </div>
+        <div>
+          <h3>Amenities And Attractions</h3>
+          <p><strong>Horse Riding:</strong> big market item. Both halves need road access and scenic, forest, or board-edge terrain.</p>
+          <p><strong>Firewood:</strong> practical road access or scenic support.</p>
+          <p><strong>Pool:</strong> at least 1 road edge.</p>
+          <p><strong>Bike Rental:</strong> at least 1 road edge.</p>
+          <p><strong>Canoe Rental:</strong> must be on a water-edge parcel.</p>
+          <p><strong>Event Pavilion:</strong> big market item. Both halves need at least 1 road edge.</p>
+          <p><strong>Hiking Trail:</strong> scenic, forest, or board-edge terrain.</p>
+          <p><strong>Ice Cream Vending:</strong> at least 1 road edge.</p>
+          <p><strong>Playground:</strong> at least 1 road edge.</p>
+          <p><strong>Bathrooms:</strong> at least 2 road edges.</p>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Important</strong>
+        Big market items count as one tile for goals that ask how many of that type you have, but both occupied squares matter for range, adjacency, and placement legality.
+      </div>
+    </section>
+
+    <section>
+      <h2>9. End Of Game And Final Scoring</h2>
+      <ol>
+        <li>Score the 4 active Late Summer goals.</li>
+        <li>Score the 3 revealed Camp Director goals.</li>
+        <li>Add those points to each player's total.</li>
+        <li>Highest total score wins.</li>
+      </ol>
+      <p>The code shows total score, money left, and director points in the final standings, but it breaks ties by score only. No further tie breaker is coded.</p>
+      <div class="diagram">
+        <h4>Diagram 10. End-Game Scoring Summary Example</h4>
+        <table>
+          <thead>
+            <tr><th>Player</th><th>Seasonal Points</th><th>Director Points</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Eric</td><td>32</td><td>8</td><td>40</td></tr>
+            <tr><td>Chris</td><td>29</td><td>10</td><td>39</td></tr>
+            <tr><td>Eliana</td><td>27</td><td>6</td><td>33</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>10. Quick Reference</h2>
+      <div class="two-col">
+        <div>
+          <h3>Setup Checklist</h3>
+          <ul>
+            <li>boards out</li>
+            <li>$100,000 each</li>
+            <li>10 start landscape tiles each</li>
+            <li>4 Early goals revealed</li>
+            <li>market filled 6 x 8</li>
+            <li>player order chosen</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Placement Checklist</h3>
+          <ul>
+            <li>inside the board</li>
+            <li>no overlap</li>
+            <li>landscape first, market second</li>
+            <li>reserved Entrance and Office stay empty of camp tiles</li>
+            <li>big items need 2 legal squares</li>
+            <li>Waterfront needs at least 1 water-edge square</li>
+          </ul>
+        </div>
+      </div>
+      <h3>Game End Checklist</h3>
+      <ul>
+        <li>score active Late Summer goals</li>
+        <li>score revealed Camp Director goals</li>
+        <li>highest total score wins</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Rules Needing Confirmation</h2>
+      <ul>
+        <li><strong>Finite physical supply counts:</strong> the app uses weighted refills rather than a shrinking deck.</li>
+        <li><strong>Expansion landscape mix:</strong> the app draws by weighted recipe, not fixed print count.</li>
+        <li><strong>Tie breaker:</strong> final code sorts by score only.</li>
+        <li><strong>Physical money and score components:</strong> tracked digitally in code, not specified as printed parts.</li>
+      </ul>
+      <p class="small">Suggested tie-breaker for tabletop testing: most money left, then most Camp Director points, then shared victory.</p>
+    </section>
+  </main>
+</body>
+</html>

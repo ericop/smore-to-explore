@@ -180,7 +180,7 @@
       makeObjective({
         id: "early-06",
         round: "early",
-        name: "Beginner’s Loop",
+        name: "Beginner's Loop",
         description: "Score for completing a road loop.",
         points: 5,
         evaluate: (context) => {
