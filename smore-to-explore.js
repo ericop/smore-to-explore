@@ -677,6 +677,24 @@
     game.ui.selection = createSelection();
   }
 
+  function cancelPendingMarketPurchase() {
+    const player = getPlayer();
+    if (!player || !canCancelPendingMarketPurchase()) return;
+    const refundedCost = game.turn.marketPurchaseTotalCost;
+    const refundedCount = game.turn.marketPurchaseStack.length;
+    player.money += refundedCost;
+    game.turn.marketPurchaseStack = [];
+    game.turn.marketPurchaseIndex = 0;
+    game.turn.marketPurchaseColumnIndex = null;
+    game.turn.marketPurchaseDepth = null;
+    game.turn.marketPurchaseTotalCost = 0;
+    clearSelection();
+    game.ui.inspectedCell = null;
+    game.ui.lastAttempt = null;
+    setActiveScene("market");
+    setMessage(game, "info", "Market purchase canceled", `${refundedCount} contractor${refundedCount === 1 ? "" : "s"} were removed from the pending stack and ${Core.formatMoney(refundedCost)} was refunded.`);
+  }
+
   function clearTurnUi() {
     clearSelection();
     game.ui.inspectedCell = null;
@@ -716,6 +734,10 @@
 
   function hasPendingMarketPurchase() {
     return game.phase === "build" && Array.isArray(game.turn.marketPurchaseStack) && game.turn.marketPurchaseStack.length > 0 && game.turn.marketPurchaseIndex < game.turn.marketPurchaseStack.length;
+  }
+
+  function canCancelPendingMarketPurchase() {
+    return hasPendingMarketPurchase() && game.turn.marketPurchaseIndex === 0;
   }
 
   function getPendingMarketPurchaseEntry() {
@@ -1618,9 +1640,9 @@
     const firstDef = getCampDef(stack[0].typeId);
     const columnLabel = game.market.columns[columnIndex].label;
     if (stack.length === 1) {
-      setMessage(game, "info", "Contractor selected", `${firstDef.name} was hired for ${Core.formatMoney(totalCost)}. Tap a valid parcel to place it.`);
+      setMessage(game, "info", "Contractor selected", `${firstDef.name} was hired for ${Core.formatMoney(totalCost)}. Tap a valid parcel to place it, or use Cancel Purchase to back out before placing it.`);
     } else {
-      setMessage(game, "info", "Column stack hired", `${stack.length} contractors were hired from ${columnLabel} for ${Core.formatMoney(totalCost)}. Place ${firstDef.name} first, then continue downward.`);
+      setMessage(game, "info", "Column stack hired", `${stack.length} contractors were hired from ${columnLabel} for ${Core.formatMoney(totalCost)}. Place ${firstDef.name} first, then continue downward, or use Cancel Purchase before placing any of them.`);
     }
     setActiveScene("board");
   }
@@ -3032,7 +3054,7 @@ function computeLayout(width, height) {
         tone: "info",
         title: `${def.name} selected`,
         body: hasPendingMarketPurchase()
-          ? `${getPendingMarketPurchaseRemaining()} contractor${getPendingMarketPurchaseRemaining() === 1 ? "" : "s"} left in this paid stack | ${def.rulesText}`
+          ? `${getPendingMarketPurchaseRemaining()} contractor${getPendingMarketPurchaseRemaining() === 1 ? "" : "s"} left in this paid stack | ${canCancelPendingMarketPurchase() ? "Use Cancel Purchase to back out before placing any of them. " : ""}${def.rulesText}`
           : `${Core.formatMoney(def.cost)} for the top card, or ${Core.formatMoney((game.ui.selection.slotIndex + 1) * def.cost)} for this full stack | ${def.rulesText}`
       };
     }
@@ -3082,7 +3104,10 @@ function computeLayout(width, height) {
       return actions;
     }
     if (game.phase === "build") {
-      if (hasPendingMarketPurchase()) return actions;
+      if (hasPendingMarketPurchase()) {
+        if (canCancelPendingMarketPurchase()) actions.push({ label: "Cancel Purchase", onClick: cancelPendingMarketPurchase, variant: "warning" });
+        return actions;
+      }
       if (game.ui.selection.source) actions.push({ label: "Clear", onClick: clearSelection });
       if (!game.turn.actionTaken) actions.push({ label: "Pass Round", onClick: passCurrentPlayerForRound, variant: "warning" });
       if (game.turn.actionTaken) {
