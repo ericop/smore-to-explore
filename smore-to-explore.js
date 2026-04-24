@@ -299,6 +299,159 @@
   const AMENITY_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "amenity");
   const CAMP_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "camp");
 
+  const DETAILED_SITE_RULES = [
+    {
+      typeId: "rustic_tent_forest",
+      body: "Rustic Tent Forest: This is a campsite tile, so it helps broad campsite-count and campsite-variety goals. The code does not give Rustic Tent Forest any extra forest scoring on its own. It only matters where the actual goals ask for rustic tents, tent adjacency, or campsite totals.\n\nDirect goals: Tents in the Pines needs any 3 Rustic Tent Forest tiles anywhere on your board. Wooded Retreat needs at least 2 Rustic Tent Forest tiles touching orthogonally. Practical Camping needs at least 2 Rustic Tent Forest tiles plus at least 1 Tent Site with Electric Hookup. Camp for Everyone needs at least 1 Rustic Tent Forest as part of the five required lodging styles. Roughing It Right needs at least 2 Rustic Tent Forest tiles plus Firewood plus Hiking Trail, and it scores 1 bonus point if your rustic tents form a touching cluster of size 2 or more. Rain or Shine uses Rustic Tent Forest as the rustic half of that director card.\n\nGeneral goals: Rustic Tent Forest also helps Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, Something for Everyone, Smore to Explore, and any round goal that rewards placing camp tiles this season."
+    },
+    {
+      typeId: "tent_electric",
+      body: "Tent Site with Electric Hookup: This is a campsite tile and a comfort-style lodging option. It must be placed on a landscape tile with at least 1 road edge, but after that it scores like any other campsite unless a goal specifically calls for electric tents.\n\nDirect goals: Hookup Demand needs at least 2 electric tent sites. Practical Camping needs at least 1 electric tent site plus at least 2 Rustic Tent Forest tiles. Family Favorite can use an electric tent site as the tent-based campsite that needs to be within 2 spaces of a Playground. Camp for Everyone needs at least 1 electric tent site. Comfort Upgrade gives 3 director points for having at least 1 electric tent site. Rain or Shine can use Tent Site with Electric Hookup as the comfort upgrade that turns that director goal from 6 points into 8.\n\nGeneral goals: Tent Site with Electric Hookup also helps Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, Something for Everyone, Destination Campground, Destination Status, Smore to Explore, and the round-by-round placement goals."
+    },
+    {
+      typeId: "rv_full_hookups",
+      body: "RV Site with Full Hookups: This is a campsite tile and a premium tile. It only counts as legal if its landscape tile has at least 2 road edges, because the placement rule requires strong road access.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so an RV Site can satisfy it by itself. RV Weekend needs 2 legal RV Sites. Big Rig Friendly also needs 2 RV Sites on strong road access. Full Hookup Favorite gives 3 director points per legal RV Site up to 9 total. Camp for Everyone needs at least 1 RV Site. Splash and Stay can use an RV Site as the nearby premium tile for a Pool. Rain or Shine can use an RV Site as the premium half of that director goal. Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, and Smore to Explore also benefit because RV Sites have the premium tag.\n\nGeneral goals: RV Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, and the seasonal placement-count goals."
+    },
+    {
+      typeId: "group_site",
+      body: "Group Site: This is a campsite tile aimed at family and scout style scoring. It must be placed on a landscape tile with at least 1 road edge.\n\nDirect goals: Scout Arrival needs 2 Group Sites connected to the Entrance road network. Family Meet-Up needs at least 1 Group Site plus at least 1 Playground. Community Spot can use a Group Site beside an Event Pavilion. Kid Camp needs a Group Site, Playground, and Firewood. Family Favorite needs a Group Site within 2 spaces of a Playground. Summer Traditions needs at least 1 Group Site along with Event Pavilion and Firewood, with a higher score if those pieces cluster together. Happy Families counts Group Site as one of its four family attractions. Camp for Everyone also needs at least 1 Group Site.\n\nGeneral goals: Group Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, Something for Everyone, Destination Campground, Destination Status, Smore to Explore, and the seasonal placement goals."
+    },
+    {
+      typeId: "cabin",
+      body: "Cabin: This is a lodging tile and a premium tile. It must be placed on a landscape tile with at least 1 road edge.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so a Cabin can satisfy it. Cabin Country needs 3 Cabins. Deluxe Weekend needs at least 1 Cabin, at least 1 Waterfront Site, and at least 1 of those two tiles supported by an amenity within 2 spaces. Splash and Stay can use a Cabin as the nearby premium tile for a Pool. Refined Retreat needs at least 1 Cabin with an amenity within 2 spaces and no tent-based campsite in the immediate 1-space ring. Camp for Everyone needs at least 1 Cabin. Comfort Upgrade gives 3 director points for having at least 1 Cabin. Premium Hospitality, Luxury Lane, Premium Cluster, Destination Campground, Destination Status, and Smore to Explore all like Cabins because they are premium.\n\nGeneral goals: Cabins also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, Something for Everyone, and the seasonal placement goals."
+    },
+    {
+      typeId: "waterfront_site",
+      body: "Waterfront Site: This is a lodging tile and a premium tile. In the current code it must be placed on a landscape tile with a water edge.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so a Waterfront Site can satisfy it. Lakeside Premium needs 2 Waterfront Sites. Deluxe Weekend needs at least 1 Waterfront Site, at least 1 Cabin, and at least 1 of those two tiles supported by an amenity within 2 spaces. Paddle Out needs Canoe Rental within 2 spaces of a Waterfront Site. Lakeside Leisure needs Canoe Rental or Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend needs 2 Waterfront Sites plus at least 1 supporting leisure amenity, which can be Canoe Rental or Ice Cream Vending. The Waterfront Draw gives 5 director points for having at least 1 Waterfront Site and another 2 points if you reach 2 Waterfront Sites. Cooling Off can also use Waterfront Site as one of its 3 cooling attractions.\n\nGeneral goals: Waterfront Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Splash and Stay, Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, Smore to Explore, and the seasonal placement goals."
+    }
+  ];
+
+  const DETAILED_AMENITY_RULES = [
+    {
+      typeId: "horse_riding",
+      body: "Horse Riding: This is a specialty attraction, not an amenity for unique-amenity counting. It must have at least 1 road edge on the landscape below, and it must be on scenic land, forest land, or the outer border of the board.\n\nDirect goals: Scenic Ride needs Horse Riding connected into the Entrance road network. Horse Country Getaway needs Horse Riding either on a scenic parcel or within 2 spaces of any premium tile. Splash and Stay can treat Horse Riding as the premium tile near a Pool because Horse Riding has the premium tag in code. Rain or Shine can also use it as the premium half of that director goal. Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, and Smore to Explore all benefit because Horse Riding is premium.\n\nLayout goals: Because Horse Riding is still a developed camp tile, it also helps Campers Everywhere, Peak Season Layout, Fully Connected Resort, and the seasonal placement-count goals."
+    },
+    {
+      typeId: "firewood",
+      body: "Firewood: Firewood is a true amenity tile. Placement is flexible: it can be on a road parcel, next to a road parcel, or on scenic terrain.\n\nDirect goals: Fire Circle Friends needs at least 1 Firewood tile orthogonally adjacent to at least 2 campsite or lodging tiles. Kid Camp needs Firewood plus Group Site plus Playground. Roughing It Right needs Firewood plus Hiking Trail plus at least 2 Rustic Tent Forest tiles. Summer Traditions needs Firewood plus Event Pavilion plus Group Site, and it scores better if the Pavilion is within 2 spaces of both Firewood and a Group Site.\n\nGeneral goals: Firewood also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore because it counts as an amenity type."
+    },
+    {
+      typeId: "pool",
+      body: "Pool: Pool is an amenity, and in code it is also a premium tile. It must be placed on a landscape tile with at least 1 road edge.\n\nDirect goals: Beat the Heat needs at least 1 Pool orthogonally adjacent to at least 2 campsite or lodging tiles. Splash and Stay needs a Pool within 2 spaces of another premium tile, which can include RV Site, Cabin, Waterfront Site, Horse Riding, or Ice Cream Vending. Cooling Off counts Pool as one of its 3 cooling attractions. Happy Families counts Pool as one of its 4 family attractions. Comfort Upgrade gives 4 director points if you have at least 1 Pool, Ice Cream Vending, or Bathrooms.\n\nGeneral goals: Pool helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore as an amenity. It also helps Luxury Lane, Premium Cluster, Premium Hospitality, and other premium-mix goals because it has the premium tag."
+    },
+    {
+      typeId: "bike_rental",
+      body: "Bike Rental: Bike Rental is an amenity. It must be placed on a landscape tile with at least 1 road edge, and it cares about how long the connected road network is.\n\nDirect goals: Wheels Ready needs Bike Rental on or next to a road component that is at least 6 road tiles long. Active Campground needs Bike Rental plus Hiking Trail. Adventure Weekend needs Canoe Rental, Bike Rental, and Hiking Trail together.\n\nGeneral goals: Bike Rental also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore because it is an amenity type."
+    },
+    {
+      typeId: "canoe_rental",
+      body: "Canoe Rental: Canoe Rental is an amenity that must be placed on a landscape tile with a water edge.\n\nDirect goals: Paddle Out needs Canoe Rental within 2 spaces of a Waterfront Site. Adventure Weekend needs Canoe Rental plus Bike Rental plus Hiking Trail. Lakeside Leisure needs Canoe Rental or Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend needs at least 1 Canoe Rental or Ice Cream Vending once you already have 2 Waterfront Sites. The Waterfront Draw gives 3 director points just for having Canoe Rental.\n\nGeneral goals: Canoe Rental also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore."
+    },
+    {
+      typeId: "event_pavilion",
+      body: "Event Pavilion: Event Pavilion is an amenity that must be placed on a landscape tile with at least 1 road edge. It scores best when it sits near developed camp tiles.\n\nDirect goals: Community Spot needs Event Pavilion beside a Group Site or beside at least 2 campsite or lodging tiles. Popular Pavilion needs Event Pavilion orthogonally adjacent to at least 2 developed camp tiles of any kind. End of Summer Event needs Event Pavilion within 2 spaces of at least 4 developed camp tiles. Summer Traditions needs Event Pavilion plus Firewood plus Group Site, and scores higher if the Pavilion is within 2 spaces of both Firewood and a Group Site.\n\nGeneral goals: Event Pavilion also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore as an amenity, and it counts as a developed tile for layout goals."
+    },
+    {
+      typeId: "hiking_trail",
+      body: "Hiking Trail: Hiking Trail is an amenity that wants scenic placement. It can be placed on a scenic parcel, a forest parcel, or any parcel on the outer border of the board.\n\nDirect goals: Trailhead Start needs Hiking Trail within 1 space of the Entrance or Camp Office. Active Campground needs Hiking Trail plus Bike Rental. Adventure Weekend needs Hiking Trail plus Bike Rental plus Canoe Rental. Roughing It Right needs Hiking Trail plus Firewood plus at least 2 Rustic Tent Forest tiles.\n\nGeneral goals: Hiking Trail also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore."
+    },
+    {
+      typeId: "ice_cream_vending",
+      body: "Ice Cream Vending: Ice Cream Vending is an amenity, and in code it is also a premium tile. It must be placed on a landscape tile with at least 1 road edge.\n\nDirect goals: Sweet Summer Stop needs Ice Cream Vending in a central traffic cell. In code that means either the tile is in the center zone or on a road hub with at least 3 connected road neighbors. Cooling Off counts Ice Cream Vending as one of its 3 cooling attractions. Lakeside Leisure can use Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend can use Ice Cream Vending as the supporting leisure amenity once you already have 2 Waterfront Sites. Happy Families counts Ice Cream Vending as one of its 4 family attractions. Comfort Upgrade can use it as the premium support amenity worth 4 director points.\n\nGeneral goals: Ice Cream Vending helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore as an amenity, and it also helps premium-tag goals like Splash and Stay, Premium Cluster, Premium Hospitality, and Luxury Lane."
+    },
+    {
+      typeId: "playground",
+      body: "Playground: Playground is an amenity and it must be placed on a landscape tile with at least 1 road edge.\n\nDirect goals: Family Meet-Up needs Playground plus Group Site. Kid Camp needs Playground plus Group Site plus Firewood. Family Favorite needs Playground within 2 spaces of at least 1 Group Site and at least 1 tent-based campsite, which means Rustic Tent Forest or Tent Site with Electric Hookup. Happy Families counts Playground as one of its 4 family attractions.\n\nGeneral goals: Playground also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore, and it counts as a developed tile for layout goals like Campers Everywhere, Peak Season Layout, and Fully Connected Resort."
+    },
+    {
+      typeId: "bathrooms",
+      body: "Bathrooms: Bathrooms are an amenity, and they use the same placement rule as RV Sites: the landscape tile underneath must have at least 2 road edges.\n\nDirect goals: Bathrooms are not named on the shared seasonal cards, but they still matter. They count toward amenity-variety goals like Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore. They can also provide the nearby amenity support needed for Deluxe Weekend and Refined Retreat. Comfort Upgrade gives 4 director points if you have at least 1 Pool, Ice Cream Vending, or Bathrooms.\n\nLayout goals: Because Bathrooms are still a developed camp tile, they also help Campers Everywhere, Peak Season Layout, Fully Connected Resort, and the seasonal placement-count goals."
+    }
+  ];
+
+  const DETAILED_GOAL_RULES = {
+    early: [
+      { id: "early-01", name: "Scout Arrival", points: "5 points", body: "Score 5 points if you have at least 2 Group Sites connected to the main road network. A Group Site counts if its own parcel is on the reachable Entrance road network, or if it sits orthogonally next to a reachable road tile.\n\nThe 2 Group Sites do not need to touch each other." },
+      { id: "early-02", name: "Glamor Guests", points: "4 points", body: "Score 4 points if you have at least 1 premium guest stay tile: a Cabin, an RV Site with Full Hookups, or a Waterfront Site.\n\nYou only need 1 of those 3 types. Pool and Ice Cream Vending are premium in code, but they do not count for this card because the card only checks those three guest-stay ids." },
+      { id: "early-03", name: "Organized Check-In", points: "4 points", body: "Score 4 points if the Camp Office is connected to the Entrance by road and the shortest road path is 5 tiles or fewer. The code counts the road steps along the graph, including the Office tile.\n\nIf the Office is disconnected, or the shortest route is longer than 5, this goal fails." },
+      { id: "early-04", name: "Fire Circle Friends", points: "4 points", body: "Score 4 points if at least 1 Firewood tile is orthogonally adjacent to at least 2 campsite or lodging tiles.\n\nDiagonal tiles do not count. The nearby camps do not need to be specific types." },
+      { id: "early-05", name: "Tents in the Pines", points: "4 points", body: "Score 4 points if you have at least 3 Rustic Tent Forest tiles anywhere on your board.\n\nThe code only checks the count. They do not need to be on forest parcels, on scenic parcels, or next to each other." },
+      { id: "early-06", name: "Beginner's Loop", points: "5 points", body: "Score 5 points if your road network contains any closed loop.\n\nIt does not matter how large the loop is. One working cycle anywhere on the board is enough." },
+      { id: "early-07", name: "Easy Access", points: "5 points", body: "Score 5 points if your road graph has 0 dead-end road tiles. The Entrance and Camp Office are ignored for this check.\n\nAny other road tile with 1 or fewer connected road neighbors counts as a dead end and makes you fail." },
+      { id: "early-08", name: "Family Meet-Up", points: "4 points", body: "Score 4 points if you have at least 1 Group Site and at least 1 Playground anywhere on your board.\n\nThey do not need to be near each other for this card." },
+      { id: "early-09", name: "Camp Basics", points: "4 points", body: "Score 4 points if you have at least 2 different amenity types. This counts unique amenity ids, not copies.\n\nHorse Riding does not count here because it is not coded as an amenity." },
+      { id: "early-10", name: "Trailhead Start", points: "4 points", body: "Score 4 points if at least 1 Hiking Trail is within 1 space of the Entrance or Camp Office.\n\nIn practice that means orthogonally adjacent. Diagonals do not count." },
+      { id: "early-11", name: "Tent Row", points: "5 points", body: "Score 5 points if you create a run of at least 3 campsite or lodging tiles in one straight row or column. To keep the run going, each neighboring pair in that line must also have a real road connection between their underlying landscape tiles.\n\nThe camps do not need to be the same type." },
+      { id: "early-12", name: "Busy Office", points: "4 points", body: "Score 4 points if the Camp Office tile has at least 2 connected road sides in the actual road graph.\n\nThis is about live connected road exits, not just printed road edges that run into open ground." },
+      { id: "early-13", name: "Branching Out", points: "4 points", body: "Score 4 points if you have placed at least 2 landscape tiles tagged as intersections. In this prototype that means Four-Way Cross and Three-Way Split tiles.\n\nIt does not matter where they are." },
+      { id: "early-14", name: "Welcome Row", points: "4 points", body: "Score 4 points if you have at least 2 campsite or lodging tiles connected to the Entrance road network.\n\nThe 2 tiles do not need to touch each other. Each one just has to be connected to the reachable Entrance road system by being on it or next to it." },
+      { id: "early-15", name: "Wooded Retreat", points: "4 points", body: "Score 4 points if your largest connected cluster of Rustic Tent Forest tiles is at least size 2.\n\nConnected means orthogonally adjacent, not diagonal." },
+      { id: "early-16", name: "Community Spot", points: "4 points", body: "Score 4 points if at least 1 Event Pavilion is either orthogonally adjacent to a Group Site or orthogonally adjacent to at least 2 campsite or lodging tiles.\n\nYou only need 1 Pavilion that satisfies either condition." },
+      { id: "early-17", name: "Opening Weekend", points: "5 points", body: "Score 5 points if you placed at least 3 camp tiles during Early Summer. Every purchased market tile counts: sites, amenities, and specialty attractions.\n\nIt only checks the current round's placements, not your whole game total." },
+      { id: "early-18", name: "Kid Camp", points: "6 points", body: "Score 6 points if you have at least 1 Group Site, 1 Playground, and 1 Firewood anywhere on your board.\n\nNo adjacency is required for this card." },
+      { id: "early-19", name: "Practical Camping", points: "5 points", body: "Score 5 points if you have at least 1 Tent Site with Electric Hookup and at least 2 Rustic Tent Forest tiles.\n\nThe three sites can be anywhere on your board." },
+      { id: "early-20", name: "Well Planned Grounds", points: "6 points", body: "Score 6 points if all landscape tiles on your board form one orthogonally connected shape, every road tile is connected back to the Entrance road network, and the Camp Office is connected to the Entrance by road.\n\nYou fail if you have an isolated landscape island, a disconnected road section, or an Office that is not road-linked to the Entrance." }
+    ],
+    mid: [
+      { id: "mid-01", name: "Beat the Heat", points: "5 points", body: "Score 5 points if at least 1 Pool is orthogonally adjacent to at least 2 campsite or lodging tiles.\n\nDiagonal camps do not count." },
+      { id: "mid-02", name: "Sweet Summer Stop", points: "5 points", body: "Score 5 points if you place Ice Cream Vending in a central traffic cell. In code that means either the tile is in the center zone or on a road hub with 3 or more connected road neighbors.\n\nBeing merely near the center is not enough." },
+      { id: "mid-03", name: "Wheels Ready", points: "5 points", body: "Score 5 points if at least 1 Bike Rental is on or next to a connected road component that contains at least 6 road tiles.\n\nThe component can be measured from Bike Rental's own parcel or from an orthogonally adjacent road parcel." },
+      { id: "mid-04", name: "Paddle Out", points: "6 points", body: "Score 6 points if at least 1 Canoe Rental is within 2 spaces of a Waterfront Site.\n\nThis uses Manhattan distance, so the tiles do not need to be in the same row or column." },
+      { id: "mid-05", name: "Packed Season", points: "5 points", body: "Score 5 points if you have at least 8 campsite or lodging tiles on your board.\n\nAmenities do not count." },
+      { id: "mid-06", name: "RV Weekend", points: "6 points", body: "Score 6 points if you have at least 2 legal RV Sites. Legal means the RV Site sits on a parcel whose landscape tile has at least 2 road edges.\n\nIf an RV was somehow placed elsewhere, it would not count." },
+      { id: "mid-07", name: "Hookup Demand", points: "5 points", body: "Score 5 points if you have at least 2 Tent Sites with Electric Hookup anywhere on your board." },
+      { id: "mid-08", name: "Summer Activity Hub", points: "5 points", body: "Score 5 points if you have at least 3 different amenity types.\n\nCopies do not matter; only distinct amenity ids matter. Horse Riding does not count because it is not an amenity in code." },
+      { id: "mid-09", name: "Campers Everywhere", points: "6 points", body: "Score 6 points if all 4 major board quadrants contain at least 1 developed camp tile. The quadrants are top-left, top-right, bottom-left, and bottom-right.\n\nAny market tile counts as a developed camp tile for this goal." },
+      { id: "mid-10", name: "Main Road Traffic", points: "6 points", body: "Score 6 points if your longest connected road route is at least 8 road tiles long and at least 4 developed camp tiles have practical road access.\n\nA developed tile has practical road access if its own landscape tile has a road edge or it sits orthogonally next to a road parcel." },
+      { id: "mid-11", name: "Splash and Stay", points: "6 points", body: "Score 6 points if at least 1 Pool is within 2 spaces of another premium tile.\n\nThe code treats any premium-tagged tile as valid, including RV Sites, Cabins, Waterfront Sites, Horse Riding, and Ice Cream Vending." },
+      { id: "mid-12", name: "Family Favorite", points: "6 points", body: "Score 6 points if at least 1 Playground is within 2 spaces of both a Group Site and a tent-based campsite. Tent-based means Rustic Tent Forest or Tent Site with Electric Hookup.\n\nThe Group Site and tent site can be different tiles anywhere in that 2-space radius." },
+      { id: "mid-13", name: "Popular Pavilion", points: "5 points", body: "Score 5 points if at least 1 Event Pavilion is orthogonally adjacent to at least 2 developed camp tiles of any kind.\n\nRoads and empty parcels do not count." },
+      { id: "mid-14", name: "Active Campground", points: "5 points", body: "Score 5 points if you have both Bike Rental and Hiking Trail anywhere on your board.\n\nThey do not need to be near each other." },
+      { id: "mid-15", name: "Full Swing", points: "6 points", body: "Score 6 points if you placed at least 7 camp tiles during Mid Summer. Every purchased market tile counts.\n\nIt only counts placements made in Mid Summer." },
+      { id: "mid-16", name: "Busy Utility Loop", points: "5 points", body: "Score 5 points if your road graph has at least 2 hubs. A hub is any road tile with 3 or more connected road neighbors." },
+      { id: "mid-17", name: "Adventure Weekend", points: "7 points", body: "Score 7 points if you have Canoe Rental, Bike Rental, and Hiking Trail all present on your board.\n\nNo distance requirement is checked." },
+      { id: "mid-18", name: "Big Rig Friendly", points: "6 points", body: "Score 6 points if you have at least 2 RV Sites on strong road-access parcels. In code that again means the underlying landscape tile has at least 2 road edges." },
+      { id: "mid-19", name: "Cooling Off", points: "5 points", body: "Score 5 points if at least 2 of these 3 are present somewhere on your board: Pool, Ice Cream Vending, Waterfront Site.\n\nAny 2 of the 3 is enough." },
+      { id: "mid-20", name: "Peak Season Layout", points: "7 points", body: "Score 7 points if you have at least 4 developed camp tiles in the center zone of the board and at least 3 of those center tiles have practical road access.\n\nA center tile is road-served if its own landscape tile has a road edge or it sits orthogonally next to a road parcel." }
+    ],
+    late: [
+      { id: "late-01", name: "Cabin Country", points: "6 points", body: "Score 6 points if you have at least 3 Cabins anywhere on your board." },
+      { id: "late-02", name: "Lakeside Premium", points: "6 points", body: "Score 6 points if you have at least 2 Waterfront Sites anywhere on your board." },
+      { id: "late-03", name: "Deluxe Weekend", points: "7 points", body: "Score 7 points if you have at least 1 Cabin, at least 1 Waterfront Site, and at least 1 of those Cabin or Waterfront tiles has an amenity within 2 spaces.\n\nThe code does not require both lodging tiles to have support. One supported Cabin or Waterfront tile is enough once both types exist." },
+      { id: "late-04", name: "Luxury Lane", points: "7 points", body: "Score 7 points if your longest straight run of premium tiles is at least 3. The tiles must be in one row or column, and each neighboring pair in the run must have a road connection between their underlying landscape tiles.\n\nAny premium-tagged tile counts, not just premium lodging." },
+      { id: "late-05", name: "End-of-Season Escape", points: "7 points", body: "Score 7 points if you have at least 10 campsite or lodging tiles on your board.\n\nAmenities do not count." },
+      { id: "late-06", name: "Polished Grounds", points: "6 points", body: "Score 6 points if you have 3 or fewer empty landscape parcels left on your board, excluding the Entrance and Camp Office. Despite the helper name in code, this check counts all empty supported spaces, not only prime spaces.\n\nEvery unused open landscape space matters here." },
+      { id: "late-07", name: "Scenic Ride", points: "6 points", body: "Score 6 points if at least 1 Horse Riding tile is connected into the main Entrance road network.\n\nThe special scenic or border placement rule is required when placing Horse Riding, but this goal itself only checks the road-network connection." },
+      { id: "late-08", name: "Premium Cluster", points: "7 points", body: "Score 7 points if your largest connected cluster of premium tiles has size 3 or more. Connected means orthogonally adjacent.\n\nAny premium-tagged tile counts, including premium amenities." },
+      { id: "late-09", name: "Camp for Everyone", points: "7 points", body: "Score 7 points if you have at least 1 Rustic Tent Forest, 1 Tent Site with Electric Hookup, 1 RV Site, 1 Group Site, and 1 Cabin.\n\nWaterfront Sites do not replace any of those required types." },
+      { id: "late-10", name: "Longest Route In", points: "Up to 8 points", body: "This card scores floor(longest road length / 2), up to a maximum of 8 points.\n\nExamples: a longest route of 2 or 3 road tiles scores 1, 4 or 5 scores 2, 6 or 7 scores 3, and so on up to 16 or more for the full 8 points." },
+      { id: "late-11", name: "Lakeside Leisure", points: "6 points", body: "Score 6 points if at least 1 Waterfront Site is within 2 spaces of Canoe Rental or Ice Cream Vending.\n\nOnly one matching Waterfront Site is needed." },
+      { id: "late-12", name: "Refined Retreat", points: "7 points", body: "Score 7 points if at least 1 Cabin has an amenity within 2 spaces and does not have any tent-based campsite within 1 space. Tent-based means Rustic Tent Forest or Tent Site with Electric Hookup.\n\nThe tent restriction is only the immediate one-space ring, not the full two-space radius." },
+      { id: "late-13", name: "Premium Hospitality", points: "7 points", body: "Score 7 points if the Camp Office is road-connected to the Entrance, you have at least 3 premium tiles, and you have at least 2 different amenity types.\n\nPremium count includes premium-tagged amenities like Pool and Ice Cream Vending." },
+      { id: "late-14", name: "End of Summer Event", points: "6 points", body: "Score 6 points if at least 1 Event Pavilion is within 2 spaces of at least 4 developed camp tiles.\n\nAll types of developed camp tiles count here." },
+      { id: "late-15", name: "Horse Country Getaway", points: "6 points", body: "Score 6 points if at least 1 Horse Riding tile is either on a scenic parcel or within 2 spaces of a premium tile.\n\nA Horse Riding tile that is only on forest land or only on the board edge does not satisfy this goal unless it is also scenic or near premium." },
+      { id: "late-16", name: "Waterfront Weekend", points: "7 points", body: "Score 7 points if you have at least 2 Waterfront Sites and at least 1 supporting leisure amenity, which can be Canoe Rental or Ice Cream Vending." },
+      { id: "late-17", name: "Fully Connected Resort", points: "8 points", body: "Score 8 points if every developed camp tile on your board has practical road access.\n\nA tile has practical road access if its own landscape tile has a road edge or it sits orthogonally next to a road parcel." },
+      { id: "late-18", name: "Built Out Season", points: "6 points", body: "Score 6 points if you placed at least 7 camp tiles during Late Summer.\n\nEvery purchased market tile counts, but only placements made in Late Summer matter." },
+      { id: "late-19", name: "Destination Campground", points: "8 points", body: "Score 8 points if you have at least 3 different amenity types, at least 4 different campsite or lodging types, and at least 3 premium tiles.\n\nPremium count includes premium-tagged amenities, while campsite-type variety only counts campsite and lodging types." },
+      { id: "late-20", name: "Smore to Explore", points: "Up to 12 points", body: "This signature card gives partial points in 6 categories. You get 2 points for 5 campsite styles, or 1 for 4. You get 2 points for 4 amenity types, or 1 for 3. You get 2 points for a longest road of 8+, or 1 for 6+. You get 2 points for 4 premium tiles, or 1 for 2+. You get 2 points for 4 center tiles, or 1 for 3. You get 2 more if you also have at least 3 amenities, 4 campsite styles, and 3 premium tiles, or 1 if you at least have 2 amenities and 3 campsite styles.\n\nThe maximum is 12 points, and the card can still score partial points even if your board is not fully built out." },
+      { id: "late-21", name: "Grand Arrival Drive", points: "6 points", body: "Score 6 points if the road leaving the Entrance continues in one unbranched path for at least 4 road tiles before the first split or dead end. The Entrance tile itself counts toward that length.\n\nAs soon as the road branches or stops, the spine ends." },
+      { id: "late-22", name: "Season Finale Sprint", points: "6 points", body: "Score 6 points if you placed at least 6 camp tiles during Late Summer.\n\nEvery purchased market tile counts, but only placements made in Late Summer matter." }
+    ],
+    director: [
+      { id: "director-01", name: "Happy Families", points: "Up to 10 points", body: "This director goal scores 2 points for each of these family attractions you have: Playground, Group Site, Ice Cream Vending, and Pool. If you have all 4, you get a 2-point bonus for a total of 10.\n\nThat means 1 attraction scores 2, 2 score 4, 3 score 6, and all 4 score 10." },
+      { id: "director-02", name: "Roughing It Right", points: "8 or 9 points", body: "You must have at least 2 Rustic Tent Forest tiles, at least 1 Firewood, and at least 1 Hiking Trail. If you do, the card scores 8 points.\n\nYou get 1 bonus point, for 9 total, if your largest Rustic Tent Forest cluster is at least size 2." },
+      { id: "director-03", name: "Full Hookup Favorite", points: "Up to 9 points", body: "This card scores 3 points for each legal RV Site, up to 9 total. A legal RV Site is on a parcel whose landscape tile has at least 2 road edges.\n\nSo 1 legal RV scores 3, 2 score 6, and 3 or more score 9." },
+      { id: "director-04", name: "The Waterfront Draw", points: "Up to 10 points", body: "This card gives 5 points if you have at least 1 Waterfront Site, 3 more if you have Canoe Rental, and 2 more if you reach at least 2 Waterfront Sites.\n\nThe full package of 2 Waterfront Sites plus Canoe Rental scores all 10 points." },
+      { id: "director-05", name: "Rain or Shine", points: "6 or 8 points", body: "You need at least 1 rustic option and at least 1 premium option. Rustic means Rustic Tent Forest. Premium can be any premium-tagged tile.\n\nIf you also have a Cabin or a Tent Site with Electric Hookup, the score is 8. Otherwise it is 6." },
+      { id: "director-06", name: "Smooth Traffic Flow", points: "Up to 9 points", body: "This card gives 3 points if your longest road is at least 7 tiles, 3 points if you have at least 2 road hubs, and 3 points if you have 1 or fewer dead-end roads.\n\nYou can score any combination of those three checks." },
+      { id: "director-07", name: "Summer Traditions", points: "8 or 10 points", body: "You need Event Pavilion, Firewood, and at least 1 Group Site to score this card at all. If all 3 are present, you score 8 points.\n\nYou score the full 10 if at least 1 Event Pavilion is within 2 spaces of both a Group Site and a Firewood tile." },
+      { id: "director-08", name: "Something for Everyone", points: "Up to 10 points", body: "This card scores 2 points for each different campsite or lodging type you have, up to 10 total.\n\nAmenities do not count toward this variety total." },
+      { id: "director-09", name: "Comfort Upgrade", points: "Up to 10 points", body: "This card gives 3 points for having at least 1 Cabin, 3 points for having at least 1 Tent Site with Electric Hookup, and 4 points for having at least 1 Pool, Ice Cream Vending, or Bathrooms.\n\nYou can score any combination of those three checks up to the full 10." },
+      { id: "director-10", name: "Destination Status", points: "Up to 12 points", body: "This card gives 3 points each for four late-game benchmarks: at least 4 campsite or lodging styles, at least 3 amenity types, a longest road of at least 7, and at least 3 premium tiles.\n\nEach benchmark is all-or-nothing, so the total can be 0, 3, 6, 9, or 12." }
+    ]
+  };
+
   let runtime = {
     now: 0,
     layout: null,
@@ -1536,6 +1689,46 @@
       kind: "pause-menu",
       blocking: true
     };
+  }
+
+  function openDetailedRulesOverlay(section = "sites", goalRound = "early", page = 0) {
+    nameEditor?.close();
+    resetOverlayScroll();
+    game.overlay = {
+      kind: "detailed-rules",
+      blocking: true,
+      section,
+      goalRound,
+      page
+    };
+  }
+
+  function getDetailedRuleSectionEntries(section, goalRound = "early") {
+    if (section === "sites") {
+      return DETAILED_SITE_RULES.map((entry) => ({
+        title: getCampDef(entry.typeId)?.name || entry.typeId,
+        subtitle: "Site scoring guide",
+        body: entry.body
+      }));
+    }
+    if (section === "amenities") {
+      return DETAILED_AMENITY_RULES.map((entry) => ({
+        title: getCampDef(entry.typeId)?.name || entry.typeId,
+        subtitle: entry.typeId === "horse_riding" ? "Special attraction scoring guide" : "Amenity scoring guide",
+        body: entry.body
+      }));
+    }
+    return (DETAILED_GOAL_RULES[goalRound] || []).map((entry) => ({
+      title: entry.name,
+      subtitle: `${entry.points} | ${goalRound === "director"
+        ? "Camp Director"
+        : goalRound === "early"
+          ? "Early Summer"
+          : goalRound === "mid"
+            ? "Mid Summer"
+            : "Late Summer"}`,
+      body: entry.body
+    }));
   }
 
   function openRenamePlayersOverlay() {
@@ -4569,7 +4762,9 @@ function computeLayout(width, height) {
     const isPortrait = runtime.layout.mode === "mobile-portrait";
     const isMobileOverlay = runtime.layout.mode !== "desktop";
     const maxHeight = runtime.layout.height - runtime.layout.pad * 2;
-    const panelWidth = Math.min(runtime.layout.width - runtime.layout.pad * 2, isPortrait ? runtime.layout.width - runtime.layout.pad * 2 : 760);
+    const panelWidth = game.overlay.kind === "detailed-rules"
+      ? Math.min(runtime.layout.width - runtime.layout.pad * 2, isPortrait ? runtime.layout.width - runtime.layout.pad * 2 : 920)
+      : Math.min(runtime.layout.width - runtime.layout.pad * 2, isPortrait ? runtime.layout.width - runtime.layout.pad * 2 : 760);
     let panelHeight = game.overlay.kind === "start"
       ? (isPortrait ? 292 : 272)
       : game.overlay.kind === "handoff"
@@ -4580,12 +4775,14 @@ function computeLayout(width, height) {
             ? (isPortrait ? 270 : 246)
             : game.overlay.kind === "about"
               ? (isPortrait ? 346 : 332)
-              : game.overlay.kind === "round-summary"
-                ? 176 + ((game.overlay.rows?.length || 0) * (isPortrait ? 56 : 62)) + 74
-                : game.overlay.kind === "final"
-                  ? 164 + ((game.overlay.rows?.length || 0) * (isPortrait ? 54 : 60)) + 78
-                  : (isPortrait ? 430 : 460);
-    panelHeight = Math.min(maxHeight, isMobileOverlay ? 250 : panelHeight);
+              : game.overlay.kind === "detailed-rules"
+                ? Math.min(maxHeight, isPortrait ? maxHeight : 720)
+                : game.overlay.kind === "round-summary"
+                  ? 176 + ((game.overlay.rows?.length || 0) * (isPortrait ? 56 : 62)) + 74
+                  : game.overlay.kind === "final"
+                    ? 164 + ((game.overlay.rows?.length || 0) * (isPortrait ? 54 : 60)) + 78
+                    : (isPortrait ? 430 : 460);
+    panelHeight = Math.min(maxHeight, isMobileOverlay && game.overlay.kind !== "detailed-rules" ? 250 : panelHeight);
     const compact = isMobileOverlay && panelHeight <= 250;
     const rect = isPortrait
       ? {
@@ -4632,6 +4829,10 @@ function computeLayout(width, height) {
     }
     if (game.overlay.kind === "about") {
       renderAboutOverlay(rect);
+      return;
+    }
+    if (game.overlay.kind === "detailed-rules") {
+      renderDetailedRulesOverlay(rect);
       return;
     }
     if (game.overlay.kind === "round-summary") {
@@ -4792,16 +4993,17 @@ function computeLayout(width, height) {
 
   function renderPauseMenuOverlay(rect) {
     const compact = isCompactOverlayRect(rect);
+    const introText = "Open roster tools, read about the prototype, review the detailed scoring guide, or restart the current session.";
     if (compact) {
       const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
-      const introWidth = viewport.w;
-      const introHeight = measureWrappedTextHeight("Open roster tools, read about the prototype, or restart the current session.", introWidth, 14, {
+      const introHeight = measureWrappedTextHeight(introText, viewport.w, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
         maxLines: 4
       });
       const buttons = [
         { label: "Resume", onClick: closeOverlay, variant: "primary", id: "overlay-resume" },
         { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
+        { label: "Detailed Rules", onClick: () => openDetailedRulesOverlay("sites"), id: "overlay-detailed-rules" },
         { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
         { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
         { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
@@ -4816,7 +5018,7 @@ function computeLayout(width, height) {
       const oy = (value) => value - scrollMeta.scrollY;
 
       ctx.fillText("Pause Menu", rect.x + rect.w / 2, oy(viewport.y + 2));
-      Core.drawWrappedText(ctx, "Open roster tools, read about the prototype, or restart the current session.", rect.x + rect.w / 2, oy(viewport.y + 34), scrollMeta.contentWidth, 14, {
+      Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(viewport.y + 34), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
         color: "rgba(82, 61, 44, 0.84)",
         align: "center",
@@ -4844,7 +5046,7 @@ function computeLayout(width, height) {
     }
 
     ctx.fillText("Pause Menu", rect.x + rect.w / 2, rect.y + 20);
-    Core.drawWrappedText(ctx, "Open roster tools, read about the prototype, or restart the current session.", rect.x + rect.w / 2, rect.y + 62, rect.w - 72, 18, {
+    Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, rect.y + 62, rect.w - 72, 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
       color: "rgba(82, 61, 44, 0.84)",
       align: "center",
@@ -4854,6 +5056,7 @@ function computeLayout(width, height) {
     const buttons = [
       { label: "Resume", onClick: closeOverlay, variant: "primary", id: "overlay-resume" },
       { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
+      { label: "Detailed Rules", onClick: () => openDetailedRulesOverlay("sites"), id: "overlay-detailed-rules" },
       { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
       { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
       { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
@@ -4873,6 +5076,192 @@ function computeLayout(width, height) {
         variant: button.variant
       });
     });
+  }
+
+  function renderDetailedRulesOverlay(rect) {
+    const section = game.overlay.section || "sites";
+    const goalRound = game.overlay.goalRound || "early";
+    const sectionEntries = getDetailedRuleSectionEntries(section, goalRound);
+    const safePage = Core.clamp(game.overlay.page || 0, 0, Math.max(sectionEntries.length - 1, 0));
+    const entry = sectionEntries[safePage] || { title: "No entry", subtitle: "Rules", body: "No rules are available for this page yet." };
+    const compact = isCompactOverlayRect(rect);
+    const viewport = {
+      x: rect.x + (compact ? 16 : 24),
+      y: rect.y + (compact ? 12 : 16),
+      w: rect.w - (compact ? 32 : 48),
+      h: rect.h - (compact ? 24 : 32)
+    };
+    const layoutWidth = viewport.w - 16;
+    const introText = section === "sites"
+      ? "Each site page explains how that market item scores, which goals it can satisfy, and what the code is actually checking."
+      : section === "amenities"
+        ? "This section covers every non-site market item in the market, including special attractions like Horse Riding."
+        : "Each goal page explains the exact scoring check in plain English, including distance, adjacency, road, and count requirements.";
+    const titleFont = compact ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const introLineHeight = compact ? 14 : 17;
+    const introFont = compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const tabHeight = compact ? 30 : 34;
+    const sectionTabGap = compact ? 8 : 10;
+    const sectionTabWidth = Math.max(82, Math.floor((layoutWidth - sectionTabGap * 2) / 3));
+    const goalsTabGap = compact ? 6 : 8;
+    const goalsTabWidth = Math.max(64, Math.floor((layoutWidth - goalsTabGap * 3) / 4));
+    const cardPaddingX = compact ? 14 : 20;
+    const cardTitleLineHeight = compact ? 22 : 24;
+    const bodyLineHeight = section === "goals"
+      ? (compact ? 15 : 16)
+      : (compact ? 14 : 15);
+    const bodyFont = section === "goals"
+      ? (compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif")
+      : (compact ? "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif");
+    const buttonHeight = compact ? 30 : 38;
+    const bottomGap = compact ? 8 : 12;
+    const pageTextGap = compact ? 12 : 14;
+    const introHeight = measureWrappedTextHeight(introText, layoutWidth, introLineHeight, {
+      font: introFont
+    });
+    const entryTitleHeight = measureWrappedTextHeight(entry.title, layoutWidth - cardPaddingX * 2, cardTitleLineHeight, {
+      font: compact ? "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
+    const bodyHeight = measureWrappedTextHeight(entry.body, layoutWidth - cardPaddingX * 2, bodyLineHeight, {
+      font: bodyFont
+    });
+    const sectionTabsY = viewport.y + (compact ? 62 : 80) + introHeight;
+    const goalTabsY = sectionTabsY + tabHeight + 12;
+    const cardY = section === "goals" ? goalTabsY + tabHeight + 12 : sectionTabsY + tabHeight + 12;
+    const cardHeight = 24 + entryTitleHeight + 32 + 20 + bodyHeight + 20;
+    const pageTextY = cardY + cardHeight + pageTextGap;
+    const buttonY = pageTextY + 16;
+    const navHeight = compact ? buttonHeight * 3 + 16 : buttonHeight;
+    const contentHeight = (buttonY - viewport.y) + navHeight + bottomGap;
+    const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+    const oy = (value) => value - scrollMeta.scrollY;
+    const cardRect = {
+      x: viewport.x,
+      y: oy(cardY),
+      w: scrollMeta.contentWidth,
+      h: cardHeight
+    };
+
+    game.overlay.page = safePage;
+
+    ctx.fillStyle = "#3d2d20";
+    ctx.font = titleFont;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("Detailed Rules", rect.x + rect.w / 2, oy(viewport.y));
+    Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(viewport.y + (compact ? 32 : 42)), scrollMeta.contentWidth, introLineHeight, {
+      font: introFont,
+      color: "rgba(82, 61, 44, 0.84)",
+      align: "center"
+    });
+
+    ["sites", "amenities", "goals"].forEach((tabId, index) => {
+      drawButton({
+        x: viewport.x + index * (sectionTabWidth + sectionTabGap),
+        y: oy(sectionTabsY),
+        w: sectionTabWidth,
+        h: tabHeight
+      }, tabId === "sites" ? "Sites" : tabId === "amenities" ? "Amenities" : "Goals", () => {
+        openDetailedRulesOverlay(tabId, tabId === "goals" ? goalRound : "early", 0);
+      }, {
+        id: `overlay-detailed-tab-${tabId}`,
+        scope: "overlay",
+        selected: section === tabId,
+        font: compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    });
+
+    if (section === "goals") {
+      ["early", "mid", "late", "director"].forEach((tabId, index) => {
+        drawButton({
+          x: viewport.x + index * (goalsTabWidth + goalsTabGap),
+          y: oy(goalTabsY),
+          w: goalsTabWidth,
+          h: tabHeight
+        }, tabId === "director" ? "Director" : tabId === "early" ? "Early" : tabId === "mid" ? "Mid" : "Late", () => {
+          openDetailedRulesOverlay("goals", tabId, 0);
+        }, {
+          id: `overlay-detailed-goals-${tabId}`,
+          scope: "overlay",
+          selected: goalRound === tabId,
+          font: compact ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        });
+      });
+    }
+
+    Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 24, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
+    ctx.fillStyle = "#3d2d20";
+    ctx.font = compact ? "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    Core.drawWrappedText(ctx, entry.title, cardRect.x + cardPaddingX, cardRect.y + 18, cardRect.w - cardPaddingX * 2, cardTitleLineHeight, {
+      font: compact ? "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif",
+      color: "#3d2d20",
+      align: "left"
+    });
+    drawPill(cardRect.x + cardPaddingX, cardRect.y + 24 + entryTitleHeight, entry.subtitle, "#efe2ca", "#5f4731", {
+      height: compact ? 22 : 24,
+      paddingX: compact ? 10 : 12,
+      font: compact ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+    });
+    Core.drawWrappedText(ctx, entry.body, cardRect.x + cardPaddingX, cardRect.y + 56 + entryTitleHeight, cardRect.w - cardPaddingX * 2, bodyLineHeight, {
+      font: bodyFont,
+      color: "rgba(74, 53, 36, 0.92)",
+      align: "left"
+    });
+
+    ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+    ctx.font = compact ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`Page ${safePage + 1} of ${Math.max(sectionEntries.length, 1)}`, rect.x + rect.w / 2, oy(pageTextY));
+
+    if (compact) {
+      const stackedWidth = rect.w - 48;
+      drawButton({ x: rect.x + 24, y: oy(buttonY), w: stackedWidth, h: buttonHeight }, "Back", openPauseMenu, {
+        id: "overlay-detailed-back",
+        scope: "overlay"
+      });
+      drawButton({ x: rect.x + 24, y: oy(buttonY + buttonHeight + 8), w: stackedWidth, h: buttonHeight }, "Previous", () => {
+        game.overlay.page = Math.max(0, safePage - 1);
+      }, {
+        id: "overlay-detailed-prev",
+        scope: "overlay",
+        enabled: safePage > 0
+      });
+      drawButton({ x: rect.x + 24, y: oy(buttonY + (buttonHeight + 8) * 2), w: stackedWidth, h: buttonHeight }, "Next", () => {
+        game.overlay.page = Math.min(sectionEntries.length - 1, safePage + 1);
+      }, {
+        id: "overlay-detailed-next",
+        scope: "overlay",
+        enabled: safePage < sectionEntries.length - 1,
+        variant: "primary"
+      });
+    } else {
+      const navGap = 16;
+      const navWidth = Math.max(132, Math.floor((rect.w - 48 * 2 - navGap * 2) / 3));
+      drawButton({ x: rect.x + 24, y: oy(buttonY), w: navWidth, h: buttonHeight }, "Back", openPauseMenu, {
+        id: "overlay-detailed-back",
+        scope: "overlay"
+      });
+      drawButton({ x: rect.x + (rect.w - navWidth) / 2, y: oy(buttonY), w: navWidth, h: buttonHeight }, "Previous", () => {
+        game.overlay.page = Math.max(0, safePage - 1);
+      }, {
+        id: "overlay-detailed-prev",
+        scope: "overlay",
+        enabled: safePage > 0
+      });
+      drawButton({ x: rect.x + rect.w - navWidth - 24, y: oy(buttonY), w: navWidth, h: buttonHeight }, "Next", () => {
+        game.overlay.page = Math.min(sectionEntries.length - 1, safePage + 1);
+      }, {
+        id: "overlay-detailed-next",
+        scope: "overlay",
+        enabled: safePage < sectionEntries.length - 1,
+        variant: "primary"
+      });
+    }
+
+    endOverlayScrollViewport(viewport, scrollMeta);
   }
 
   function renderRestartConfirmOverlay(rect) {
