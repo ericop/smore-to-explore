@@ -49,13 +49,30 @@
     return Boolean(cell.campTile);
   }
 
+  function getOccupiedCells(cell) {
+    if (Array.isArray(cell?.occupiedCells) && cell.occupiedCells.length) {
+      return cell.occupiedCells;
+    }
+    return [{ row: cell.row, col: cell.col }];
+  }
+
+  function getCellDistance(sourceCell, otherCell) {
+    let best = Number.POSITIVE_INFINITY;
+    for (const source of getOccupiedCells(sourceCell)) {
+      for (const other of getOccupiedCells(otherCell)) {
+        best = Math.min(best, Math.abs(source.row - other.row) + Math.abs(source.col - other.col));
+      }
+    }
+    return Number.isFinite(best) ? best : Number.POSITIVE_INFINITY;
+  }
+
   function countNearbyCells(context, sourceCell, predicate, maxDistance) {
     let total = 0;
     for (const other of context.campCells) {
-      if (other.row === sourceCell.row && other.col === sourceCell.col) {
+      if (other.campTile?.placementId === sourceCell.campTile?.placementId) {
         continue;
       }
-      const distance = Math.abs(other.row - sourceCell.row) + Math.abs(other.col - sourceCell.col);
+      const distance = getCellDistance(sourceCell, other);
       if (distance <= maxDistance && predicate(other)) {
         total += 1;
       }
@@ -67,13 +84,18 @@
     return getCellsByType(context, typeId).find((cell) => countNearbyCells(context, cell, predicate, maxDistance) >= minimumCount);
   }
 
-  function isCellConnectedToMainRoad(context, row, col) {
-    const key = `${row},${col}`;
-    if (context.reachableRoadKeys.has(key)) {
-      return true;
-    }
+  function isCellConnectedToMainRoad(context, cellOrRow, col) {
+    const occupiedCells = typeof cellOrRow === "object"
+      ? getOccupiedCells(cellOrRow)
+      : [{ row: cellOrRow, col }];
 
-    return context.getOrthogonalNeighbors(row, col).some((neighbor) => context.reachableRoadKeys.has(`${neighbor.row},${neighbor.col}`));
+    return occupiedCells.some((occupiedCell) => {
+      const key = `${occupiedCell.row},${occupiedCell.col}`;
+      if (context.reachableRoadKeys.has(key)) {
+        return true;
+      }
+      return context.getOrthogonalNeighbors(occupiedCell.row, occupiedCell.col).some((neighbor) => context.reachableRoadKeys.has(`${neighbor.row},${neighbor.col}`));
+    });
   }
 
   function isNearImportantBuilding(context, cell, maxDistance) {
@@ -82,8 +104,10 @@
     if (context.office) anchors.push(context.office);
 
     return anchors.some((anchor) => {
-      const distance = Math.abs(cell.row - anchor.row) + Math.abs(cell.col - anchor.col);
-      return distance <= maxDistance;
+      return getOccupiedCells(cell).some((occupiedCell) => {
+        const distance = Math.abs(occupiedCell.row - anchor.row) + Math.abs(occupiedCell.col - anchor.col);
+        return distance <= maxDistance;
+      });
     });
   }
 
@@ -96,7 +120,7 @@
         description: "Score for having 2 Group Sites connected to the main road network.",
         points: 5,
         evaluate: (context) => {
-          const connectedGroups = getCellsByType(context, "group_site").filter((cell) => isCellConnectedToMainRoad(context, cell.row, cell.col)).length;
+          const connectedGroups = getCellsByType(context, "group_site").filter((cell) => isCellConnectedToMainRoad(context, cell)).length;
           return connectedGroups >= 2
             ? passed(5, "Two Group Sites are tied into the main arrival road.")
             : failed(`${connectedGroups}/2 Group Sites currently connect to the main road.`);
@@ -258,7 +282,7 @@
         points: 4,
         evaluate: (context) => {
           const connectedCampCount = context.campCells.filter((cell) =>
-            isCampsiteCell(cell) && isCellConnectedToMainRoad(context, cell.row, cell.col)
+            isCampsiteCell(cell) && isCellConnectedToMainRoad(context, cell)
           ).length;
           return connectedCampCount >= 2
             ? passed(4, `${connectedCampCount} guest stays already connect to the Entrance road network.`)
@@ -706,7 +730,7 @@
         description: "Score for Horse Riding connected into the road network.",
         points: 6,
         evaluate: (context) => {
-          const horse = getCellsByType(context, "horse_riding").find((cell) => isCellConnectedToMainRoad(context, cell.row, cell.col));
+          const horse = getCellsByType(context, "horse_riding").find((cell) => isCellConnectedToMainRoad(context, cell));
           return horse
             ? passed(6, "Horse Riding is connected into the main campground road network.")
             : failed("Place Horse Riding on a scenic parcel with road access.");

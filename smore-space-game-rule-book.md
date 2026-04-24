@@ -115,7 +115,22 @@ These are placed **on top of** landscape tiles.
 You may only have:
 
 - **1 landscape tile per board space**
-- **1 camp tile per board space**
+- **1 normal camp tile per board space**
+
+Some market items are **big market items** and always occupy **exactly 2 campground squares**:
+
+- RV Site with Full Hookups
+- Group Site
+- Waterfront Site
+- Horse Riding
+- Event Pavilion
+
+Big market items may be placed:
+
+- **horizontally**
+- **vertically**
+
+In the digital version, when you tap a parcel for a big market item, the game previews the clicked parcel plus the parcel to the left by default. If left would go off the board, it falls back to the right. Rotating switches the preview to vertical, which uses the clicked parcel plus the parcel above by default and falls back below when needed.
 
 ---
 
@@ -203,12 +218,18 @@ All camp tiles cost **$10,000 each** unless you later rebalance the game.
 - Needs at least 1 road edge on the parcel below
 
 #### RV Site with Full Hookups
-- Needs strong road access
-- Recommended rule: at least **2 road edges** on the parcel below
+- Big market item
+- Occupies exactly **2 squares**
+- Can be rotated horizontal or vertical
+- Needs strong road access on both occupied parcels
+- Recommended rule: at least **2 road edges** on each parcel below
 
 #### Group Site
 - Large social campsite
-- Needs at least 1 road edge
+- Big market item
+- Occupies exactly **2 squares**
+- Can be rotated horizontal or vertical
+- Needs at least 1 road edge on each occupied parcel
 - Likes nearby amenities and intersections
 
 #### Cabin
@@ -217,12 +238,19 @@ All camp tiles cost **$10,000 each** unless you later rebalance the game.
 
 #### Waterfront Site
 - Premium lodging
-- Must be placed on a parcel with a **water edge**
+- Big market item
+- Occupies exactly **2 squares**
+- Can be rotated horizontal or vertical
+- At least **1 half** must be placed on a parcel with a **water edge**
+- The other half must still be a legal open parcel
 
 #### Horse Riding
 - Rare activity tile
-- Needs at least 1 road edge
-- Best on scenic, forest, or border parcels
+- Big market item
+- Occupies exactly **2 squares**
+- Can be rotated horizontal or vertical
+- Needs at least 1 road edge on each occupied parcel
+- Each occupied parcel should be scenic, forest, or border-friendly
 
 ### Amenities
 
@@ -242,7 +270,10 @@ All camp tiles cost **$10,000 each** unless you later rebalance the game.
 - Must be placed on a parcel with a **water edge**
 
 #### Event Pavilion
-- Needs at least 1 road edge
+- Big market item
+- Occupies exactly **2 squares**
+- Can be rotated horizontal or vertical
+- Needs at least 1 road edge on each occupied parcel
 - Best near clusters of campsites
 
 #### Hiking Trail
@@ -396,13 +427,14 @@ Use the same placement rules as setup, with these additions:
 
 ## Build Phase
 
-During the Build Phase, players take turns buying and placing **1 camp tile per turn**.
+During the Build Phase, players take turns buying and placing **1 market item per turn**.
 
 ### On Your Turn
 
 1. Choose **1 face-up tile** from the contractor market
 2. Pay **$10,000**
 3. Place that tile on a valid parcel in your campground
+   - if it is a big market item, place it across **2 valid parcels**
 4. Refill the empty market space from the matching pool
 5. End your turn
 
@@ -428,6 +460,8 @@ A camp tile may be placed only if:
 - you can pay the cost
 - the tile’s own placement rule is satisfied
 
+For a **big market item**, all of the above must be true for **both occupied parcels**.
+
 ### Access Rules Summary
 
 #### Needs at least 1 road edge on the parcel below
@@ -445,11 +479,11 @@ A camp tile may be placed only if:
 - Bathrooms
 
 #### Needs a water-edge parcel
-- Waterfront Site
+- Waterfront Site (at least one half)
 - Canoe Rental
 
 #### Needs scenic / forest / border support
-- Horse Riding
+- Horse Riding (each half)
 - Hiking Trail
 
 #### Flexible but thematic
@@ -828,10 +862,11 @@ If the final theme feels too cluttered, decide whether:
 - Bathrooms are removed entirely
 
 ### 13. Should players be allowed to rotate camp tiles?
-Camp tiles are currently conceptually square overlays with no directional edge logic.
-This rulebook assumes:
-- camp tile rotation does not matter
-- only landscape tile rotation matters
+Most camp tiles are conceptually square overlays with no directional edge logic.
+This rulebook now assumes:
+- normal 1-square camp tiles do not care about rotation
+- big market items may be rotated between horizontal and vertical
+- only landscape tiles use full 90-degree road-edge rotation
 
 ### 14. Should players be able to rearrange landscape tiles during setup before finalizing?
 Recommended rule:

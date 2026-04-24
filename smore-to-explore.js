@@ -280,16 +280,16 @@
   const CAMP_TILE_DEFS = {
     rustic_tent_forest: { id: "rustic_tent_forest", name: "Rustic Tent Forest", shortLabel: "Rustic", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#b47b4f", accent: "#7c4f2d", tags: ["tent", "rustic", "family"], description: "Flexible camping that is happiest in wooded or scenic corners.", rulesText: "Can go on almost any non-office parcel. Forest and scenic terrain score better." },
     tent_electric: { id: "tent_electric", name: "Tent Site with Electric Hookup", shortLabel: "E-Tent", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#7db987", accent: "#477b53", tags: ["tent", "electric", "comfort"], description: "A road-adjacent tent site with more comfort built in.", rulesText: "Needs at least one road edge on the landscape below." },
-    rv_full_hookups: { id: "rv_full_hookups", name: "RV Site with Full Hookups", shortLabel: "RV", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#73a4c6", accent: "#3f6d90", tags: ["rv", "premium"], description: "A premium RV pad that wants strong drive-up access.", rulesText: "Needs strong road access from at least two sides on the same landscape tile." },
-    group_site: { id: "group_site", name: "Group Site", shortLabel: "Group", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#d5965d", accent: "#945927", tags: ["group", "family"], description: "A larger social camping zone for scouts, reunions, and clubs.", rulesText: "Needs at least one road edge. It likes hub roads and nearby amenities." },
+    rv_full_hookups: { id: "rv_full_hookups", name: "RV Site with Full Hookups", shortLabel: "RV", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#73a4c6", accent: "#3f6d90", tags: ["rv", "premium"], description: "A premium RV pad that wants strong drive-up access.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 2 road edges." },
+    group_site: { id: "group_site", name: "Group Site", shortLabel: "Group", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#d5965d", accent: "#945927", tags: ["group", "family"], description: "A larger social camping zone for scouts, reunions, and clubs.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
     cabin: { id: "cabin", name: "Cabin", shortLabel: "Cabin", marketGroup: "camp", kind: "lodging", copies: 5, cost: CAMP_TILE_COST, color: "#d07d58", accent: "#8d4a30", tags: ["cabin", "premium", "comfort"], description: "Comfort lodging that still wants proper road access.", rulesText: "Needs at least one road edge on the landscape below." },
-    waterfront_site: { id: "waterfront_site", name: "Waterfront Site", shortLabel: "Waterfront", marketGroup: "camp", kind: "lodging", copies: 5, cost: CAMP_TILE_COST, color: "#6aaec8", accent: "#2f7087", tags: ["waterfront", "premium"], description: "A premium scenic site that must sit on a water-edge landscape.", rulesText: "Only placeable on a landscape tile with a water edge." },
-    horse_riding: { id: "horse_riding", name: "Horse Riding", shortLabel: "Horse", marketGroup: "camp", kind: "activity", copies: 2, cost: CAMP_TILE_COST, color: "#a97b63", accent: "#6c4c3d", tags: ["horse", "activity", "premium"], description: "A rare specialty attraction that wants road access and a scenic feel.", rulesText: "Needs at least one road edge and a scenic, forest, or lakeside landscape." },
+    waterfront_site: { id: "waterfront_site", name: "Waterfront Site", shortLabel: "Waterfront", marketGroup: "camp", kind: "lodging", copies: 5, cost: CAMP_TILE_COST, color: "#6aaec8", accent: "#2f7087", tags: ["waterfront", "premium"], description: "A premium scenic site that must sit on a water-edge landscape.", rulesText: "Big market item. Occupies 2 squares. At least 1 half must be on a water-edge parcel." },
+    horse_riding: { id: "horse_riding", name: "Horse Riding", shortLabel: "Horse", marketGroup: "camp", kind: "activity", copies: 2, cost: CAMP_TILE_COST, color: "#a97b63", accent: "#6c4c3d", tags: ["horse", "activity", "premium"], description: "A rare specialty attraction that wants road access and a scenic feel.", rulesText: "Big market item. Occupies 2 squares. Both halves need road access and scenic, forest, or border placement." },
     firewood: { id: "firewood", name: "Firewood", shortLabel: "Wood", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#b97142", accent: "#784421", tags: ["amenity", "campfire"], description: "A flexible support amenity that thrives near tents and group camping.", rulesText: "Very flexible. Best beside tent-heavy camping areas." },
     pool: { id: "pool", name: "Pool", shortLabel: "Pool", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#79bfde", accent: "#397394", tags: ["amenity", "family", "premium"], description: "A family favorite that wants good access and nearby campers.", rulesText: "Needs at least one road edge on the landscape below." },
     bike_rental: { id: "bike_rental", name: "Bike Rental", shortLabel: "Bikes", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#87a56f", accent: "#4b6535", tags: ["amenity", "activity"], description: "Works best off a longer connected road network.", rulesText: "Needs at least one road edge. It loves long connected road runs." },
     canoe_rental: { id: "canoe_rental", name: "Canoe Rental", shortLabel: "Canoes", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#72b6b0", accent: "#37746f", tags: ["amenity", "activity", "waterfront"], description: "A lakeside activity amenity that needs direct water access.", rulesText: "Needs a water-edge landscape tile." },
-    event_pavilion: { id: "event_pavilion", name: "Event Pavilion", shortLabel: "Pavilion", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#d8a96d", accent: "#9a6a31", tags: ["amenity", "family", "event"], description: "A social gathering space for busy clusters and group campers.", rulesText: "Needs at least one road edge for easy access." },
+    event_pavilion: { id: "event_pavilion", name: "Event Pavilion", shortLabel: "Pavilion", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#d8a96d", accent: "#9a6a31", tags: ["amenity", "family", "event"], description: "A social gathering space for busy clusters and group campers.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
     hiking_trail: { id: "hiking_trail", name: "Hiking Trail", shortLabel: "Trail", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#87ab68", accent: "#4f6a33", tags: ["amenity", "activity", "scenic"], description: "A scenic feature that likes forest parcels, edges, and quieter cells.", rulesText: "Place on scenic or border parcels. Forest parcels are especially strong." },
     ice_cream_vending: { id: "ice_cream_vending", name: "Ice Cream Vending", shortLabel: "Ice Cream", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#efb2c8", accent: "#b56f8d", tags: ["amenity", "family", "premium"], description: "A central-traffic treat stop for busy parts of camp.", rulesText: "Needs at least one road edge and likes the middle of the board." },
     playground: { id: "playground", name: "Playground", shortLabel: "Play", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#f0a26a", accent: "#b56331", tags: ["amenity", "family"], description: "Best near group and family camping.", rulesText: "Needs at least one road edge. It shines near Group Sites and tent camping." },
@@ -298,6 +298,17 @@
 
   const AMENITY_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "amenity");
   const CAMP_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "camp");
+  const BIG_MARKET_ITEM_IDS = new Set([
+    "rv_full_hookups",
+    "group_site",
+    "waterfront_site",
+    "horse_riding",
+    "event_pavilion"
+  ]);
+  const BIG_MARKET_ITEM_ORIENTATION = {
+    horizontal: "horizontal",
+    vertical: "vertical"
+  };
 
   const DETAILED_SITE_RULES = [
     {
@@ -310,11 +321,11 @@
     },
     {
       typeId: "rv_full_hookups",
-      body: "RV Site with Full Hookups: This is a campsite tile and a premium tile. It only counts as legal if its landscape tile has at least 2 road edges, because the placement rule requires strong road access.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so an RV Site can satisfy it by itself. RV Weekend needs 2 legal RV Sites. Big Rig Friendly also needs 2 RV Sites on strong road access. Full Hookup Favorite gives 3 director points per legal RV Site up to 9 total. Camp for Everyone needs at least 1 RV Site. Splash and Stay can use an RV Site as the nearby premium tile for a Pool. Rain or Shine can use an RV Site as the premium half of that director goal. Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, and Smore to Explore also benefit because RV Sites have the premium tag.\n\nGeneral goals: RV Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, and the seasonal placement-count goals."
+      body: "RV Site with Full Hookups: This is a campsite tile, a premium tile, and a big market item. It always occupies exactly 2 campground squares. The preview uses the clicked parcel plus the parcel to the left by default, and Rotate switches it to a vertical 2-square footprint. Both halves must be legal RV parcels, which means each occupied landscape tile needs at least 2 road edges.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so an RV Site can satisfy it by itself. RV Weekend needs 2 legal RV Sites. Big Rig Friendly also needs 2 RV Sites on strong road access. Full Hookup Favorite gives 3 director points per legal RV Site up to 9 total. Camp for Everyone needs at least 1 RV Site. Splash and Stay can use an RV Site as the nearby premium tile for a Pool. Rain or Shine can use an RV Site as the premium half of that director goal. Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, and Smore to Explore also benefit because RV Sites have the premium tag.\n\nGeneral goals: RV Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, and the seasonal placement-count goals."
     },
     {
       typeId: "group_site",
-      body: "Group Site: This is a campsite tile aimed at family and scout style scoring. It must be placed on a landscape tile with at least 1 road edge.\n\nDirect goals: Scout Arrival needs 2 Group Sites connected to the Entrance road network. Family Meet-Up needs at least 1 Group Site plus at least 1 Playground. Community Spot can use a Group Site beside an Event Pavilion. Kid Camp needs a Group Site, Playground, and Firewood. Family Favorite needs a Group Site within 2 spaces of a Playground. Summer Traditions needs at least 1 Group Site along with Event Pavilion and Firewood, with a higher score if those pieces cluster together. Happy Families counts Group Site as one of its four family attractions. Camp for Everyone also needs at least 1 Group Site.\n\nGeneral goals: Group Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, Something for Everyone, Destination Campground, Destination Status, Smore to Explore, and the seasonal placement goals."
+      body: "Group Site: This is a campsite tile aimed at family and scout style scoring, and it is a big market item. It always occupies exactly 2 campground squares. The preview starts horizontal from the clicked parcel and can be rotated to vertical. Both halves need legal placement, so each occupied parcel must have at least 1 road edge.\n\nDirect goals: Scout Arrival needs 2 Group Sites connected to the Entrance road network. Family Meet-Up needs at least 1 Group Site plus at least 1 Playground. Community Spot can use a Group Site beside an Event Pavilion. Kid Camp needs a Group Site, Playground, and Firewood. Family Favorite needs a Group Site within 2 spaces of a Playground. Summer Traditions needs at least 1 Group Site along with Event Pavilion and Firewood, with a higher score if those pieces cluster together. Happy Families counts Group Site as one of its four family attractions. Camp for Everyone also needs at least 1 Group Site.\n\nGeneral goals: Group Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Campers Everywhere, Peak Season Layout, Fully Connected Resort, Something for Everyone, Destination Campground, Destination Status, Smore to Explore, and the seasonal placement goals."
     },
     {
       typeId: "cabin",
@@ -322,14 +333,14 @@
     },
     {
       typeId: "waterfront_site",
-      body: "Waterfront Site: This is a lodging tile and a premium tile. In the current code it must be placed on a landscape tile with a water edge.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so a Waterfront Site can satisfy it. Lakeside Premium needs 2 Waterfront Sites. Deluxe Weekend needs at least 1 Waterfront Site, at least 1 Cabin, and at least 1 of those two tiles supported by an amenity within 2 spaces. Paddle Out needs Canoe Rental within 2 spaces of a Waterfront Site. Lakeside Leisure needs Canoe Rental or Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend needs 2 Waterfront Sites plus at least 1 supporting leisure amenity, which can be Canoe Rental or Ice Cream Vending. The Waterfront Draw gives 5 director points for having at least 1 Waterfront Site and another 2 points if you reach 2 Waterfront Sites. Cooling Off can also use Waterfront Site as one of its 3 cooling attractions.\n\nGeneral goals: Waterfront Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Splash and Stay, Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, Smore to Explore, and the seasonal placement goals."
+      body: "Waterfront Site: This is a lodging tile, a premium tile, and a big market item. It always occupies exactly 2 campground squares. The preview starts with the clicked parcel plus the parcel to the left, and Rotate switches it to vertical with the same kind of up-or-down fallback. The special rule is that at least 1 half must be on a water-edge landscape tile. The other half still must be open and legal, but it does not also need its own water edge.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so a Waterfront Site can satisfy it. Lakeside Premium needs 2 Waterfront Sites. Deluxe Weekend needs at least 1 Waterfront Site, at least 1 Cabin, and at least 1 of those two tiles supported by an amenity within 2 spaces. Paddle Out needs Canoe Rental within 2 spaces of a Waterfront Site. Lakeside Leisure needs Canoe Rental or Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend needs 2 Waterfront Sites plus at least 1 supporting leisure amenity, which can be Canoe Rental or Ice Cream Vending. The Waterfront Draw gives 5 director points for having at least 1 Waterfront Site and another 2 points if you reach 2 Waterfront Sites. Cooling Off can also use Waterfront Site as one of its 3 cooling attractions.\n\nGeneral goals: Waterfront Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Splash and Stay, Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, Smore to Explore, and the seasonal placement goals."
     }
   ];
 
   const DETAILED_AMENITY_RULES = [
     {
       typeId: "horse_riding",
-      body: "Horse Riding: This is a specialty attraction, not an amenity for unique-amenity counting. It must have at least 1 road edge on the landscape below, and it must be on scenic land, forest land, or the outer border of the board.\n\nDirect goals: Scenic Ride needs Horse Riding connected into the Entrance road network. Horse Country Getaway needs Horse Riding either on a scenic parcel or within 2 spaces of any premium tile. Splash and Stay can treat Horse Riding as the premium tile near a Pool because Horse Riding has the premium tag in code. Rain or Shine can also use it as the premium half of that director goal. Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, and Smore to Explore all benefit because Horse Riding is premium.\n\nLayout goals: Because Horse Riding is still a developed camp tile, it also helps Campers Everywhere, Peak Season Layout, Fully Connected Resort, and the seasonal placement-count goals."
+      body: "Horse Riding: This is a specialty attraction, not an amenity for unique-amenity counting, and it is a big market item. It always occupies exactly 2 campground squares. The preview starts horizontal from the clicked parcel, and Rotate switches it to a vertical 2-square footprint. Both halves must have at least 1 road edge, and each half must also be on scenic land, forest land, or the outer border of the board.\n\nDirect goals: Scenic Ride needs Horse Riding connected into the Entrance road network. Horse Country Getaway needs Horse Riding either on a scenic parcel or within 2 spaces of any premium tile. Splash and Stay can treat Horse Riding as the premium tile near a Pool because Horse Riding has the premium tag in code. Rain or Shine can also use it as the premium half of that director goal. Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, and Smore to Explore all benefit because Horse Riding is premium.\n\nLayout goals: Because Horse Riding is still a developed camp tile, it also helps Campers Everywhere, Peak Season Layout, Fully Connected Resort, and the seasonal placement-count goals."
     },
     {
       typeId: "firewood",
@@ -349,7 +360,7 @@
     },
     {
       typeId: "event_pavilion",
-      body: "Event Pavilion: Event Pavilion is an amenity that must be placed on a landscape tile with at least 1 road edge. It scores best when it sits near developed camp tiles.\n\nDirect goals: Community Spot needs Event Pavilion beside a Group Site or beside at least 2 campsite or lodging tiles. Popular Pavilion needs Event Pavilion orthogonally adjacent to at least 2 developed camp tiles of any kind. End of Summer Event needs Event Pavilion within 2 spaces of at least 4 developed camp tiles. Summer Traditions needs Event Pavilion plus Firewood plus Group Site, and scores higher if the Pavilion is within 2 spaces of both Firewood and a Group Site.\n\nGeneral goals: Event Pavilion also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore as an amenity, and it counts as a developed tile for layout goals."
+      body: "Event Pavilion: Event Pavilion is an amenity and a big market item. It always occupies exactly 2 campground squares. The preview starts horizontal from the clicked parcel, and Rotate switches it to vertical. Both halves must be open legal parcels, and each occupied parcel needs at least 1 road edge.\n\nDirect goals: Community Spot needs Event Pavilion beside a Group Site or beside at least 2 campsite or lodging tiles. Popular Pavilion needs Event Pavilion orthogonally adjacent to at least 2 developed camp tiles of any kind. End of Summer Event needs Event Pavilion within 2 spaces of at least 4 developed camp tiles. Summer Traditions needs Event Pavilion plus Firewood plus Group Site, and scores higher if the Pavilion is within 2 spaces of both Firewood and a Group Site.\n\nGeneral goals: Event Pavilion also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore as an amenity, and it counts as a developed tile for layout goals."
     },
     {
       typeId: "hiking_trail",
@@ -477,6 +488,7 @@
 
   const ctx = controller.context;
   let game = createBootstrapState(2);
+  let nextCampPlacementId = 1;
 
   function createBoard() {
     return Array.from({ length: BOARD_ROWS }, (_, row) =>
@@ -485,7 +497,7 @@
   }
 
   function createSelection() {
-    return { source: null, typeId: null, rotation: 0, columnIndex: null, slotIndex: null };
+    return { source: null, typeId: null, rotation: 0, orientation: BIG_MARKET_ITEM_ORIENTATION.horizontal, columnIndex: null, slotIndex: null };
   }
 
   function createUiState(playerCount = 2) {
@@ -1160,6 +1172,76 @@
     return row === 0 || row === BOARD_ROWS - 1 || col === 0 || col === BOARD_COLS - 1;
   }
 
+  function isBigMarketItem(typeId) {
+    return BIG_MARKET_ITEM_IDS.has(typeId);
+  }
+
+  function getSelectedMarketOrientation() {
+    return game.ui.selection.orientation === BIG_MARKET_ITEM_ORIENTATION.vertical
+      ? BIG_MARKET_ITEM_ORIENTATION.vertical
+      : BIG_MARKET_ITEM_ORIENTATION.horizontal;
+  }
+
+  function getBigMarketItemTargetCells(row, col, orientation = BIG_MARKET_ITEM_ORIENTATION.horizontal) {
+    if (orientation === BIG_MARKET_ITEM_ORIENTATION.vertical) {
+      const otherRow = row > 0 ? row - 1 : row + 1;
+      return [
+        { row, col },
+        { row: otherRow, col }
+      ];
+    }
+    const otherCol = col > 0 ? col - 1 : col + 1;
+    return [
+      { row, col },
+      { row, col: otherCol }
+    ];
+  }
+
+  function normalizePlacementCells(cells) {
+    return cells
+      .map((cell) => ({ row: cell.row, col: cell.col }))
+      .sort((a, b) => (a.row - b.row) || (a.col - b.col));
+  }
+
+  function getCampPlacementCells(row, col, typeId, orientation = getSelectedMarketOrientation()) {
+    return isBigMarketItem(typeId)
+      ? normalizePlacementCells(getBigMarketItemTargetCells(row, col, orientation))
+      : [{ row, col }];
+  }
+
+  function getCampPlacementAnchor(cells) {
+    const [anchor] = normalizePlacementCells(cells);
+    return anchor || null;
+  }
+
+  function createCampPlacement(typeId, occupiedCells, orientation = BIG_MARKET_ITEM_ORIENTATION.horizontal) {
+    const normalizedCells = normalizePlacementCells(occupiedCells);
+    const anchor = getCampPlacementAnchor(normalizedCells);
+    return {
+      placementId: `camp-placement-${nextCampPlacementId++}`,
+      typeId,
+      anchorRow: anchor?.row ?? normalizedCells[0]?.row ?? 0,
+      anchorCol: anchor?.col ?? normalizedCells[0]?.col ?? 0,
+      orientation: orientation === BIG_MARKET_ITEM_ORIENTATION.vertical
+        ? BIG_MARKET_ITEM_ORIENTATION.vertical
+        : BIG_MARKET_ITEM_ORIENTATION.horizontal,
+      occupiedCells: normalizedCells
+    };
+  }
+
+  function getCampPlacementOccupiedCells(campTile, fallbackRow = null, fallbackCol = null) {
+    if (!campTile) return [];
+    if (Array.isArray(campTile.occupiedCells) && campTile.occupiedCells.length) {
+      return campTile.occupiedCells.map((cell) => ({ row: cell.row, col: cell.col }));
+    }
+    if (fallbackRow == null || fallbackCol == null) return [];
+    return [{ row: fallbackRow, col: fallbackCol }];
+  }
+
+  function getCampPlacementDisplayLabel(cells) {
+    return normalizePlacementCells(cells).map((cell) => formatBoardCellLabel(cell.row, cell.col)).join(" + ");
+  }
+
   function isCentralParcel(row, col) {
     return row >= 1 && row <= 3 && col >= 2 && col <= 5;
   }
@@ -1181,36 +1263,93 @@
     return false;
   }
 
-  function getLongestAlignedCampRun(context, predicate) {
-    let best = 0;
-    for (let row = 0; row < BOARD_ROWS; row += 1) {
-      let current = 0;
-      for (let col = 0; col < BOARD_COLS; col += 1) {
-        const decorated = context.campCells.find((entry) => entry.row === row && entry.col === col);
-        if (decorated && predicate(decorated) && (col === 0 || hasRoadConnectionBetween(context.board, row, col - 1, row, col))) {
-          current = col === 0 ? 1 : current + 1;
-          best = Math.max(best, current);
-        } else if (decorated && predicate(decorated)) {
-          current = 1;
-          best = Math.max(best, current);
-        } else {
-          current = 0;
-        }
+  function getPlacementDistance(source, other) {
+    const sourceCells = getCampPlacementOccupiedCells(source, source.row, source.col);
+    const otherCells = getCampPlacementOccupiedCells(other, other.row, other.col);
+    let best = Number.POSITIVE_INFINITY;
+    for (const sourceCell of sourceCells) {
+      for (const otherCell of otherCells) {
+        best = Math.min(best, Math.abs(sourceCell.row - otherCell.row) + Math.abs(sourceCell.col - otherCell.col));
       }
     }
+    return Number.isFinite(best) ? best : Number.POSITIVE_INFINITY;
+  }
+
+  function placementsTouchOrthogonally(source, other) {
+    return getPlacementDistance(source, other) === 1;
+  }
+
+  function findPlacementOccupyingBoardCell(placements, row, col, predicate = () => true) {
+    return placements.find((placement) => {
+      if (!predicate(placement)) return false;
+      return getCampPlacementOccupiedCells(placement, placement.row, placement.col)
+        .some((occupiedCell) => occupiedCell.row === row && occupiedCell.col === col);
+    }) || null;
+  }
+
+  function getLongestAlignedCampRun(context, predicate) {
+    let best = 0;
+    const matchingPlacements = context.campCells.filter(predicate);
+
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      let current = 0;
+      let previousPlacement = null;
+      let previousEndCol = -1;
+      for (let col = 0; col < BOARD_COLS;) {
+        const decorated = findPlacementOccupyingBoardCell(matchingPlacements, row, col);
+        if (!decorated) {
+          current = 0;
+          previousPlacement = null;
+          previousEndCol = -1;
+          col += 1;
+          continue;
+        }
+        const occupiedOnRow = getCampPlacementOccupiedCells(decorated.campTile, decorated.row, decorated.col)
+          .filter((cell) => cell.row === row)
+          .map((cell) => cell.col)
+          .sort((a, b) => a - b);
+        const startCol = occupiedOnRow[0];
+        const endCol = occupiedOnRow[occupiedOnRow.length - 1];
+        const continues = previousPlacement
+          && previousPlacement.campTile.placementId !== decorated.campTile.placementId
+          && previousEndCol + 1 === startCol
+          && hasRoadConnectionBetween(context.board, row, previousEndCol, row, startCol);
+        current = continues ? current + 1 : 1;
+        best = Math.max(best, current);
+        previousPlacement = decorated;
+        previousEndCol = endCol;
+        col = endCol + 1;
+      }
+    }
+
     for (let col = 0; col < BOARD_COLS; col += 1) {
       let current = 0;
-      for (let row = 0; row < BOARD_ROWS; row += 1) {
-        const decorated = context.campCells.find((entry) => entry.row === row && entry.col === col);
-        if (decorated && predicate(decorated) && (row === 0 || hasRoadConnectionBetween(context.board, row - 1, col, row, col))) {
-          current = row === 0 ? 1 : current + 1;
-          best = Math.max(best, current);
-        } else if (decorated && predicate(decorated)) {
-          current = 1;
-          best = Math.max(best, current);
-        } else {
+      let previousPlacement = null;
+      let previousEndRow = -1;
+      for (let row = 0; row < BOARD_ROWS;) {
+        const decorated = findPlacementOccupyingBoardCell(matchingPlacements, row, col);
+        if (!decorated) {
           current = 0;
+          previousPlacement = null;
+          previousEndRow = -1;
+          row += 1;
+          continue;
         }
+        const occupiedOnCol = getCampPlacementOccupiedCells(decorated.campTile, decorated.row, decorated.col)
+          .filter((cell) => cell.col === col)
+          .map((cell) => cell.row)
+          .sort((a, b) => a - b);
+        const startRow = occupiedOnCol[0];
+        const endRow = occupiedOnCol[occupiedOnCol.length - 1];
+        const continues = previousPlacement
+          && previousPlacement.campTile.placementId !== decorated.campTile.placementId
+          && previousEndRow + 1 === startRow
+          && hasRoadConnectionBetween(context.board, previousEndRow, col, startRow, col);
+        current = continues ? current + 1 : 1;
+        best = Math.max(best, current);
+        previousPlacement = decorated;
+        previousEndRow = endRow;
+        row = endRow + 1;
       }
     }
     return best;
@@ -1288,45 +1427,69 @@
     return errors;
   }
 
-  function getCampTilePlacementReasons(gameState, player, row, col, typeId) {
+  function getCampTilePlacementEvaluation(gameState, player, row, col, typeId, orientation = getSelectedMarketOrientation()) {
     const reasons = [];
-    const cell = getCell(player.board, row, col);
-    const campDef = getCampDef(typeId);
-    if (!cell) return ["Choose a board space inside the campground."];
-    if (!cell.landscapeTile) return ["Place a landscape tile here first."];
-    if (cell.campTile) reasons.push("There is already a camp tile on this parcel.");
-    if (player.money < campDef.cost) reasons.push(`You need ${Core.formatMoney(campDef.cost)} to hire this contractor.`);
+    const cells = getCampPlacementCells(row, col, typeId, orientation);
+    let waterEdgeCount = 0;
 
-    const landscapeInfo = getLandscapeInfoFromTile(cell.landscapeTile);
-    const practicalRoadAccess = landscapeInfo.roadEdgeCount >= 1 || hasAdjacentRoadCell(player.board, row, col);
+    for (const targetCell of cells) {
+      const cell = getCell(player.board, targetCell.row, targetCell.col);
+      if (!cell) {
+        reasons.push("Choose board spaces inside the campground.");
+        continue;
+      }
+      if (!cell.landscapeTile) {
+        reasons.push(isBigMarketItem(typeId) ? "Place a landscape tile on both parcels first." : "Place a landscape tile here first.");
+        continue;
+      }
+      if (cell.campTile) reasons.push(isBigMarketItem(typeId) ? "A big market item needs two open parcels with no other camp tile on them." : "There is already a camp tile on this parcel.");
 
-    if (landscapeInfo.isEntrance || landscapeInfo.isOffice) reasons.push("The Entrance and Camp Office tiles stay reserved for road services.");
-    if (["tent_electric", "group_site", "cabin", "pool", "bike_rental", "event_pavilion", "ice_cream_vending", "playground"].includes(typeId) && landscapeInfo.roadEdgeCount < 1) {
-      reasons.push("This tile needs at least one road edge on the landscape below.");
-    }
-    if (["rv_full_hookups", "bathrooms"].includes(typeId) && landscapeInfo.roadEdgeCount < 2) {
-      reasons.push("This tile needs strong road access from at least two sides.");
-    }
-    if (typeId === "waterfront_site" && !landscapeInfo.hasWaterEdge) reasons.push("Waterfront Sites only fit on a water-edge landscape tile.");
-    if (typeId === "canoe_rental" && !landscapeInfo.hasWaterEdge) reasons.push("Canoe Rental must sit on a water-edge landscape tile.");
-    if (typeId === "horse_riding") {
-      if (landscapeInfo.roadEdgeCount < 1) reasons.push("Horse Riding needs at least one road edge for access.");
-      if (!landscapeInfo.hasScenicTag && !landscapeInfo.hasForestTag && !isBorderParcel(row, col)) reasons.push("Horse Riding wants scenic, forest, or edge-of-camp placement.");
-    }
-    if (typeId === "hiking_trail" && !landscapeInfo.hasScenicTag && !landscapeInfo.hasForestTag && !isBorderParcel(row, col)) {
-      reasons.push("Hiking Trail wants scenic, forest, or board-edge placement.");
-    }
-    if (typeId === "firewood" && !practicalRoadAccess && !landscapeInfo.hasScenicTag) {
-      reasons.push("Firewood should reach camp either from a road parcel or a scenic gathering spot.");
+      const landscapeInfo = getLandscapeInfoFromTile(cell.landscapeTile);
+      const practicalRoadAccess = landscapeInfo.roadEdgeCount >= 1 || hasAdjacentRoadCell(player.board, targetCell.row, targetCell.col);
+
+      if (landscapeInfo.isEntrance || landscapeInfo.isOffice) reasons.push("The Entrance and Camp Office tiles stay reserved for road services.");
+      if (["tent_electric", "group_site", "cabin", "pool", "bike_rental", "event_pavilion", "ice_cream_vending", "playground"].includes(typeId) && landscapeInfo.roadEdgeCount < 1) {
+        reasons.push("This tile needs at least one road edge on each parcel it occupies.");
+      }
+      if (["rv_full_hookups", "bathrooms"].includes(typeId) && landscapeInfo.roadEdgeCount < 2) {
+        reasons.push("This tile needs strong road access from at least two sides on each parcel it occupies.");
+      }
+      if (typeId === "waterfront_site" && landscapeInfo.hasWaterEdge) waterEdgeCount += 1;
+      if (typeId === "canoe_rental" && !landscapeInfo.hasWaterEdge) reasons.push("Canoe Rental must sit on a water-edge landscape tile.");
+      if (typeId === "horse_riding") {
+        if (landscapeInfo.roadEdgeCount < 1) reasons.push("Horse Riding needs at least one road edge on each parcel it occupies.");
+        if (!landscapeInfo.hasScenicTag && !landscapeInfo.hasForestTag && !isBorderParcel(targetCell.row, targetCell.col)) reasons.push("Horse Riding wants scenic, forest, or edge-of-camp placement for each half.");
+      }
+      if (typeId === "hiking_trail" && !landscapeInfo.hasScenicTag && !landscapeInfo.hasForestTag && !isBorderParcel(targetCell.row, targetCell.col)) {
+        reasons.push("Hiking Trail wants scenic, forest, or board-edge placement.");
+      }
+      if (typeId === "firewood" && !practicalRoadAccess && !landscapeInfo.hasScenicTag) {
+        reasons.push("Firewood should reach camp either from a road parcel or a scenic gathering spot.");
+      }
     }
 
-    return Core.unique(reasons);
+    if (typeId === "waterfront_site" && waterEdgeCount === 0) {
+      reasons.push("A Waterfront Site needs at least one half on a water-edge landscape tile.");
+    }
+
+    return {
+      cells,
+      reasons: Core.unique(reasons),
+      orientation: isBigMarketItem(typeId) ? orientation : null
+    };
+  }
+
+  function getCampTilePlacementReasons(gameState, player, row, col, typeId, orientation = getSelectedMarketOrientation()) {
+    return getCampTilePlacementEvaluation(gameState, player, row, col, typeId, orientation).reasons;
   }
 
   function canPlaceCampTileAnywhere(gameState, player, typeId) {
     for (let row = 0; row < BOARD_ROWS; row += 1) {
       for (let col = 0; col < BOARD_COLS; col += 1) {
-        if (!getCampTilePlacementReasons(gameState, player, row, col, typeId).length) return true;
+        const orientations = isBigMarketItem(typeId)
+          ? [BIG_MARKET_ITEM_ORIENTATION.horizontal, BIG_MARKET_ITEM_ORIENTATION.vertical]
+          : [BIG_MARKET_ITEM_ORIENTATION.horizontal];
+        if (orientations.some((orientation) => !getCampTilePlacementReasons(gameState, player, row, col, typeId, orientation).length)) return true;
       }
     }
     return false;
@@ -1334,29 +1497,32 @@
 
   function getBlockedMarketPurchaseReason(gameState, player, stack) {
     if (!player) return "No player is active.";
-    if (stack.some((entry) => entry.typeId === "waterfront_site") && !canPlaceCampTileAnywhere(gameState, player, "waterfront_site")) {
-      return "You cannot hire Waterfront Sites right now because your campground has no open legal waterfront parcel.";
+    const blockedBigItem = stack.find((entry) => isBigMarketItem(entry.typeId) && !canPlaceCampTileAnywhere(gameState, player, entry.typeId));
+    if (blockedBigItem) {
+      return blockedBigItem.typeId === "waterfront_site"
+        ? "You cannot hire Waterfront Sites right now because your campground has no open legal two-square waterfront placement."
+        : `You cannot hire ${getCampDef(blockedBigItem.typeId).name} right now because your campground has no open legal two-square placement for it.`;
     }
     return "";
   }
 
   function getLargestCampCluster(board, campCells, predicate) {
-    const matching = new Set(campCells.filter(predicate).map((cell) => cellKey(cell.row, cell.col)));
+    const matching = campCells.filter(predicate);
     let best = 0;
     const visited = new Set();
-    for (const key of matching) {
-      if (visited.has(key)) continue;
-      const queue = [key];
+    for (const placement of matching) {
+      const placementId = placement.campTile.placementId;
+      if (visited.has(placementId)) continue;
+      const queue = [placement];
       let size = 0;
       while (queue.length) {
         const current = queue.shift();
-        if (visited.has(current) || !matching.has(current)) continue;
-        visited.add(current);
+        const currentPlacementId = current.campTile.placementId;
+        if (visited.has(currentPlacementId)) continue;
+        visited.add(currentPlacementId);
         size += 1;
-        const [row, col] = current.split(",").map(Number);
-        for (const neighbor of getOrthogonalNeighbors(board, row, col)) {
-          const neighborKey = cellKey(neighbor.row, neighbor.col);
-          if (!visited.has(neighborKey) && matching.has(neighborKey)) queue.push(neighborKey);
+        for (const neighbor of matching) {
+          if (!visited.has(neighbor.campTile.placementId) && placementsTouchOrthogonally(current, neighbor)) queue.push(neighbor);
         }
       }
       best = Math.max(best, size);
@@ -1378,14 +1544,31 @@
     const campTypeCounts = {};
     const amenityTypeCounts = {};
     const landscapeInfos = new Map();
+    const seenPlacements = new Set();
 
     for (let row = 0; row < BOARD_ROWS; row += 1) {
       for (let col = 0; col < BOARD_COLS; col += 1) {
         const cell = board[row][col];
         if (cell.landscapeTile) landscapeInfos.set(cellKey(row, col), getLandscapeInfoFromTile(cell.landscapeTile));
         if (cell.campTile) {
+          const placementId = cell.campTile.placementId || `legacy-${row}-${col}-${cell.campTile.typeId}`;
+          if (seenPlacements.has(placementId)) continue;
+          seenPlacements.add(placementId);
           const campDef = getCampDef(cell.campTile.typeId);
-          const decorated = { row, col, campTile: cell.campTile, campDef, landscapeInfo: landscapeInfos.get(cellKey(row, col)) };
+          const occupiedCells = getCampPlacementOccupiedCells(cell.campTile, row, col).map((occupiedCell) => ({
+            row: occupiedCell.row,
+            col: occupiedCell.col,
+            landscapeInfo: landscapeInfos.get(cellKey(occupiedCell.row, occupiedCell.col))
+          }));
+          const anchor = occupiedCells.find((occupiedCell) => occupiedCell.row === cell.campTile.anchorRow && occupiedCell.col === cell.campTile.anchorCol) || occupiedCells[0];
+          const decorated = {
+            row: anchor?.row ?? row,
+            col: anchor?.col ?? col,
+            campTile: cell.campTile,
+            campDef,
+            landscapeInfo: landscapeInfos.get(cellKey(anchor?.row ?? row, anchor?.col ?? col)),
+            occupiedCells
+          };
           campCells.push(decorated);
           campCellsByType[campDef.id] = campCellsByType[campDef.id] || [];
           campCellsByType[campDef.id].push(decorated);
@@ -1411,20 +1594,28 @@
         const info = landscapeInfos.get(cellKey(row, col));
         if (!info) continue;
         if (info.def.tags.includes("intersection")) intersectionCount += 1;
-        const practical = info.roadEdgeCount >= 1 || hasAdjacentRoadCell(board, row, col);
         if (!cell.campTile && !info.isEntrance && !info.isOffice) unusedSupportedSpaces += 1;
-        if (cell.campTile) {
-          developedQuadrants.add(getQuadrantKey(row, col));
-          if (isCentralParcel(row, col)) centerCampCount += 1;
-          if (practical) {
-            roadServedCampCount += 1;
-            if (isCentralParcel(row, col)) centerRoadServedCampCount += 1;
-          } else {
-            allDevelopedTilesPracticallyAccessible = false;
-          }
-        }
       }
     }
+
+    campCells.forEach((cell) => {
+      const occupiedCells = cell.occupiedCells.length ? cell.occupiedCells : [{ row: cell.row, col: cell.col, landscapeInfo: cell.landscapeInfo }];
+      const intersectsCenter = occupiedCells.some((occupiedCell) => isCentralParcel(occupiedCell.row, occupiedCell.col));
+      const practicallyAccessible = occupiedCells.some((occupiedCell) => {
+        const info = landscapeInfos.get(cellKey(occupiedCell.row, occupiedCell.col));
+        return info && (info.roadEdgeCount >= 1 || hasAdjacentRoadCell(board, occupiedCell.row, occupiedCell.col));
+      });
+      occupiedCells.forEach((occupiedCell) => {
+        developedQuadrants.add(getQuadrantKey(occupiedCell.row, occupiedCell.col));
+      });
+      if (intersectsCenter) centerCampCount += 1;
+      if (practicallyAccessible) {
+        roadServedCampCount += 1;
+        if (intersectsCenter) centerRoadServedCampCount += 1;
+      } else {
+        allDevelopedTilesPracticallyAccessible = false;
+      }
+    });
 
     const context = {
       game: gameState,
@@ -1474,8 +1665,8 @@
       countNearby: (source, predicate, distance) => {
         let total = 0;
         for (const other of campCells) {
-          if (other.row === source.row && other.col === source.col) continue;
-          if (Math.abs(other.row - source.row) + Math.abs(other.col - source.col) <= distance && predicate(other)) total += 1;
+          if (other.campTile?.placementId === source.campTile?.placementId) continue;
+          if (getPlacementDistance(source, other) <= distance && predicate(other)) total += 1;
         }
         return total;
       }
@@ -1486,11 +1677,19 @@
     return context;
   }
 
-  function scoreAdjacencyBonuses(gameState, player, row, col, typeId) {
+  function scoreAdjacencyBonuses(gameState, player, typeId, occupiedCells) {
     const context = createEvaluationContext(gameState, player);
-    const cell = getCell(player.board, row, col);
+    const anchor = getCampPlacementAnchor(occupiedCells);
+    const cell = anchor ? getCell(player.board, anchor.row, anchor.col) : null;
     if (!cell || !cell.landscapeTile) return { score: 0, lines: [] };
-    const source = { row, col, campTile: { typeId }, campDef: getCampDef(typeId), landscapeInfo: getLandscapeInfoFromTile(cell.landscapeTile) };
+    const source = {
+      row: anchor.row,
+      col: anchor.col,
+      occupiedCells: normalizePlacementCells(occupiedCells),
+      campTile: { typeId, placementId: `preview-${typeId}` },
+      campDef: getCampDef(typeId),
+      landscapeInfo: getLandscapeInfoFromTile(cell.landscapeTile)
+    };
     const lines = [];
     let score = 0;
 
@@ -1514,10 +1713,10 @@
       if (nearby > 0) lines.push(`Event Pavilion would anchor ${nearby} nearby developed camp tiles.`);
     }
     if (typeId === "bike_rental") {
-      const roadSize = context.getRoadComponentSizeForCell(row, col);
+      const roadSize = context.getRoadComponentSizeForCell(anchor.row, anchor.col);
       if (roadSize > 0) lines.push(`Bike Rental would connect to a road corridor ${roadSize} tiles long.`);
     }
-    if (typeId === "hiking_trail" && (source.landscapeInfo.hasForestTag || source.landscapeInfo.hasScenicTag || isBorderParcel(row, col))) {
+    if (typeId === "hiking_trail" && (source.landscapeInfo.hasForestTag || source.landscapeInfo.hasScenicTag || isBorderParcel(anchor.row, anchor.col))) {
       lines.push("Trail placement gets a scenic bonus here.");
     }
 
@@ -1807,6 +2006,7 @@
       source: "landscape",
       typeId,
       rotation: same ? game.ui.selection.rotation : 0,
+      orientation: BIG_MARKET_ITEM_ORIENTATION.horizontal,
       columnIndex: null,
       slotIndex: null
     };
@@ -1849,7 +2049,14 @@
     game.turn.marketPurchaseColumnIndex = columnIndex;
     game.turn.marketPurchaseDepth = slotIndex;
     game.turn.marketPurchaseTotalCost = totalCost;
-    game.ui.selection = { source: "market", typeId: stack[0].typeId, rotation: 0, columnIndex, slotIndex: 0 };
+    game.ui.selection = {
+      source: "market",
+      typeId: stack[0].typeId,
+      rotation: 0,
+      orientation: BIG_MARKET_ITEM_ORIENTATION.horizontal,
+      columnIndex,
+      slotIndex: 0
+    };
     game.ui.inspectedCell = null;
     game.ui.lastAttempt = null;
     const firstDef = getCampDef(stack[0].typeId);
@@ -1865,6 +2072,14 @@
   function rotateSelectedLandscape(delta) {
     if (game.ui.selection.source !== "landscape") return;
     game.ui.selection.rotation = (game.ui.selection.rotation + delta + 4) % 4;
+    game.ui.lastAttempt = null;
+  }
+
+  function rotateSelectedBigMarketItem() {
+    if (game.ui.selection.source !== "market" || !isBigMarketItem(game.ui.selection.typeId)) return;
+    game.ui.selection.orientation = getSelectedMarketOrientation() === BIG_MARKET_ITEM_ORIENTATION.horizontal
+      ? BIG_MARKET_ITEM_ORIENTATION.vertical
+      : BIG_MARKET_ITEM_ORIENTATION.horizontal;
     game.ui.lastAttempt = null;
   }
 
@@ -1922,21 +2137,25 @@
     const player = getPlayer();
     if (!player || game.phase !== "build" || game.ui.selection.source !== "market" || game.turn.actionTaken || !hasPendingMarketPurchase()) return;
     const pending = getPendingMarketPurchaseEntry();
-    const reasons = getCampTilePlacementReasons(game, player, row, col, pending.typeId);
+    const placement = getCampTilePlacementEvaluation(game, player, row, col, pending.typeId, getSelectedMarketOrientation());
+    const reasons = placement.reasons;
     markAttempt(row, col, reasons);
     if (reasons.length) {
       setMessage(game, "error", "Invalid camp placement", reasons[0]);
       return;
     }
 
-    const cell = getCell(player.board, row, col);
     const campDef = getCampDef(pending.typeId);
-    cell.campTile = { typeId: pending.typeId };
+    const builtPlacement = createCampPlacement(pending.typeId, placement.cells, placement.orientation || BIG_MARKET_ITEM_ORIENTATION.horizontal);
+    placement.cells.forEach((targetCell) => {
+      const boardCell = getCell(player.board, targetCell.row, targetCell.col);
+      if (boardCell) boardCell.campTile = builtPlacement;
+    });
     player.roundCampPlacements[game.roundIndex] += 1;
     player.passedThisRound = false;
-    game.ui.inspectedCell = { row, col };
+    game.ui.inspectedCell = { row: builtPlacement.anchorRow, col: builtPlacement.anchorCol };
 
-    const bonuses = scoreAdjacencyBonuses(game, player, row, col, pending.typeId);
+    const bonuses = scoreAdjacencyBonuses(game, player, pending.typeId, placement.cells);
     game.ui.lastAttempt = null;
     game.turn.marketPurchaseIndex += 1;
 
@@ -1947,6 +2166,7 @@
         source: "market",
         typeId: nextPending.typeId,
         rotation: 0,
+        orientation: BIG_MARKET_ITEM_ORIENTATION.horizontal,
         columnIndex: game.turn.marketPurchaseColumnIndex,
         slotIndex: nextPending.slotIndex
       };
@@ -3250,26 +3470,30 @@ function computeLayout(width, height) {
     if (game.ui.selection.source === "market") {
       const def = getCampDef(game.ui.selection.typeId);
       if (game.ui.hoveredCell) {
-        const reasons = getCampTilePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, def.id);
+        const placement = getCampTilePlacementEvaluation(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, def.id, getSelectedMarketOrientation());
+        const reasons = placement.reasons;
+        const placementLabel = getCampPlacementDisplayLabel(placement.cells);
         if (reasons.length) {
           return {
             tone: "error",
-            title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
+            title: `${def.name} on ${placementLabel}`,
             body: reasons[0]
           };
         }
-        const bonuses = scoreAdjacencyBonuses(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, def.id);
+        const bonuses = scoreAdjacencyBonuses(game, player, def.id, placement.cells);
         return {
           tone: "success",
-          title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
-          body: bonuses.lines[0] || "Valid placement on this parcel."
+          title: `${def.name} on ${placementLabel}`,
+          body: bonuses.lines[0] || (isBigMarketItem(def.id)
+            ? `Valid ${getSelectedMarketOrientation()} 2-square placement.`
+            : "Valid placement on this parcel.")
         };
       }
       return {
         tone: "info",
         title: `${def.name} selected`,
         body: hasPendingMarketPurchase()
-          ? `${getPendingMarketPurchaseRemaining()} contractor${getPendingMarketPurchaseRemaining() === 1 ? "" : "s"} left in this paid stack | ${canCancelPendingMarketPurchase() ? "Use Cancel Purchase to back out before placing any of them. " : ""}${def.rulesText}`
+          ? `${getPendingMarketPurchaseRemaining()} contractor${getPendingMarketPurchaseRemaining() === 1 ? "" : "s"} left in this paid stack | ${isBigMarketItem(def.id) ? `Big market item in ${getSelectedMarketOrientation()} mode. Use Rotate to switch orientation. ` : ""}${canCancelPendingMarketPurchase() ? "Use Cancel Purchase to back out before placing any of them. " : ""}${def.rulesText}`
           : `${Core.formatMoney(def.cost)} for the top card, or ${Core.formatMoney((game.ui.selection.slotIndex + 1) * def.cost)} for this full stack | ${def.rulesText}`
       };
     }
@@ -3320,6 +3544,7 @@ function computeLayout(width, height) {
     }
     if (game.phase === "build") {
       if (hasPendingMarketPurchase()) {
+        if (isBigMarketItem(game.ui.selection.typeId)) actions.push({ label: "Rotate", onClick: rotateSelectedBigMarketItem });
         if (canCancelPendingMarketPurchase()) actions.push({ label: "Cancel Purchase", onClick: cancelPendingMarketPurchase, variant: "warning" });
         return actions;
       }
@@ -3712,16 +3937,80 @@ function computeLayout(width, height) {
   function drawCampTileVisual(rect, campTile) {
     const def = getCampDef(campTile.typeId);
     const stroke = def.tags.includes("premium") ? "rgba(255, 236, 175, 0.94)" : "rgba(64, 45, 31, 0.16)";
-    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.18, rect.y + rect.h * 0.18, rect.w * 0.64, rect.h * 0.64, Math.max(8, rect.w * 0.16), def.color, stroke, 2);
+    const bigPlacement = Array.isArray(campTile.occupiedCells) && campTile.occupiedCells.length > 1;
+    const insetX = bigPlacement ? rect.w * 0.08 : rect.w * 0.18;
+    const insetY = bigPlacement ? rect.h * 0.12 : rect.h * 0.18;
+    const bodyRect = {
+      x: rect.x + insetX,
+      y: rect.y + insetY,
+      w: rect.w - insetX * 2,
+      h: rect.h - insetY * 2
+    };
+    Core.drawRoundedRect(ctx, bodyRect.x, bodyRect.y, bodyRect.w, bodyRect.h, Math.max(8, Math.min(bodyRect.w, bodyRect.h) * 0.16), def.color, stroke, 2);
+    if (bigPlacement) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.34)";
+      ctx.lineWidth = Math.max(2, Math.min(bodyRect.w, bodyRect.h) * 0.04);
+      ctx.beginPath();
+      if (campTile.orientation === BIG_MARKET_ITEM_ORIENTATION.vertical) {
+        ctx.moveTo(bodyRect.x + 10, bodyRect.y + bodyRect.h / 2);
+        ctx.lineTo(bodyRect.x + bodyRect.w - 10, bodyRect.y + bodyRect.h / 2);
+      } else {
+        ctx.moveTo(bodyRect.x + bodyRect.w / 2, bodyRect.y + 10);
+        ctx.lineTo(bodyRect.x + bodyRect.w / 2, bodyRect.y + bodyRect.h - 10);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.fillStyle = "#fffdf8";
-    ctx.font = rect.w >= 58 ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = Math.max(rect.w, rect.h) >= 58 ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    Core.drawWrappedText(ctx, def.shortLabel, rect.x + rect.w / 2, rect.y + rect.h * 0.31, rect.w * 0.52, rect.w >= 58 ? 12 : 10, {
+    Core.drawWrappedText(ctx, def.shortLabel, rect.x + rect.w / 2, rect.y + rect.h * (bigPlacement ? 0.36 : 0.31), rect.w * (bigPlacement ? 0.72 : 0.52), Math.max(rect.w, rect.h) >= 58 ? 12 : 10, {
       font: ctx.font,
       align: "center",
       color: "#fffdf8",
       maxLines: 2
+    });
+  }
+
+  function getUniqueCampPlacementsFromBoard(board) {
+    const placements = [];
+    const seen = new Set();
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        const campTile = board[row][col].campTile;
+        if (!campTile) continue;
+        const placementId = campTile.placementId || `legacy-${row}-${col}-${campTile.typeId}`;
+        if (seen.has(placementId)) continue;
+        seen.add(placementId);
+        placements.push(campTile);
+      }
+    }
+    return placements;
+  }
+
+  function getCampPlacementRenderRect(geometry, campTile) {
+    const occupiedCells = getCampPlacementOccupiedCells(campTile, campTile.anchorRow, campTile.anchorCol);
+    const cellRects = occupiedCells.map((occupiedCell) => getCellRect(geometry, occupiedCell.row, occupiedCell.col));
+    if (!cellRects.length) return null;
+    const minX = Math.min(...cellRects.map((rect) => rect.x));
+    const minY = Math.min(...cellRects.map((rect) => rect.y));
+    const maxX = Math.max(...cellRects.map((rect) => rect.x + rect.w));
+    const maxY = Math.max(...cellRects.map((rect) => rect.y + rect.h));
+    const inset = Math.max(4, geometry.cellSize * 0.06);
+    return {
+      x: minX + inset,
+      y: minY + inset,
+      w: (maxX - minX) - inset * 2,
+      h: (maxY - minY) - inset * 2
+    };
+  }
+
+  function drawPlacedCampTiles(board, geometry) {
+    getUniqueCampPlacementsFromBoard(board).forEach((campTile) => {
+      const rect = getCampPlacementRenderRect(geometry, campTile);
+      if (rect) drawCampTileVisual(rect, campTile);
     });
   }
 
@@ -3763,7 +4052,6 @@ function computeLayout(width, height) {
       ctx.setLineDash([]);
     } else {
       drawLandscapeTileVisual(rect, cell.landscapeTile);
-      if (cell.campTile) drawCampTileVisual(rect, cell.campTile);
     }
     if (hovered) Core.drawRoundedRect(ctx, rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, Math.max(8, rect.w * 0.14), null, `rgba(215, 118, 56, ${pulse})`, 2);
     if (inspected) Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, Math.max(8, rect.w * 0.14), null, "rgba(56, 108, 69, 0.58)", 2);
@@ -3777,8 +4065,8 @@ function computeLayout(width, height) {
 
   function drawPlacementPreview(player, geometry) {
     if (!game.ui.hoveredCell || !game.ui.selection.source) return;
-    const rect = getCellRect(geometry, game.ui.hoveredCell.row, game.ui.hoveredCell.col);
     if (game.ui.selection.source === "landscape") {
+      const rect = getCellRect(geometry, game.ui.hoveredCell.row, game.ui.hoveredCell.col);
       const reasons = getLandscapePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
       ctx.save();
       ctx.globalAlpha = reasons.length ? 0.5 : 0.8;
@@ -3788,14 +4076,25 @@ function computeLayout(width, height) {
       if (reasons.length) drawInvalidPlacementX(rect);
       return;
     }
-    const reasons = getCampTilePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId);
-    if (getCell(player.board, game.ui.hoveredCell.row, game.ui.hoveredCell.col)?.landscapeTile) {
+    const placement = getCampTilePlacementEvaluation(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, getSelectedMarketOrientation());
+    const reasons = placement.reasons;
+    const allCellsReady = placement.cells.every((targetCell) => getCell(player.board, targetCell.row, targetCell.col)?.landscapeTile);
+    if (allCellsReady) {
+      const previewPlacement = {
+        typeId: game.ui.selection.typeId,
+        orientation: placement.orientation || BIG_MARKET_ITEM_ORIENTATION.horizontal,
+        occupiedCells: placement.cells
+      };
+      const previewRect = getCampPlacementRenderRect(geometry, previewPlacement);
       ctx.save();
       ctx.globalAlpha = reasons.length ? 0.5 : 0.82;
-      drawCampTileVisual(rect, { typeId: game.ui.selection.typeId });
+      if (previewRect) drawCampTileVisual(previewRect, previewPlacement);
       ctx.restore();
     }
-    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
+    placement.cells.forEach((targetCell) => {
+      const targetRect = getCellRect(geometry, targetCell.row, targetCell.col);
+      Core.drawRoundedRect(ctx, targetRect.x + 8, targetRect.y + 8, targetRect.w - 16, targetRect.h - 16, Math.max(8, targetRect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
+    });
   }
 
   function renderLandscapeRackCards(player, content) {
@@ -3878,6 +4177,7 @@ function computeLayout(width, height) {
       for (let row = 0; row < BOARD_ROWS; row += 1) {
         for (let col = 0; col < BOARD_COLS; col += 1) drawBoardCell(player.board, geometry, row, col);
       }
+      drawPlacedCampTiles(player.board, geometry);
       drawPlacementPreview(player, geometry);
       drawCurrentPlayerStump(geometry, player);
       return;
@@ -3887,6 +4187,7 @@ function computeLayout(width, height) {
     for (let row = 0; row < BOARD_ROWS; row += 1) {
       for (let col = 0; col < BOARD_COLS; col += 1) drawBoardCell(player.board, geometry, row, col);
     }
+    drawPlacedCampTiles(player.board, geometry);
     drawPlacementPreview(player, geometry);
     drawCurrentPlayerStump(geometry, player);
     if (geometry.rackRect) renderLandscapeRack(player, geometry.rackRect);
@@ -5093,9 +5394,9 @@ function computeLayout(width, height) {
     };
     const layoutWidth = viewport.w - 16;
     const introText = section === "sites"
-      ? "Each site page explains how that market item scores, which goals it can satisfy, and what the code is actually checking."
+      ? "Each site page explains how that market item scores, which goals it can satisfy, and what the code is actually checking. Big market items in the site group are RV Site with Full Hookups, Group Site, and Waterfront Site."
       : section === "amenities"
-        ? "This section covers every non-site market item in the market, including special attractions like Horse Riding."
+        ? "This section covers every non-site market item in the market, including special attractions like Horse Riding. Big market items in this section are Horse Riding and Event Pavilion."
         : "Each goal page explains the exact scoring check in plain English, including distance, adjacency, road, and count requirements.";
     const titleFont = compact ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
     const introLineHeight = compact ? 14 : 17;
