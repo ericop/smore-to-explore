@@ -81,7 +81,7 @@
         "Big market items use a two-square preview, can rotate between horizontal and vertical, and only place if both parcels are legal.",
         "You pay for the full stack up front, then place those contractors starting from the top tile first."
       ],
-      reminder: "Check the parcel first, then spend the money. If you tapped the wrong stack, you can cancel the purchase before placing any tile from it."
+      reminder: "Check the parcel first, then spend the money. If you tapped the wrong stack, you can cancel the full purchase and refund it."
     },
     {
       title: "Goals And Scoring",
@@ -843,22 +843,42 @@
     game.ui.selection = createSelection();
   }
 
-  function cancelPendingMarketPurchase() {
-    const player = getPlayer();
-    if (!player || !canCancelPendingMarketPurchase()) return;
-    const refundedCost = game.turn.marketPurchaseTotalCost;
-    const refundedCount = game.turn.marketPurchaseStack.length;
-    player.money += refundedCost;
+  function clearPendingMarketPurchaseState() {
     game.turn.marketPurchaseStack = [];
     game.turn.marketPurchaseIndex = 0;
     game.turn.marketPurchaseColumnIndex = null;
     game.turn.marketPurchaseDepth = null;
     game.turn.marketPurchaseTotalCost = 0;
+  }
+
+  function cancelPendingMarketPurchase() {
+    const player = getPlayer();
+    if (!player || !hasPendingMarketPurchase()) return;
+    const refundedCost = game.turn.marketPurchaseTotalCost;
+    const refundedCount = game.turn.marketPurchaseStack.length;
+    let removedCount = 0;
+
+    game.turn.marketPurchaseStack.forEach((entry) => {
+      if (!Array.isArray(entry.occupiedCells) || !entry.occupiedCells.length) return;
+      entry.occupiedCells.forEach((cellPos) => {
+        const boardCell = getCell(player.board, cellPos.row, cellPos.col);
+        if (boardCell?.campTile?.placementId === entry.placementId) {
+          boardCell.campTile = null;
+        }
+      });
+      removedCount += 1;
+    });
+
+    if (removedCount > 0) {
+      player.roundCampPlacements[game.roundIndex] = Math.max(0, player.roundCampPlacements[game.roundIndex] - removedCount);
+    }
+    player.money += refundedCost;
+    clearPendingMarketPurchaseState();
     clearSelection();
     game.ui.inspectedCell = null;
     game.ui.lastAttempt = null;
     setActiveScene("market");
-    setMessage(game, "info", "Market purchase canceled", `${refundedCount} contractor${refundedCount === 1 ? "" : "s"} were removed from the pending stack and ${Core.formatMoney(refundedCost)} was refunded.`);
+    setMessage(game, "info", "Market purchase canceled", `${refundedCount} contractor${refundedCount === 1 ? "" : "s"} were canceled and ${Core.formatMoney(refundedCost)} was refunded.${removedCount ? ` ${removedCount} placed contractor${removedCount === 1 ? "" : "s"} ${removedCount === 1 ? "was" : "were"} removed from the board.` : ""}`);
   }
 
   function clearTurnUi() {
@@ -903,7 +923,7 @@
   }
 
   function canCancelPendingMarketPurchase() {
-    return hasPendingMarketPurchase() && game.turn.marketPurchaseIndex === 0;
+    return hasPendingMarketPurchase();
   }
 
   function getPendingMarketPurchaseEntry() {
@@ -2063,9 +2083,9 @@
     const firstDef = getCampDef(stack[0].typeId);
     const columnLabel = game.market.columns[columnIndex].label;
     if (stack.length === 1) {
-      setMessage(game, "info", "Contractor selected", `${firstDef.name} was hired for ${Core.formatMoney(totalCost)}. Tap a valid parcel to place it, or use Cancel Purchase to back out before placing it.`);
+      setMessage(game, "info", "Contractor selected", `${firstDef.name} was hired for ${Core.formatMoney(totalCost)}. Tap a valid parcel to place it, or use Cancel Purchase to refund the whole purchase.`);
     } else {
-      setMessage(game, "info", "Column stack hired", `${stack.length} contractors were hired from ${columnLabel} for ${Core.formatMoney(totalCost)}. Place ${firstDef.name} first, then continue downward, or use Cancel Purchase before placing any of them.`);
+      setMessage(game, "info", "Column stack hired", `${stack.length} contractors were hired from ${columnLabel} for ${Core.formatMoney(totalCost)}. Place ${firstDef.name} first, then continue downward, or use Cancel Purchase to unwind the whole purchase.`);
     }
     setActiveScene("board");
   }
@@ -2152,6 +2172,8 @@
       const boardCell = getCell(player.board, targetCell.row, targetCell.col);
       if (boardCell) boardCell.campTile = builtPlacement;
     });
+    pending.placementId = builtPlacement.placementId;
+    pending.occupiedCells = builtPlacement.occupiedCells.map((cell) => ({ row: cell.row, col: cell.col }));
     player.roundCampPlacements[game.roundIndex] += 1;
     player.passedThisRound = false;
     game.ui.inspectedCell = { row: builtPlacement.anchorRow, col: builtPlacement.anchorCol };
@@ -2182,11 +2204,7 @@
     for (let refillIndex = 0; refillIndex <= game.turn.marketPurchaseDepth; refillIndex += 1) {
       refillMarketSlot(game, game.turn.marketPurchaseColumnIndex, refillIndex);
     }
-    game.turn.marketPurchaseStack = [];
-    game.turn.marketPurchaseIndex = 0;
-    game.turn.marketPurchaseColumnIndex = null;
-    game.turn.marketPurchaseDepth = null;
-    game.turn.marketPurchaseTotalCost = 0;
+    clearPendingMarketPurchaseState();
     game.turn.actionTaken = true;
     game.turn.actionType = "build";
     clearSelection();
@@ -3494,7 +3512,7 @@ function computeLayout(width, height) {
         tone: "info",
         title: `${def.name} selected`,
         body: hasPendingMarketPurchase()
-          ? `${getPendingMarketPurchaseRemaining()} contractor${getPendingMarketPurchaseRemaining() === 1 ? "" : "s"} left in this paid stack | ${isBigMarketItem(def.id) ? `Big market item in ${getSelectedMarketOrientation()} mode. Use Rotate to switch orientation. ` : ""}${canCancelPendingMarketPurchase() ? "Use Cancel Purchase to back out before placing any of them. " : ""}${def.rulesText}`
+          ? `${getPendingMarketPurchaseRemaining()} contractor${getPendingMarketPurchaseRemaining() === 1 ? "" : "s"} left in this paid stack | ${isBigMarketItem(def.id) ? `Big market item in ${getSelectedMarketOrientation()} mode. Use Rotate to switch orientation. ` : ""}${canCancelPendingMarketPurchase() ? "Use Cancel Purchase to refund and remove this whole paid stack. " : ""}${def.rulesText}`
           : `${Core.formatMoney(def.cost)} for the top card, or ${Core.formatMoney((game.ui.selection.slotIndex + 1) * def.cost)} for this full stack | ${def.rulesText}`
       };
     }
