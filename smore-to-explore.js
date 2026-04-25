@@ -97,7 +97,7 @@
       title: "Seasons And Progression",
       lead: "The full game runs through Early Summer, Mid Summer, and Late Summer. Each season expands the same board instead of starting over.",
       bullets: [
-        "The opening setup uses 10 starting landscape tiles.",
+        "The opening setup uses 14 starting landscape tiles.",
         "At the start of Mid and Late Summer, every player gains $50,000 and 8 new expansion landscape tiles.",
         "After Late Summer scoring, director goals are added and the highest total score wins."
       ],
@@ -252,10 +252,11 @@
   const STARTING_LANDSCAPE_HAND = [
     { typeId: "entrance", count: 1 },
     { typeId: "office", count: 1 },
-    { typeId: "road_straight", count: 4 },
+    { typeId: "road_straight", count: 7 },
     { typeId: "road_turn", count: 2 },
     { typeId: "road_cross", count: 1 },
-    { typeId: "road_t", count: 1 }
+    { typeId: "road_t", count: 1 },
+    { typeId: "lakeside_straight", count: 1 }
   ];
 
   const ROAD_POOL = [
@@ -739,7 +740,7 @@
     };
 
     setActiveRoundObjectives(state, 0);
-    pushFeed(state, "info", "Campground setup", "Each player places the 10 starting landscape tiles before contractor turns begin.");
+    pushFeed(state, "info", "Campground setup", "Each player places the 14 starting landscape tiles before contractor turns begin.");
     openHandoffOverlay(state);
     return state;
   }

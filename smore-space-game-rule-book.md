@@ -27,13 +27,14 @@ This rulebook follows the current coded rules in the digital prototype. When the
 - 1 player aid or Camp Director reminder card: optional
 - 1 score marker if you are using a shared score track
 - 1 money reserve
-- 10 starting landscape tiles:
+- 14 starting landscape tiles:
   - 1 Entrance to Camp
   - 1 Camp Office
-  - 4 Straight Road
+  - 7 Straight Road
   - 2 Road Turn
   - 1 Four-Way Cross
   - 1 Three-Way Split
+  - 1 Lakeside Road
 
 ### Expansion Landscape Tiles
 
@@ -96,7 +97,7 @@ The game supports 2 to 5 players. The code uses the same starting resources and 
 
 1. Give each player a campground board.
 2. Give each player $100,000.
-3. Give each player the same 10 starting landscape tiles.
+3. Give each player the same 14 starting landscape tiles.
 4. Shuffle the Early Summer, Mid Summer, Late Summer, and Camp Director goal decks separately.
 5. Reveal 4 Early Summer goals.
 6. Keep the Camp Director deck face down for now.
@@ -128,7 +129,7 @@ All three players begin with:
 
 - $100,000
 - an empty 8 x 5 campground board
-- the same 10 starting landscape tiles
+- the same 14 starting landscape tiles
 
 The table also has:
 
@@ -145,9 +146,9 @@ Shared Area
 +----------------------+  +-----------------------+
 
 Players in Order
-1. Eric    -> empty 8x5 board + $100,000 + 10 starting landscape tiles
-2. Chris   -> empty 8x5 board + $100,000 + 10 starting landscape tiles
-3. Eliana  -> empty 8x5 board + $100,000 + 10 starting landscape tiles
+1. Eric    -> empty 8x5 board + $100,000 + 14 starting landscape tiles
+2. Chris   -> empty 8x5 board + $100,000 + 14 starting landscape tiles
+3. Eliana  -> empty 8x5 board + $100,000 + 14 starting landscape tiles
 ```
 
 > [!IMPORTANT]
@@ -167,7 +168,7 @@ Each Summer has 3 parts:
 
 Players place every landscape tile currently in their hand before the market opens.
 
-- Early Summer: each player places 10 starting landscape tiles
+- Early Summer: each player places 14 starting landscape tiles
 - Mid Summer: each player places 8 expansion landscape tiles and gains $50,000
 - Late Summer: each player places 8 expansion landscape tiles and gains $50,000
 
@@ -203,7 +204,7 @@ Landscape tiles form the ground layer of your campground. Campsites and amenitie
 
 You do not draft landscape tiles during the phase. You already have them in hand.
 
-- In Early Summer each player starts with 10 fixed tiles.
+- In Early Summer each player starts with 14 fixed tiles.
 - In Mid Summer and Late Summer each player receives 8 new expansion tiles drawn from the code's weighted expansion pools.
 
 ### Rotation
@@ -799,7 +800,7 @@ Eric wins with 40 points.
 - choose 2 to 5 players
 - give each player an 8 x 5 board
 - give each player $100,000
-- give each player 10 starting landscape tiles
+- give each player 14 starting landscape tiles
 - reveal 4 Early Summer goals
 - fill the 6 x 8 contractor market
 - decide player order

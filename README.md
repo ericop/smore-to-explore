@@ -17,7 +17,7 @@ The current prototype focuses on:
 
 ## Core Flow
 
-1. Place the 10 starting landscape tiles.
+1. Place the 14 starting landscape tiles.
 2. Enter the build phase and buy camp tiles from the visible market.
 3. Score the current round's shared objectives.
 4. Receive 8 new landscape tiles and a new contractor budget grant.
