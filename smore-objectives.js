@@ -1120,10 +1120,14 @@
     ];
   }
 
-  window.SmoreObjectiveFactory = {
+  const api = {
     createDirectorObjectives,
     createEarlySummerObjectives,
     createLateSummerObjectives,
     createMidSummerObjectives
   };
+
+  const root = typeof globalThis !== "undefined" ? globalThis : window;
+  root.SmoreObjectiveFactory = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();

@@ -325,7 +325,7 @@
     };
   }
 
-  window.SmoreCore = {
+  const api = {
     setRng,
     clamp,
     sum,
@@ -340,4 +340,8 @@
     drawWrappedText,
     createCanvasController
   };
+
+  const root = typeof globalThis !== "undefined" ? globalThis : window;
+  root.SmoreCore = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();
