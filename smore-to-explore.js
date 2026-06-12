@@ -699,6 +699,7 @@
       landscapeInventory: cloneInventory(STARTING_LANDSCAPE_HAND),
       landscapePlacementStack: [],
       scoreLog: [],
+      buyLog: [],
       passedThisRound: false
     };
   }
@@ -2414,6 +2415,7 @@
     pending.placementId = builtPlacement.placementId;
     pending.occupiedCells = builtPlacement.occupiedCells.map((cell) => ({ row: cell.row, col: cell.col }));
     player.roundCampPlacements[game.roundIndex] += 1;
+    (player.buyLog || (player.buyLog = [])).push({ round: game.roundIndex, typeId: pending.typeId }); // pre-buyLog saved games restore without the field
     player.passedThisRound = false;
     game.ui.inspectedCell = { row: builtPlacement.anchorRow, col: builtPlacement.anchorCol };
 
