@@ -1,6 +1,12 @@
 (() => {
   "use strict";
 
+  let rng = Math.random;
+
+  function setRng(fn) {
+    rng = typeof fn === "function" ? fn : Math.random;
+  }
+
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
@@ -16,7 +22,7 @@
   function shuffle(list) {
     const copy = list.slice();
     for (let index = copy.length - 1; index > 0; index -= 1) {
-      const swapIndex = Math.floor(Math.random() * (index + 1));
+      const swapIndex = Math.floor(rng() * (index + 1));
       [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
     }
     return copy;
@@ -26,7 +32,7 @@
     const totalWeight = sum(list, (entry) => Math.max(0, weightSelector(entry)));
     if (!list.length || totalWeight <= 0) return list[0] || null;
 
-    let roll = Math.random() * totalWeight;
+    let roll = rng() * totalWeight;
     for (const entry of list) {
       roll -= Math.max(0, weightSelector(entry));
       if (roll <= 0) return entry;
@@ -320,6 +326,7 @@
   }
 
   window.SmoreCore = {
+    setRng,
     clamp,
     sum,
     unique,
