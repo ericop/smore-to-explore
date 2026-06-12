@@ -1944,7 +1944,162 @@
 
   function restartToStartScreen() {
     nameEditor?.close();
+    clearSavedGame();
     game = createBootstrapState(game.ui.configuredPlayerCount || 2);
+  }
+
+  const GAME_SAVE_STORAGE_KEY = "smore-to-explore-save-v1";
+
+  function sanitizeForSave(value, playerIndexOf) {
+    if (value === null || typeof value !== "object") {
+      return typeof value === "function" ? undefined : value;
+    }
+    if (playerIndexOf.has(value)) return { __playerRef: playerIndexOf.get(value) };
+    if (typeof value.evaluate === "function" && value.id) return { __objectiveRef: value.id };
+    if (Array.isArray(value)) return value.map((entry) => sanitizeForSave(entry, playerIndexOf));
+    const out = {};
+    for (const [key, entry] of Object.entries(value)) {
+      const sanitized = sanitizeForSave(entry, playerIndexOf);
+      if (sanitized !== undefined) out[key] = sanitized;
+    }
+    return out;
+  }
+
+  function buildSaveSnapshot() {
+    const playerIndexOf = new Map(game.players.map((player, index) => [player, index]));
+    const emptyRefs = new Map();
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      phase: game.phase,
+      roundIndex: game.roundIndex,
+      currentPlayerIndex: game.currentPlayerIndex,
+      directorRevealed: game.directorRevealed,
+      players: game.players.map((player) => sanitizeForSave(player, emptyRefs)),
+      roundDecks: sanitizeForSave(game.roundDecks, emptyRefs),
+      activeRoundObjectives: sanitizeForSave(game.activeRoundObjectives, emptyRefs),
+      directorDeck: sanitizeForSave(game.directorDeck, emptyRefs),
+      activeDirectorObjectives: sanitizeForSave(game.activeDirectorObjectives, emptyRefs),
+      market: sanitizeForSave(game.market, emptyRefs),
+      turn: sanitizeForSave(game.turn, emptyRefs),
+      message: sanitizeForSave(game.message, emptyRefs),
+      feed: sanitizeForSave(game.feed, emptyRefs),
+      overlay: game.overlay && game.overlay.kind !== "rename-players"
+        ? sanitizeForSave(game.overlay, playerIndexOf)
+        : null
+    };
+  }
+
+  function saveGameToStorage() {
+    if (game.ui?.appScreen !== APP_SCREENS.inGame || !game.players.length) return;
+    try {
+      localStorage.setItem(GAME_SAVE_STORAGE_KEY, JSON.stringify(buildSaveSnapshot()));
+    } catch (_error) {
+      // storage unavailable or full; resuming is best-effort
+    }
+  }
+
+  function readSavedGame() {
+    try {
+      const raw = localStorage.getItem(GAME_SAVE_STORAGE_KEY);
+      if (!raw) return null;
+      const snapshot = JSON.parse(raw);
+      if (!snapshot || snapshot.version !== 1) return null;
+      if (!Array.isArray(snapshot.players) || snapshot.players.length < 2 || snapshot.players.length > 5) return null;
+      return snapshot;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function clearSavedGame() {
+    runtime.savedGameAvailable = false;
+    try {
+      localStorage.removeItem(GAME_SAVE_STORAGE_KEY);
+    } catch (_error) {
+      // ignore
+    }
+  }
+
+  function buildObjectiveIndex() {
+    const index = new Map();
+    [
+      ...ObjectiveFactory.createEarlySummerObjectives(),
+      ...ObjectiveFactory.createMidSummerObjectives(),
+      ...ObjectiveFactory.createLateSummerObjectives(),
+      ...ObjectiveFactory.createDirectorObjectives()
+    ].forEach((objective) => index.set(objective.id, objective));
+    return index;
+  }
+
+  function restoreSavedGame(snapshot) {
+    const objectiveIndex = buildObjectiveIndex();
+    const revivedPlayers = [];
+    const revive = (value) => {
+      if (value === null || typeof value !== "object") return value;
+      if (value.__playerRef !== undefined) return revivedPlayers[value.__playerRef];
+      if (value.__objectiveRef !== undefined) return objectiveIndex.get(value.__objectiveRef) || null;
+      if (Array.isArray(value)) return value.map(revive);
+      const out = {};
+      for (const [key, entry] of Object.entries(value)) out[key] = revive(entry);
+      return out;
+    };
+    snapshot.players.forEach((player) => revivedPlayers.push(revive(player)));
+
+    const reviveObjectiveList = (list) => (revive(list) || []).filter(Boolean);
+    const activeRoundObjectives = reviveObjectiveList(snapshot.activeRoundObjectives);
+    const activeDirectorObjectives = reviveObjectiveList(snapshot.activeDirectorObjectives);
+    if (snapshot.activeRoundObjectives?.length && activeRoundObjectives.length !== snapshot.activeRoundObjectives.length) {
+      return false;
+    }
+
+    game = {
+      phase: snapshot.phase,
+      roundIndex: snapshot.roundIndex,
+      players: revivedPlayers,
+      currentPlayerIndex: Core.clamp(snapshot.currentPlayerIndex || 0, 0, revivedPlayers.length - 1),
+      roundDecks: {
+        early: reviveObjectiveList(snapshot.roundDecks?.early),
+        mid: reviveObjectiveList(snapshot.roundDecks?.mid),
+        late: reviveObjectiveList(snapshot.roundDecks?.late)
+      },
+      activeRoundObjectives,
+      directorDeck: reviveObjectiveList(snapshot.directorDeck),
+      activeDirectorObjectives,
+      directorRevealed: !!snapshot.directorRevealed,
+      market: revive(snapshot.market),
+      message: revive(snapshot.message) || { tone: "info", title: "Game resumed", body: "Pick up where the table left off." },
+      feed: revive(snapshot.feed) || [],
+      overlay: revive(snapshot.overlay),
+      ui: {
+        ...createUiState(revivedPlayers.length),
+        appScreen: APP_SCREENS.inGame,
+        returnScreen: APP_SCREENS.inGame,
+        showStartScreen: false,
+        gameActive: true
+      },
+      turn: revive(snapshot.turn) || createTurnState()
+    };
+    setActiveScene(getDefaultSceneForGameState(game));
+    return true;
+  }
+
+  function resumeSavedGameFromMenu() {
+    const snapshot = readSavedGame();
+    if (!snapshot) {
+      runtime.savedGameAvailable = false;
+      setMessage(game, "warning", "No saved game", "The saved session could not be loaded. Start a new game instead.");
+      return;
+    }
+    try {
+      if (!restoreSavedGame(snapshot)) {
+        clearSavedGame();
+        setMessage(game, "warning", "Resume failed", "The saved session was incomplete, so it was discarded.");
+      }
+    } catch (_error) {
+      clearSavedGame();
+      setMessage(game, "warning", "Resume failed", "The saved session could not be restored, so it was discarded.");
+    }
   }
 
   function openPauseMenu() {
@@ -4895,6 +5050,15 @@ function computeLayout(width, height) {
     const pickerWidth = stackPrimary ? primaryWidth : sideBySidePickerWidth;
 
     let flowY = body.y + pillHeight + introHeight;
+    if (runtime.savedGameAvailable) {
+      const resumeRect = { x: rowX, y: flowY, w: primaryWidth, h: short ? 44 : 52 };
+      drawScreenButton(resumeRect, "Resume Saved Game", resumeSavedGameFromMenu, {
+        id: "menu-resume",
+        variant: "success",
+        font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      flowY = resumeRect.y + resumeRect.h + actionGap;
+    }
     const pickerRect = { x: rowX, y: flowY, w: pickerWidth, h: rowHeight };
     const labelTop = short ? 8 : 10;
     const buttonTop = short ? 30 : compact ? 38 : 42;
@@ -6052,6 +6216,13 @@ function computeLayout(width, height) {
     if (game.ui.appScreen !== APP_SCREENS.inGame) return false;
     return !!(game.ui.lastAttempt || getEffectivePreviewCell());
   }
+
+  runtime.savedGameAvailable = !!readSavedGame();
+  setInterval(saveGameToStorage, 5000);
+  window.addEventListener("pagehide", saveGameToStorage);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") saveGameToStorage();
+  });
 
   function renderFrame(now) {
     const heartbeatDue = now - runtime.lastRenderAt > 500;
