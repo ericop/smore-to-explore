@@ -2080,6 +2080,31 @@
       },
       turn: revive(snapshot.turn) || createTurnState()
     };
+
+    let maxPlacementId = 0;
+    revivedPlayers.forEach((player) => {
+      for (let row = 0; row < BOARD_ROWS; row += 1) {
+        for (let col = 0; col < BOARD_COLS; col += 1) {
+          const placementId = getCell(player.board, row, col)?.campTile?.placementId;
+          const match = typeof placementId === "string" && placementId.match(/^camp-placement-(\d+)$/);
+          if (match) maxPlacementId = Math.max(maxPlacementId, Number(match[1]));
+        }
+      }
+    });
+    nextCampPlacementId = Math.max(nextCampPlacementId, maxPlacementId + 1);
+
+    if (game.phase === "build" && game.turn.marketPurchaseStack.length > game.turn.marketPurchaseIndex) {
+      const pendingEntry = game.turn.marketPurchaseStack[game.turn.marketPurchaseIndex];
+      game.ui.selection = {
+        source: "market",
+        typeId: pendingEntry.typeId,
+        rotation: 0,
+        orientation: BIG_MARKET_ITEM_ORIENTATION.horizontal,
+        columnIndex: game.turn.marketPurchaseColumnIndex,
+        slotIndex: pendingEntry.slotIndex
+      };
+    }
+
     setActiveScene(getDefaultSceneForGameState(game));
     return true;
   }
@@ -2683,8 +2708,22 @@
   }
 
   const CLICK_SLOP_PX = 10;
+  const CLICK_MAX_DURATION_MS = 1200;
 
-  function handlePointerMove(point) {
+  function activeGesturePointerId() {
+    if (runtime.pendingClick) return runtime.pendingClick.pointerId;
+    if (runtime.overlayScrollDrag) return runtime.overlayScrollDrag.pointerId;
+    if (runtime.frontScrollDrag) return runtime.frontScrollDrag.pointerId;
+    return null;
+  }
+
+  function isForeignPointer(event) {
+    const owner = activeGesturePointerId();
+    return owner !== null && owner !== (event?.pointerId ?? -1);
+  }
+
+  function handlePointerMove(point, event) {
+    if (isForeignPointer(event)) return;
     runtime.needsRender = true;
     const pending = runtime.pendingClick;
     if (pending && !pending.moved) {
@@ -2708,6 +2747,8 @@
   }
 
   function handlePointerDown(point, event) {
+    if (isForeignPointer(event)) return;
+    const pointerId = event?.pointerId ?? -1;
     runtime.needsRender = true;
     runtime.lastPointerType = event?.pointerType || "mouse";
     const overlayScrollState = runtime.overlayScroll;
@@ -2716,6 +2757,7 @@
         runtime.overlayScrollDrag = {
           kind: "overlay",
           mode: "thumb",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.overlayScroll
         };
@@ -2728,6 +2770,7 @@
         runtime.overlayScrollDrag = {
           kind: "overlay",
           mode: "thumb",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.overlayScroll
         };
@@ -2737,6 +2780,7 @@
         runtime.overlayScrollDrag = {
           kind: "overlay",
           mode: "content",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.overlayScroll
         };
@@ -2749,6 +2793,7 @@
         runtime.frontScrollDrag = {
           kind: "howto",
           mode: "thumb",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.howToScroll
         };
@@ -2761,6 +2806,7 @@
         runtime.frontScrollDrag = {
           kind: "howto",
           mode: "thumb",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.howToScroll
         };
@@ -2770,6 +2816,7 @@
         runtime.frontScrollDrag = {
           kind: "howto",
           mode: "content",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.howToScroll
         };
@@ -2778,17 +2825,19 @@
 
     const target = findTargetAtPoint(point);
     runtime.pendingClick = target && target.onClick
-      ? { targetId: target.id, start: point, moved: false }
+      ? { targetId: target.id, start: point, moved: false, pointerId, at: performance.now() }
       : null;
   }
 
-  function handlePointerUp(point) {
+  function handlePointerUp(point, event) {
+    if (isForeignPointer(event)) return;
     runtime.needsRender = true;
     const pending = runtime.pendingClick;
     runtime.pendingClick = null;
     runtime.overlayScrollDrag = null;
     runtime.frontScrollDrag = null;
     if (!pending || pending.moved || !point) return;
+    if (performance.now() - pending.at > CLICK_MAX_DURATION_MS) return;
     const target = findTargetAtPoint(point);
     if (target && target.id === pending.targetId && target.onClick) target.onClick();
   }
@@ -2810,7 +2859,8 @@
     return true;
   }
 
-  function handlePointerLeave() {
+  function handlePointerLeave(point, event) {
+    if (isForeignPointer(event)) return;
     runtime.needsRender = true;
     runtime.hoveredTargetId = null;
     game.ui.hoveredCell = null;
@@ -5029,6 +5079,7 @@ function computeLayout(width, height) {
     const { shell, body } = drawFrontScreenShell("Smore to Explore", GAME_PITCH);
     const pillHeight = renderHeroPillRow(body);
 
+    const resumeAvailable = !!runtime.savedGameAvailable;
     let introHeight = 0;
     if (!short) {
       const introMetrics = Core.drawWrappedText(ctx, GAME_INTRO, body.x, body.y + pillHeight + 16, Math.min(body.w, compact ? body.w : 560), compact ? 18 : 20, {
@@ -5038,11 +5089,11 @@ function computeLayout(width, height) {
       });
       introHeight = introMetrics.height + (compact ? 30 : 36);
     } else {
-      introHeight = 14;
+      introHeight = resumeAvailable ? 6 : 14;
     }
 
-    const actionGap = compact ? 12 : 16;
-    const rowHeight = short ? 64 : compact ? 78 : 86;
+    const actionGap = short && resumeAvailable ? 8 : compact ? 12 : 16;
+    const rowHeight = short ? (resumeAvailable ? 56 : 64) : compact ? 78 : 86;
     const primaryWidth = compact ? body.w : Math.min(body.w, 620);
     const rowX = compact ? body.x : body.x + (body.w - primaryWidth) / 2;
     const sideBySidePickerWidth = compact ? Math.max(176, Math.round(primaryWidth * 0.52)) : Math.max(240, Math.round(primaryWidth * 0.46));
@@ -5050,8 +5101,8 @@ function computeLayout(width, height) {
     const pickerWidth = stackPrimary ? primaryWidth : sideBySidePickerWidth;
 
     let flowY = body.y + pillHeight + introHeight;
-    if (runtime.savedGameAvailable) {
-      const resumeRect = { x: rowX, y: flowY, w: primaryWidth, h: short ? 44 : 52 };
+    if (resumeAvailable) {
+      const resumeRect = { x: rowX, y: flowY, w: primaryWidth, h: short ? 40 : 52 };
       drawScreenButton(resumeRect, "Resume Saved Game", resumeSavedGameFromMenu, {
         id: "menu-resume",
         variant: "success",
@@ -5095,7 +5146,7 @@ function computeLayout(width, height) {
 
     flowY = startRect.y + startRect.h + actionGap;
     const secondarySideBySide = !compact || short || primaryWidth >= 420;
-    const secondaryH = short ? 42 : compact ? 52 : 54;
+    const secondaryH = short ? (resumeAvailable ? 38 : 42) : compact ? 52 : 54;
     if (secondarySideBySide) {
       const secondaryWidth = (primaryWidth - actionGap) / 2;
       drawScreenButton({ x: rowX, y: flowY, w: secondaryWidth, h: secondaryH }, "How to Play", () => openHowToScreen(0), {
@@ -5119,13 +5170,17 @@ function computeLayout(width, height) {
       });
     }
 
-    ctx.fillStyle = "rgba(82, 61, 44, 0.7)";
-    ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const footerText = "Local prototype | Best on one shared device around the table";
-    const footerFits = ctx.measureText(footerText).width <= shell.w - 24;
-    ctx.fillText(footerFits ? footerText : "Local prototype | Pass-and-play", shell.x + shell.w / 2, shell.y + shell.h - 20);
+    const menuBottom = flowY + secondaryH + (secondarySideBySide ? 0 : secondaryH + actionGap + 4);
+    const footerY = shell.y + shell.h - 20;
+    if (footerY - 10 > menuBottom) {
+      ctx.fillStyle = "rgba(82, 61, 44, 0.7)";
+      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const footerText = "Local prototype | Best on one shared device around the table";
+      const footerFits = ctx.measureText(footerText).width <= shell.w - 24;
+      ctx.fillText(footerFits ? footerText : "Local prototype | Pass-and-play", shell.x + shell.w / 2, footerY);
+    }
   }
 
   function getTutorialStepLayout(step, width, compact) {

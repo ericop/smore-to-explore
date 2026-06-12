@@ -56,6 +56,19 @@ Goal: confirm the existing game is robust on phones, tablets, and desktop before
 
 Done when: `/verify-ui-dev-browser` passes on representative mobile and desktop viewports, plus a manual smoke test on a real phone via the live URL.
 
+### Phase 0 status (executed on branch `phase-0-foundation`)
+
+A 51-agent audit (six dimensions, two adversarial verifiers per finding) confirmed 14 issues; all confirmed issues plus the credible completeness-critic gaps were fixed and browser-verified:
+
+- Input model: clicks commit on pointerup with a 10px drag slop (drag-to-scroll no longer fires buttons), clip-aware hit testing (scrolled-out overlay buttons untappable), multi-touch and mouse-button guards, try/catch around the render loop.
+- Layout: the severity-9 phone-landscape board collapse is fixed (compact chrome, rack relocated to the context pane during setup); adaptive start menu for narrow/short viewports; tap-target minimums (38px scene tabs, hit-inset top-bar icons, 3-column action grid fallback); panel subtitles stack in narrow panes.
+- Touch parity (pulled forward from Phase 4 track 2): two-tap placement, where the first non-mouse tap arms the ghost preview (including both parcels of 2-square items) with validity text and a tap-again hint, the second commits; mouse unchanged.
+- Performance: idle render throttling (needsRender flag + animation check + 500ms heartbeat), memoized market legality scans, text-wrap caching; the market slot blocked-footer now states the real reason instead of a hardcoded water message.
+- Session persistence (completeness-critic gap, severity 8): 5s autosave plus pagehide/visibilitychange to localStorage, objectives saved by id, Resume Saved Game on the menu, graceful discard of corrupt snapshots.
+- Head metadata: SVG favicon + 180px touch icon, web manifest (standalone, subpath-safe), theme-color, description, OpenGraph/Twitter cards, interactive-widget viewport hint.
+
+Deferred watch-items (re-test in Phase 3 playtests): mixed-DPI monitor drag leaves canvas blurry until any resize (cosmetic, self-healing); rename-dialog vs on-screen keyboard on small phones (Android hint shipped; iOS recoverable); printable-rulebook discoverability (Phase 4 covers it); market pagination volume on phones (12 page-flips to see all 48 slots; Phase 4 UX).
+
 ## Phase 1: Engine seam, AI players, and a headless self-play harness
 
 Goal: deliver computer opponents (workstream 4) and the harness that makes Phase 2 balancing reliable. This is the largest phase. Build it in the order below; each step is independently testable.
