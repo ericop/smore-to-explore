@@ -473,7 +473,10 @@
     frontScroll: null,
     frontScrollDrag: null,
     overlayScroll: null,
-    overlayScrollDrag: null
+    overlayScrollDrag: null,
+    pendingClick: null,
+    activeClipRect: null,
+    renderErrorCount: 0
   };
 
   const controller = Core.createCanvasController({
@@ -2429,7 +2432,8 @@
       enabled: options.enabled !== false,
       scope: options.scope || "main",
       kind: options.kind || "button",
-      data: options.data || null
+      data: options.data || null,
+      clipRect: options.clipRect || runtime.activeClipRect
     };
     runtime.targets.push(target);
     return target.id;
@@ -2443,6 +2447,7 @@
       if (!target.enabled) continue;
       if (frontOnly && target.scope !== "front") continue;
       if (overlayOnly && target.scope !== "overlay") continue;
+      if (target.clipRect && !Core.pointInRect(point, target.clipRect)) continue;
       if (Core.pointInRect(point, target.rect)) return target;
     }
     return null;
@@ -2480,7 +2485,15 @@
     return true;
   }
 
+  const CLICK_SLOP_PX = 10;
+
   function handlePointerMove(point) {
+    const pending = runtime.pendingClick;
+    if (pending && !pending.moved) {
+      const dx = point.x - pending.start.x;
+      const dy = point.y - pending.start.y;
+      if (dx * dx + dy * dy > CLICK_SLOP_PX * CLICK_SLOP_PX) pending.moved = true;
+    }
     if (runtime.overlayScrollDrag && handleOverlayScrollDrag(point)) {
       runtime.hoveredTargetId = null;
       game.ui.hoveredCell = null;
@@ -2564,13 +2577,19 @@
     }
 
     const target = findTargetAtPoint(point);
-    if (!target || !target.onClick) return;
-    target.onClick();
+    runtime.pendingClick = target && target.onClick
+      ? { targetId: target.id, start: point, moved: false }
+      : null;
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(point) {
+    const pending = runtime.pendingClick;
+    runtime.pendingClick = null;
     runtime.overlayScrollDrag = null;
     runtime.frontScrollDrag = null;
+    if (!pending || pending.moved || !point) return;
+    const target = findTargetAtPoint(point);
+    if (target && target.id === pending.targetId && target.onClick) target.onClick();
   }
 
   function handleWheel(point, event) {
@@ -2594,6 +2613,7 @@
     game.ui.hoveredCell = null;
     runtime.overlayScrollDrag = null;
     runtime.frontScrollDrag = null;
+    runtime.pendingClick = null;
   }
 
   function getPhaseLabel() {
@@ -4569,6 +4589,7 @@ function computeLayout(width, height) {
     ctx.beginPath();
     ctx.rect(clipRect.x, clipRect.y, clipRect.w, clipRect.h);
     ctx.clip();
+    runtime.activeClipRect = clipRect;
 
     return {
       clipRect,
@@ -4580,6 +4601,7 @@ function computeLayout(width, height) {
 
   function endOverlayScrollViewport(viewport, scrollMeta) {
     ctx.restore();
+    runtime.activeClipRect = null;
     runtime.overlayScroll = null;
 
     if (scrollMeta.maxScroll <= 0) return;
@@ -5902,19 +5924,19 @@ function computeLayout(width, height) {
     });
   }
 
-  function renderFrame(now) {
+  function renderFrameBody(now) {
     runtime.now = now;
     runtime.layout = computeLayout(controller.state.width, controller.state.height);
     runtime.targets = [];
     runtime.frontScroll = null;
     runtime.overlayScroll = null;
+    runtime.activeClipRect = null;
     cleanupTransientState();
     if (!game.directorRevealed && game.ui.objectiveTab === "director") game.ui.objectiveTab = "shared";
 
     renderBackground();
     if (game.ui.appScreen !== APP_SCREENS.inGame || frontScreenActive()) {
       renderFrontScreen();
-      requestAnimationFrame(renderFrame);
       return;
     }
     renderGameTopBar(runtime.layout.topBar);
@@ -5930,6 +5952,17 @@ function computeLayout(width, height) {
     renderBottomBar(runtime.layout.bottomBar);
 
     renderOverlay();
+  }
+
+  function renderFrame(now) {
+    try {
+      renderFrameBody(now);
+    } catch (error) {
+      runtime.renderErrorCount += 1;
+      if (runtime.renderErrorCount <= 3 || runtime.renderErrorCount % 600 === 0) {
+        console.error("Smore to Explore render error (frame kept alive):", error);
+      }
+    }
     requestAnimationFrame(renderFrame);
   }
 

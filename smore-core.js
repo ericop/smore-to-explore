@@ -229,15 +229,19 @@
     }
 
     function handlePointerMove(event) {
+      if (!event.isPrimary) return;
       if (onPointerMove) onPointerMove(toCanvasPoint(event), event);
     }
 
     function handlePointerDown(event) {
+      if (!event.isPrimary) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
       if (event.pointerType !== "mouse") canvas.setPointerCapture?.(event.pointerId);
       if (onPointerDown) onPointerDown(toCanvasPoint(event), event);
     }
 
     function handlePointerUp(event) {
+      if (!event.isPrimary) return;
       if (onPointerUp) onPointerUp(toCanvasPoint(event), event);
     }
 
