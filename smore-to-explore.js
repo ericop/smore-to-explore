@@ -1,14 +1,20 @@
 (() => {
   "use strict";
 
-  const Core = window.SmoreCore;
-  const ObjectiveFactory = window.SmoreObjectiveFactory;
-  const appShell = document.getElementById("appShell");
-  const canvas = document.getElementById("gameCanvas");
-  const nameEditorHost = document.getElementById("nameEditorHost");
-  const fallbackMessage = document.getElementById("fallbackMessage");
+  const GLOBAL_ROOT = typeof globalThis !== "undefined" ? globalThis : window;
+  const HEADLESS = !!(GLOBAL_ROOT.__SMORE_HOST__ && GLOBAL_ROOT.__SMORE_HOST__.headless);
+  const Core = GLOBAL_ROOT.SmoreCore;
+  const ObjectiveFactory = GLOBAL_ROOT.SmoreObjectiveFactory;
+  const appShell = HEADLESS ? null : document.getElementById("appShell");
+  const canvas = HEADLESS ? null : document.getElementById("gameCanvas");
+  const nameEditorHost = HEADLESS ? null : document.getElementById("nameEditorHost");
+  const fallbackMessage = HEADLESS ? null : document.getElementById("fallbackMessage");
 
-  if (!Core || !ObjectiveFactory || !canvas || !appShell) {
+  if (!Core || !ObjectiveFactory) {
+    if (fallbackMessage) fallbackMessage.classList.add("visible");
+    throw new Error("Smore to Explore needs the core helpers and objective data.");
+  }
+  if (!HEADLESS && (!canvas || !appShell)) {
     if (fallbackMessage) fallbackMessage.classList.add("visible");
     throw new Error("Smore to Explore needs the core helpers, objective data, and the main canvas shell.");
   }
@@ -482,17 +488,25 @@
     lastPointerType: "mouse"
   };
 
-  const controller = Core.createCanvasController({
-    canvas,
-    onResize: handleResize,
-    onPointerMove: handlePointerMove,
-    onPointerDown: handlePointerDown,
-    onPointerUp: handlePointerUp,
-    onWheel: handleWheel,
-    onPointerLeave: handlePointerLeave
-  });
+  const controller = HEADLESS
+    ? {
+        canvas: null,
+        context: null,
+        state: { width: 1280, height: 800, pixelRatio: 1, isFullscreen: false, fullscreenSupported: false },
+        toggleFullscreen: async () => false,
+        resize: () => {}
+      }
+    : Core.createCanvasController({
+        canvas,
+        onResize: handleResize,
+        onPointerMove: handlePointerMove,
+        onPointerDown: handlePointerDown,
+        onPointerUp: handlePointerUp,
+        onWheel: handleWheel,
+        onPointerLeave: handlePointerLeave
+      });
 
-  const nameEditor = createNameEditorController();
+  const nameEditor = HEADLESS ? null : createNameEditorController();
 
   const ctx = controller.context;
   let game = createBootstrapState(2);
@@ -6272,12 +6286,14 @@ function computeLayout(width, height) {
     return !!(game.ui.lastAttempt || getEffectivePreviewCell());
   }
 
-  runtime.savedGameAvailable = !!readSavedGame();
-  setInterval(saveGameToStorage, 5000);
-  window.addEventListener("pagehide", saveGameToStorage);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") saveGameToStorage();
-  });
+  if (!HEADLESS) {
+    runtime.savedGameAvailable = !!readSavedGame();
+    setInterval(saveGameToStorage, 5000);
+    window.addEventListener("pagehide", saveGameToStorage);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") saveGameToStorage();
+    });
+  }
 
   function renderFrame(now) {
     const heartbeatDue = now - runtime.lastRenderAt > 500;
@@ -6298,5 +6314,55 @@ function computeLayout(width, height) {
     requestAnimationFrame(renderFrame);
   }
 
-  requestAnimationFrame(renderFrame);
+  if (!HEADLESS) {
+    requestAnimationFrame(renderFrame);
+  }
+
+  const engine = {
+    HEADLESS,
+    setGame: (next) => { game = next; },
+    getGame: () => game,
+    getPlayer,
+    createGameState,
+    createEvaluationContext,
+    getLandscapePlacementReasons,
+    getCampTilePlacementReasons,
+    getCampTilePlacementEvaluation,
+    getBlockedMarketPurchaseReason,
+    canPlaceCampTileAnywhere,
+    isLandscapePhaseReadyToContinue,
+    countRemainingLandscapeTiles,
+    hasPendingMarketPurchase,
+    getPendingMarketPurchaseEntry,
+    canCancelPendingMarketPurchase,
+    cancelPendingMarketPurchase,
+    isBigMarketItem,
+    getCampDef,
+    getLandscapeDef,
+    getCell,
+    selectLandscapeTile,
+    selectMarketTile,
+    attemptLandscapePlacement,
+    attemptCampPlacement,
+    rotateSelectedBigMarketItem,
+    undoLandscapePlacement,
+    clearSelection,
+    passRemainingLandscapeTiles,
+    passCurrentPlayerForRound,
+    continueLandscapeFlow,
+    endBuildTurnOrScore,
+    scoreRoundForAllPlayers,
+    startNextRound,
+    applyFinalScoring,
+    validateFinishedLandscapePhase,
+    closeOverlay,
+    BOARD_ROWS,
+    BOARD_COLS,
+    CAMP_TILE_DEFS,
+    LANDSCAPE_TILE_DEFS,
+    MARKET_COLUMNS,
+    ROUND_DEFS
+  };
+  GLOBAL_ROOT.SmoreEngine = engine;
+  if (typeof module !== "undefined" && module.exports) module.exports = engine;
 })();
