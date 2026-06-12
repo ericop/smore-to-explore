@@ -328,8 +328,10 @@
         continue;
       }
 
-      // Priority 3: place the best-scoring remaining tile, or pass once the
-      // best candidate drops below the strategy's floor and the layout is valid.
+      // Priority 3: place the best-scoring remaining tile. Landscape tiles are
+      // free board capacity, so the AI lays its whole hand; under-built boards
+      // strand camp purchases later (no legal parcels) far more than a weak
+      // tile placement ever costs.
       const candidates = [];
       for (const entry of hand) {
         candidates.push(...enumerateLandscapeCandidates(engine, game, player, entry.typeId));
@@ -339,11 +341,6 @@
         return;
       }
       const best = pickBestLandscapeCandidate(engine, game, player, strategy, rng, candidates);
-      if (best.score < strategy.landscapeFloor) {
-        engine.passRemainingLandscapeTiles();
-        if (game.turn.actionTaken) return;
-        // Pass was refused (layout not valid yet), so keep building.
-      }
       placeLandscapeCandidate(engine, game, best.candidate);
     }
   }
@@ -414,40 +411,52 @@
     return best;
   }
 
+  const MAX_BUY_DEPTH = 4;
+
+  // Scores stacks SEQUENTIALLY: each entry is valued at its best placement on
+  // a hypothetical board that already contains the earlier entries, so deep
+  // stacks earn honestly diminishing returns instead of summing eight
+  // tiles' independently-best spots (which made the AI sweep whole columns).
   function enumerateScoredBuyOptions(engine, game, player, strategy, rng) {
-    const before = engine.createEvaluationContext(game, player);
-    const bestByType = new Map();
-
-    // Best hypothetical placement per tile type on the CURRENT board.
-    // Earlier stack placements change later ones; this is the accepted
-    // approximation, memoized once per decision point.
-    const bestForType = (typeId) => {
-      if (!bestByType.has(typeId)) {
-        const placements = enumerateCampPlacements(engine, game, player, typeId);
-        if (!placements.length) {
-          recordZeroLegal(typeId);
-          bestByType.set(typeId, null);
-        } else {
-          bestByType.set(typeId, pickBestCampPlacement(engine, game, player, strategy, rng, typeId, placements, before));
-        }
-      }
-      return bestByType.get(typeId);
-    };
-
     const thrift = strategy.weights.thrift || 0;
     const options = [];
+
     for (let columnIndex = 0; columnIndex < game.market.columns.length; columnIndex += 1) {
       const slots = game.market.columns[columnIndex].slots;
-      for (let depth = 0; depth < slots.length; depth += 1) {
+      const maxDepth = Math.min(slots.length, MAX_BUY_DEPTH);
+      if (!maxDepth) continue;
+
+      const hypoBoard = structuredClone(player.board);
+      const hypoPlayer = { ...player, board: hypoBoard };
+      let runningContext = engine.createEvaluationContext(game, hypoPlayer);
+      let runningValue = 0;
+
+      for (let depth = 0; depth < maxDepth; depth += 1) {
         const stack = slots.slice(0, depth + 1).map((slot, index) => ({ typeId: slot.typeId, slotIndex: index }));
         const totalCost = stack.reduce((sum, entry) => sum + engine.getCampDef(entry.typeId).cost, 0);
         if (totalCost > player.money) break;
-        if (engine.getBlockedMarketPurchaseReason(game, player, stack)) continue;
-        if (!stack.every((entry) => engine.canPlaceCampTileAnywhere(game, player, entry.typeId))) continue;
-        const entryScores = stack.map((entry) => bestForType(entry.typeId));
-        if (entryScores.some((entry) => !entry)) continue;
-        const value = entryScores.reduce((sum, entry) => sum + entry.score, 0) - thrift * totalCost / COST_SCALE;
-        options.push({ columnIndex, depth, totalCost, value });
+        if (engine.getBlockedMarketPurchaseReason(game, player, stack)) break;
+
+        const typeId = slots[depth].typeId;
+        const placements = enumerateCampPlacements(engine, game, hypoPlayer, typeId);
+        if (!placements.length) {
+          recordZeroLegal(typeId);
+          break;
+        }
+
+        let best = null;
+        for (const placement of placements) {
+          const after = evaluateHypotheticalPlacement(engine, game, hypoPlayer, (board) => {
+            applyHypotheticalCampTile(board, typeId, placement);
+          });
+          const score = scoreContextDiff(engine, game, player, runningContext, after, strategy.weights) + rng() * TIEBREAK_SCALE;
+          if (!best || score > best.score) best = { placement, score, after };
+        }
+
+        applyHypotheticalCampTile(hypoBoard, typeId, best.placement);
+        runningContext = best.after;
+        runningValue += best.score;
+        options.push({ columnIndex, depth, totalCost, value: runningValue - thrift * totalCost / COST_SCALE });
       }
     }
     return options;

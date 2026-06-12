@@ -286,26 +286,35 @@
   ];
 
   const CAMP_TILE_DEFS = {
-    rustic_tent_forest: { id: "rustic_tent_forest", name: "Rustic Tent Forest", shortLabel: "Rustic", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#b47b4f", accent: "#7c4f2d", tags: ["tent", "rustic", "family"], description: "Flexible camping that is happiest in wooded or scenic corners.", rulesText: "Can go on almost any non-office parcel. Forest and scenic terrain score better." },
-    tent_electric: { id: "tent_electric", name: "Tent Site with Electric Hookup", shortLabel: "E-Tent", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#7db987", accent: "#477b53", tags: ["tent", "electric", "comfort"], description: "A road-adjacent tent site with more comfort built in.", rulesText: "Needs at least one road edge on the landscape below." },
-    rv_full_hookups: { id: "rv_full_hookups", name: "RV Site with Full Hookups", shortLabel: "RV", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#73a4c6", accent: "#3f6d90", tags: ["rv", "premium"], description: "A premium RV pad that wants strong drive-up access.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 2 road edges." },
-    group_site: { id: "group_site", name: "Group Site", shortLabel: "Group", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#d5965d", accent: "#945927", tags: ["group", "family"], description: "A larger social camping zone for scouts, reunions, and clubs.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
-    cabin: { id: "cabin", name: "Cabin", shortLabel: "Cabin", marketGroup: "camp", kind: "lodging", copies: 5, cost: CAMP_TILE_COST, color: "#d07d58", accent: "#8d4a30", tags: ["cabin", "premium", "comfort"], description: "Comfort lodging that still wants proper road access.", rulesText: "Needs at least one road edge on the landscape below." },
-    waterfront_site: { id: "waterfront_site", name: "Waterfront Site", shortLabel: "Waterfront", marketGroup: "camp", kind: "lodging", copies: 5, cost: CAMP_TILE_COST, color: "#6aaec8", accent: "#2f7087", tags: ["waterfront", "premium"], description: "A premium scenic site that must sit on a water-edge landscape.", rulesText: "Big market item. Occupies 2 squares. At least 1 half must be on a water-edge parcel." },
-    horse_riding: { id: "horse_riding", name: "Horse Riding", shortLabel: "Horse", marketGroup: "camp", kind: "activity", copies: 2, cost: CAMP_TILE_COST, color: "#a97b63", accent: "#6c4c3d", tags: ["horse", "activity", "premium"], description: "A rare specialty attraction that wants road access and a scenic feel.", rulesText: "Big market item. Occupies 2 squares. Both halves need road access and scenic, forest, or border placement." },
-    firewood: { id: "firewood", name: "Firewood", shortLabel: "Wood", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#b97142", accent: "#784421", tags: ["amenity", "campfire"], description: "A flexible support amenity that thrives near tents and group camping.", rulesText: "Very flexible. Best beside tent-heavy camping areas." },
-    pool: { id: "pool", name: "Pool", shortLabel: "Pool", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#79bfde", accent: "#397394", tags: ["amenity", "family", "premium"], description: "A family favorite that wants good access and nearby campers.", rulesText: "Needs at least one road edge on the landscape below." },
-    bike_rental: { id: "bike_rental", name: "Bike Rental", shortLabel: "Bikes", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#87a56f", accent: "#4b6535", tags: ["amenity", "activity"], description: "Works best off a longer connected road network.", rulesText: "Needs at least one road edge. It loves long connected road runs." },
-    canoe_rental: { id: "canoe_rental", name: "Canoe Rental", shortLabel: "Canoes", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#72b6b0", accent: "#37746f", tags: ["amenity", "activity", "waterfront"], description: "A lakeside activity amenity that needs direct water access.", rulesText: "Needs a water-edge landscape tile." },
-    event_pavilion: { id: "event_pavilion", name: "Event Pavilion", shortLabel: "Pavilion", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#d8a96d", accent: "#9a6a31", tags: ["amenity", "family", "event"], description: "A social gathering space for busy clusters and group campers.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
+    rustic_tent_forest: { id: "rustic_tent_forest", name: "Rustic Tent Forest", shortLabel: "Rustic", marketGroup: "camp", kind: "campsite", copies: 10, cost: CAMP_TILE_COST, color: "#b47b4f", accent: "#7c4f2d", tags: ["tent", "rustic", "family"], description: "Flexible camping that is happiest in wooded or scenic corners.", rulesText: "Can go on almost any non-office parcel. Forest and scenic terrain score better." },
+    tent_electric: { id: "tent_electric", name: "Tent Site with Electric Hookup", shortLabel: "E-Tent", marketGroup: "camp", kind: "campsite", copies: 11, cost: CAMP_TILE_COST, color: "#7db987", accent: "#477b53", tags: ["tent", "electric", "comfort"], description: "A road-adjacent tent site with more comfort built in.", rulesText: "Needs at least one road edge on the landscape below." },
+    rv_full_hookups: { id: "rv_full_hookups", name: "RV Site with Full Hookups", shortLabel: "RV", marketGroup: "camp", kind: "campsite", copies: 11, cost: CAMP_TILE_COST, color: "#73a4c6", accent: "#3f6d90", tags: ["rv", "premium"], description: "A premium RV pad that wants strong drive-up access.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 2 road edges." },
+    group_site: { id: "group_site", name: "Group Site", shortLabel: "Group", marketGroup: "camp", kind: "campsite", copies: 7, cost: CAMP_TILE_COST, color: "#d5965d", accent: "#945927", tags: ["group", "family"], description: "A larger social camping zone for scouts, reunions, and clubs.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
+    cabin: { id: "cabin", name: "Cabin", shortLabel: "Cabin", marketGroup: "camp", kind: "lodging", copies: 11, cost: CAMP_TILE_COST, color: "#d07d58", accent: "#8d4a30", tags: ["cabin", "premium", "comfort"], description: "Comfort lodging that still wants proper road access.", rulesText: "Needs at least one road edge on the landscape below." },
+    waterfront_site: { id: "waterfront_site", name: "Waterfront Site", shortLabel: "Waterfront", marketGroup: "camp", kind: "lodging", copies: 10, cost: CAMP_TILE_COST, color: "#6aaec8", accent: "#2f7087", tags: ["waterfront", "premium"], description: "A premium scenic site that must sit on a water-edge landscape.", rulesText: "Big market item. Occupies 2 squares. At least 1 half must be on a water-edge parcel." },
+    horse_riding: { id: "horse_riding", name: "Horse Riding", shortLabel: "Horse", marketGroup: "camp", kind: "activity", copies: 4, cost: CAMP_TILE_COST, color: "#a97b63", accent: "#6c4c3d", tags: ["horse", "activity", "premium"], description: "A rare specialty attraction that wants road access and a scenic feel.", rulesText: "Big market item. Occupies 2 squares. Both halves need road access and scenic, forest, or border placement." },
+    firewood: { id: "firewood", name: "Firewood", shortLabel: "Wood", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#b97142", accent: "#784421", tags: ["amenity", "campfire"], description: "A flexible support amenity that thrives near tents and group camping.", rulesText: "Very flexible. Best beside tent-heavy camping areas." },
+    pool: { id: "pool", name: "Pool", shortLabel: "Pool", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#79bfde", accent: "#397394", tags: ["amenity", "family", "premium"], description: "A family favorite that wants good access and nearby campers.", rulesText: "Needs at least one road edge on the landscape below." },
+    bike_rental: { id: "bike_rental", name: "Bike Rental", shortLabel: "Bikes", marketGroup: "amenity", kind: "amenity", copies: 3, cost: CAMP_TILE_COST, color: "#87a56f", accent: "#4b6535", tags: ["amenity", "activity"], description: "Works best off a longer connected road network.", rulesText: "Needs at least one road edge. It loves long connected road runs." },
+    canoe_rental: { id: "canoe_rental", name: "Canoe Rental", shortLabel: "Canoes", marketGroup: "amenity", kind: "amenity", copies: 3, cost: CAMP_TILE_COST, color: "#72b6b0", accent: "#37746f", tags: ["amenity", "activity", "waterfront"], description: "A lakeside activity amenity that needs direct water access.", rulesText: "Needs a water-edge landscape tile." },
+    event_pavilion: { id: "event_pavilion", name: "Event Pavilion", shortLabel: "Pavilion", marketGroup: "amenity", kind: "amenity", copies: 3, cost: CAMP_TILE_COST, color: "#d8a96d", accent: "#9a6a31", tags: ["amenity", "family", "event"], description: "A social gathering space for busy clusters and group campers.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
     hiking_trail: { id: "hiking_trail", name: "Hiking Trail", shortLabel: "Trail", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#87ab68", accent: "#4f6a33", tags: ["amenity", "activity", "scenic"], description: "A scenic feature that likes forest parcels, edges, and quieter cells.", rulesText: "Place on scenic or border parcels. Forest parcels are especially strong." },
-    ice_cream_vending: { id: "ice_cream_vending", name: "Ice Cream Vending", shortLabel: "Ice Cream", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#efb2c8", accent: "#b56f8d", tags: ["amenity", "family", "premium"], description: "A central-traffic treat stop for busy parts of camp.", rulesText: "Needs at least one road edge and likes the middle of the board." },
-    playground: { id: "playground", name: "Playground", shortLabel: "Play", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#f0a26a", accent: "#b56331", tags: ["amenity", "family"], description: "Best near group and family camping.", rulesText: "Needs at least one road edge. It shines near Group Sites and tent camping." },
-    bathrooms: { id: "bathrooms", name: "Bathrooms", shortLabel: "Bath", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#b496d8", accent: "#735796", tags: ["amenity", "service"], description: "A practical campground service tile added for prototype clarity.", rulesText: "Uses the same strong-road-access rule as RV sites." }
+    ice_cream_vending: { id: "ice_cream_vending", name: "Ice Cream Vending", shortLabel: "Ice Cream", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#efb2c8", accent: "#b56f8d", tags: ["amenity", "family", "premium"], description: "A central-traffic treat stop for busy parts of camp.", rulesText: "Needs at least one road edge and likes the middle of the board." },
+    playground: { id: "playground", name: "Playground", shortLabel: "Play", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#f0a26a", accent: "#b56331", tags: ["amenity", "family"], description: "Best near group and family camping.", rulesText: "Needs at least one road edge. It shines near Group Sites and tent camping." },
+    bathrooms: { id: "bathrooms", name: "Bathrooms", shortLabel: "Bath", marketGroup: "amenity", kind: "amenity", copies: 5, cost: CAMP_TILE_COST, color: "#b496d8", accent: "#735796", tags: ["amenity", "service"], description: "A practical campground service tile added for prototype clarity.", rulesText: "Uses the same strong-road-access rule as RV sites." }
   };
 
-  const AMENITY_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "amenity");
-  const CAMP_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "camp");
+  // Finite per-column draw decks: the component manifest for the market.
+  // Counts are literal card counts for the whole game; decks deplete and never re-roll.
+  const MARKET_COLUMN_DECKS = {
+    "amenity-1": [["bathrooms", 5], ["firewood", 4], ["event_pavilion", 3], ["ice_cream_vending", 4]],
+    "amenity-2": [["pool", 4], ["playground", 4], ["bike_rental", 3], ["canoe_rental", 3], ["hiking_trail", 2]],
+    "camp-1": [["rustic_tent_forest", 6], ["tent_electric", 6], ["group_site", 4]],
+    "camp-2": [["cabin", 7], ["tent_electric", 5], ["rustic_tent_forest", 4]],
+    "camp-3": [["rv_full_hookups", 7], ["waterfront_site", 5], ["cabin", 4]],
+    "camp-4": [["horse_riding", 4], ["waterfront_site", 5], ["rv_full_hookups", 4], ["group_site", 3]]
+  };
+  const MARKET_VISIBLE_SLOTS = 8;
   const BIG_MARKET_ITEM_IDS = new Set([
     "rv_full_hookups",
     "group_site",
@@ -1022,28 +1031,39 @@
     return createInventoryFromTypeIds(typeIds);
   }
 
+  function buildColumnDeck(columnId) {
+    const composition = MARKET_COLUMN_DECKS[columnId] || [];
+    const cards = [];
+    composition.forEach(([typeId, count]) => {
+      for (let copy = 0; copy < count; copy += 1) cards.push({ typeId });
+    });
+    return Core.shuffle(cards);
+  }
+
   function createMarket() {
     return {
-      columns: MARKET_COLUMNS.map((column) => ({
-        ...column,
-        slots: Array.from({ length: 8 }, () => createMarketSlot(column.category))
-      }))
+      columns: MARKET_COLUMNS.map((column) => {
+        const deck = buildColumnDeck(column.id);
+        return { ...column, slots: deck.splice(0, MARKET_VISIBLE_SLOTS), deck };
+      })
     };
   }
 
-  function createMarketSlot(category) {
-    const pool = category === "amenity" ? AMENITY_MARKET_POOL : CAMP_MARKET_POOL;
-    return {
-      typeId: Core.pickWeighted(pool, (entry) => entry.copies).id
-    };
+  function topUpMarketColumn(column) {
+    if (!column.deck) column.deck = [];
+    while (column.slots.length < MARKET_VISIBLE_SLOTS && column.deck.length) {
+      column.slots.push(column.deck.shift());
+    }
   }
 
-  function refillMarketSlot(gameState, columnIndex, slotIndex) {
-    gameState.market.columns[columnIndex].slots[slotIndex] = createMarketSlot(gameState.market.columns[columnIndex].category);
+  function removeBoughtSlotsAndRefill(gameState, columnIndex, depth) {
+    const column = gameState.market.columns[columnIndex];
+    column.slots.splice(0, depth + 1);
+    topUpMarketColumn(column);
   }
 
   function refreshMarket(gameState) {
-    gameState.market = createMarket();
+    gameState.market.columns.forEach(topUpMarketColumn);
   }
 
   function setActiveRoundObjectives(gameState, roundIndex) {
@@ -2468,9 +2488,7 @@
     const completedCount = game.turn.marketPurchaseStack.length;
     const completedCost = game.turn.marketPurchaseTotalCost;
     const completedColumnLabel = game.market.columns[game.turn.marketPurchaseColumnIndex].label;
-    for (let refillIndex = 0; refillIndex <= game.turn.marketPurchaseDepth; refillIndex += 1) {
-      refillMarketSlot(game, game.turn.marketPurchaseColumnIndex, refillIndex);
-    }
+    removeBoughtSlotsAndRefill(game, game.turn.marketPurchaseColumnIndex, game.turn.marketPurchaseDepth);
     clearPendingMarketPurchaseState();
     game.turn.actionTaken = true;
     game.turn.actionType = "build";
@@ -2504,7 +2522,9 @@
     }
 
     game.phase = "build";
-    game.currentPlayerIndex = 0;
+    // Rotate the build-phase starting player each round: the shared market
+    // gives the first buyer a real edge, so the seat that opens it must change.
+    game.currentPlayerIndex = game.roundIndex % game.players.length;
     game.turn = createTurnState();
     clearTurnUi();
     setActiveScene("market");
@@ -4593,7 +4613,8 @@ function computeLayout(width, height) {
     const startIndex = game.ui.marketPage * columnsPerPage;
     const visibleColumns = game.market.columns.slice(startIndex, startIndex + columnsPerPage);
     const slotsPerPage = isPortrait ? 4 : 8;
-    const totalSlotPages = Math.max(1, Math.ceil(8 / slotsPerPage));
+    const maxVisibleSlotCount = Math.max(1, ...visibleColumns.map((column) => column.slots.length));
+    const totalSlotPages = Math.max(1, Math.ceil(maxVisibleSlotCount / slotsPerPage));
     game.ui.marketSlotPage = Core.clamp(game.ui.marketSlotPage || 0, 0, totalSlotPages - 1);
     const slotStartIndex = game.ui.marketSlotPage * slotsPerPage;
 
@@ -4616,7 +4637,7 @@ function computeLayout(width, height) {
       }, { id: "market-next", enabled: game.ui.marketPage < totalPages - 1 });
     }
     if (isPortrait && totalSlotPages > 1) {
-      ctx.fillText(`Contractors ${slotStartIndex + 1}-${Math.min(8, slotStartIndex + slotsPerPage)} of 8`, content.x + content.w / 2, content.y + 46);
+      ctx.fillText(`Contractors ${slotStartIndex + 1}-${Math.min(maxVisibleSlotCount, slotStartIndex + slotsPerPage)} of ${maxVisibleSlotCount}`, content.x + content.w / 2, content.y + 46);
       drawButton({ x: content.x, y: content.y + 32, w: 42, h: 30 }, "<", () => {
         game.ui.marketSlotPage = Math.max(0, game.ui.marketSlotPage - 1);
       }, { id: "market-slot-prev", enabled: game.ui.marketSlotPage > 0 });
@@ -4641,7 +4662,19 @@ function computeLayout(width, height) {
         : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(fitText(column.label, colRect.w - 16, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2);
+      ctx.fillText(fitText(column.label, colRect.w - 16, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 - 7);
+      ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.fillStyle = "rgba(75, 55, 38, 0.72)";
+      const deckCount = column.deck ? column.deck.length : 0;
+      ctx.fillText(deckCount ? `${deckCount} more in deck` : "Last cards out", colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 + 9);
+
+      if (!column.slots.length) {
+        const emptyRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap, w: colRect.w, h: rowHeight };
+        Core.drawRoundedRect(ctx, emptyRect.x, emptyRect.y, emptyRect.w, emptyRect.h, 16, "rgba(240, 233, 222, 0.7)", "rgba(108,80,54,0.12)", 1);
+        ctx.fillStyle = "rgba(95, 74, 53, 0.6)";
+        ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.fillText("Sold out for this game", emptyRect.x + emptyRect.w / 2, emptyRect.y + emptyRect.h / 2);
+      }
 
       column.slots.slice(slotStartIndex, slotStartIndex + slotsPerPage).forEach((slot, visibleSlotIndex) => {
         const def = getCampDef(slot.typeId);
