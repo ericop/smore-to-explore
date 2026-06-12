@@ -2936,7 +2936,7 @@ function computeLayout(width, height) {
     ctx.stroke();
     ctx.font = "700 8px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = "rgba(65, 42, 25, 0.88)";
-    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, textCenterX, line2Y);
+    ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, rect.w - 10, ctx.font), textCenterX, line2Y);
     ctx.restore();
   }
 
@@ -4754,70 +4754,88 @@ function computeLayout(width, height) {
 
   function renderMainMenuScreen() {
     const compact = isFrontScreenCompact();
+    const short = isVeryShortViewport();
     const { shell, body } = drawFrontScreenShell("Smore to Explore", GAME_PITCH);
     const pillHeight = renderHeroPillRow(body);
 
-    const introMetrics = Core.drawWrappedText(ctx, GAME_INTRO, body.x, body.y + pillHeight + 16, Math.min(body.w, compact ? body.w : 560), compact ? 18 : 20, {
-      font: compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.86)",
-      maxLines: 2
-    });
+    let introHeight = 0;
+    if (!short) {
+      const introMetrics = Core.drawWrappedText(ctx, GAME_INTRO, body.x, body.y + pillHeight + 16, Math.min(body.w, compact ? body.w : 560), compact ? 18 : 20, {
+        font: compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: "rgba(82, 61, 44, 0.86)",
+        maxLines: 2
+      });
+      introHeight = introMetrics.height + (compact ? 30 : 36);
+    } else {
+      introHeight = 14;
+    }
 
-    const actionTop = body.y + pillHeight + introMetrics.height + (compact ? 30 : 36);
     const actionGap = compact ? 12 : 16;
-    const rowHeight = compact ? 78 : 86;
+    const rowHeight = short ? 64 : compact ? 78 : 86;
     const primaryWidth = compact ? body.w : Math.min(body.w, 620);
     const rowX = compact ? body.x : body.x + (body.w - primaryWidth) / 2;
-    const pickerWidth = compact ? Math.max(176, Math.round(primaryWidth * 0.52)) : Math.max(240, Math.round(primaryWidth * 0.46));
-    const startWidth = primaryWidth - pickerWidth - actionGap;
-    const pickerRect = { x: rowX, y: actionTop, w: pickerWidth, h: rowHeight };
-    const startRect = { x: pickerRect.x + pickerRect.w + actionGap, y: actionTop, w: startWidth, h: rowHeight };
+    const sideBySidePickerWidth = compact ? Math.max(176, Math.round(primaryWidth * 0.52)) : Math.max(240, Math.round(primaryWidth * 0.46));
+    const stackPrimary = primaryWidth - sideBySidePickerWidth - actionGap < 120;
+    const pickerWidth = stackPrimary ? primaryWidth : sideBySidePickerWidth;
+
+    let flowY = body.y + pillHeight + introHeight;
+    const pickerRect = { x: rowX, y: flowY, w: pickerWidth, h: rowHeight };
+    const labelTop = short ? 8 : 10;
+    const buttonTop = short ? 30 : compact ? 38 : 42;
+    const buttonH = short ? 26 : compact ? 28 : 32;
+    const buttonW = compact ? 52 : 58;
+    const countMid = short ? 44 : compact ? 54 : 58;
 
     Core.drawRoundedRect(ctx, pickerRect.x, pickerRect.y, pickerRect.w, pickerRect.h, 22, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
     ctx.fillStyle = "#4a3524";
     ctx.font = compact ? "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText("Player Count", pickerRect.x + pickerRect.w / 2, pickerRect.y + 10);
-    drawScreenButton({ x: pickerRect.x + 14, y: pickerRect.y + (compact ? 38 : 42), w: compact ? 52 : 58, h: compact ? 28 : 32 }, "-", () => adjustConfiguredPlayerCount(-1), {
+    ctx.fillText("Player Count", pickerRect.x + pickerRect.w / 2, pickerRect.y + labelTop);
+    drawScreenButton({ x: pickerRect.x + 14, y: pickerRect.y + buttonTop, w: buttonW, h: buttonH }, "-", () => adjustConfiguredPlayerCount(-1), {
       id: "menu-player-minus",
       enabled: game.ui.configuredPlayerCount > 2
     });
-    drawScreenButton({ x: pickerRect.x + pickerRect.w - (compact ? 66 : 72), y: pickerRect.y + (compact ? 38 : 42), w: compact ? 52 : 58, h: compact ? 28 : 32 }, "+", () => adjustConfiguredPlayerCount(1), {
+    drawScreenButton({ x: pickerRect.x + pickerRect.w - buttonW - 14, y: pickerRect.y + buttonTop, w: buttonW, h: buttonH }, "+", () => adjustConfiguredPlayerCount(1), {
       id: "menu-player-plus",
       enabled: game.ui.configuredPlayerCount < 5
     });
-    ctx.font = compact ? "800 24px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 30px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = short ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif" : compact ? "800 24px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 30px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(game.ui.configuredPlayerCount), pickerRect.x + pickerRect.w / 2, pickerRect.y + (compact ? 54 : 58));
+    ctx.fillText(String(game.ui.configuredPlayerCount), pickerRect.x + pickerRect.w / 2, pickerRect.y + countMid);
 
+    const startRect = stackPrimary
+      ? { x: rowX, y: pickerRect.y + pickerRect.h + actionGap, w: primaryWidth, h: short ? 48 : 56 }
+      : { x: pickerRect.x + pickerRect.w + actionGap, y: pickerRect.y, w: primaryWidth - pickerWidth - actionGap, h: rowHeight };
     drawScreenButton(startRect, "Start New Game", startNewGameFromMenu, {
       id: "menu-start",
       variant: "primary",
       font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
 
-    const secondaryTop = startRect.y + startRect.h + actionGap;
-    if (compact) {
-      drawScreenButton({ x: rowX, y: secondaryTop, w: primaryWidth, h: 52 }, "How to Play", () => openHowToScreen(0), {
+    flowY = startRect.y + startRect.h + actionGap;
+    const secondarySideBySide = !compact || short || primaryWidth >= 420;
+    const secondaryH = short ? 42 : compact ? 52 : 54;
+    if (secondarySideBySide) {
+      const secondaryWidth = (primaryWidth - actionGap) / 2;
+      drawScreenButton({ x: rowX, y: flowY, w: secondaryWidth, h: secondaryH }, "How to Play", () => openHowToScreen(0), {
         id: "menu-howto",
         variant: "warning",
-        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
-      drawScreenButton({ x: rowX, y: secondaryTop + 64, w: primaryWidth, h: 46 }, "About", openAboutScreen, {
+      drawScreenButton({ x: rowX + secondaryWidth + actionGap, y: flowY, w: secondaryWidth, h: secondaryH }, "About", openAboutScreen, {
         id: "menu-about",
-        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     } else {
-      const secondaryWidth = (primaryWidth - actionGap) / 2;
-      drawScreenButton({ x: rowX, y: secondaryTop, w: secondaryWidth, h: 54 }, "How to Play", () => openHowToScreen(0), {
+      drawScreenButton({ x: rowX, y: flowY, w: primaryWidth, h: secondaryH }, "How to Play", () => openHowToScreen(0), {
         id: "menu-howto",
         variant: "warning",
-        font: "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
-      drawScreenButton({ x: rowX + secondaryWidth + actionGap, y: secondaryTop, w: secondaryWidth, h: 54 }, "About", openAboutScreen, {
+      drawScreenButton({ x: rowX, y: flowY + secondaryH + actionGap, w: primaryWidth, h: 46 }, "About", openAboutScreen, {
         id: "menu-about",
-        font: "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     }
 
@@ -4825,7 +4843,9 @@ function computeLayout(width, height) {
     ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("Local prototype | Best on one shared device around the table", shell.x + shell.w / 2, shell.y + shell.h - 20);
+    const footerText = "Local prototype | Best on one shared device around the table";
+    const footerFits = ctx.measureText(footerText).width <= shell.w - 24;
+    ctx.fillText(footerFits ? footerText : "Local prototype | Pass-and-play", shell.x + shell.w / 2, shell.y + shell.h - 20);
   }
 
   function getTutorialStepLayout(step, width, compact) {
