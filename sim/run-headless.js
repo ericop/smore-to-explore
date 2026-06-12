@@ -1,10 +1,14 @@
-// Headless full-game runner with random-legal moves.
+// Headless full-game runner with per-seat policies (random-legal or AI strategy).
 // Drives one or more complete games through the real engine mutators
 // (no rules are reimplemented here) and reports standings.
 //
 // Usage:
 //   node sim/run-headless.js --games 100 --players 2 --seed-base 1000
+//   node sim/run-headless.js --games 20 --players 2 --strategies premium,balanced
 //   node sim/run-headless.js --games 1 --players 3 --seed-base 42 --determinism-check
+//
+// --strategies takes a comma list of strategy ids (or "random"), padded and
+// cycled to the player count. Default is all-random.
 
 "use strict";
 
@@ -12,10 +16,12 @@ globalThis.__SMORE_HOST__ = { headless: true };
 const Core = require("../smore-core.js");
 require("../smore-objectives.js");
 const engine = require("../smore-to-explore.js");
+const Ai = require("../smore-ai.js");
 
 const STEP_CAP = 2000;
 const LANDSCAPE_RETRY_LIMIT = 3;
 const ORIENTATIONS = ["horizontal", "vertical"];
+const BUY_PROFILE_DISTANCE_FLOOR = 0.15;
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -186,8 +192,8 @@ function pickWeightedOption(rand, options) {
   return options[options.length - 1];
 }
 
-// Plays one build action (buy a stack and place it, or pass) and ends the turn.
-function playBuildTurn(game, rand) {
+// Plays one random build action (buy a stack and place it, or pass) and ends the turn.
+function playBuildTurn(game, rand, recordBuy) {
   const player = engine.getPlayer();
   const options = enumerateBuyOptions(game, player);
 
@@ -236,6 +242,7 @@ function playBuildTurn(game, rand) {
       throw new Error(`attemptCampPlacement did not advance for ${pending.typeId} at `
         + `${placement.row},${placement.col} (${placement.orientation}).`);
     }
+    if (recordBuy) recordBuy(pending.typeId);
   }
 
   if (!game.turn.actionTaken) throw new Error("Market stack completed without ending the action.");
@@ -256,11 +263,47 @@ function dismissBlockingOverlay(game) {
   throw new Error(`Unexpected blocking overlay kind: ${kind}`);
 }
 
-function simulateGame({ seed, playerCount }) {
+function seatLabel(seat) {
+  return seat.kind === "ai" ? seat.strategyId : "random";
+}
+
+function getSeatStrategy(seat) {
+  const strategy = Ai.getStrategy(seat.strategyId);
+  if (!strategy) throw new Error(`Unknown strategy id: ${seat.strategyId}`);
+  return strategy;
+}
+
+function normalizeSeats(seats, playerCount) {
+  if (Array.isArray(seats) && seats.length) return seats;
+  return Array.from({ length: playerCount || 2 }, () => ({ kind: "random" }));
+}
+
+// Ranks with ties sharing the average of their positions (1-based).
+function computeRanksBySeat(players) {
+  const order = players
+    .map((player, seatIndex) => ({ seatIndex, score: player.score }))
+    .sort((a, b) => b.score - a.score);
+  const ranks = new Array(players.length).fill(0);
+  let index = 0;
+  while (index < order.length) {
+    let end = index;
+    while (end + 1 < order.length && order[end + 1].score === order[index].score) end += 1;
+    const averageRank = (index + 1 + end + 1) / 2;
+    for (let cursor = index; cursor <= end; cursor += 1) ranks[order[cursor].seatIndex] = averageRank;
+    index = end + 1;
+  }
+  return ranks;
+}
+
+// Each seat is { kind: "random" } or { kind: "ai", strategyId }.
+function simulateGame({ seed, seats, playerCount }) {
+  const seatConfigs = normalizeSeats(seats, playerCount);
   const rand = mulberry32(seed);
   Core.setRng(rand);
-  engine.setGame(engine.createGameState(playerCount));
+  Ai.resetTelemetry();
+  engine.setGame(engine.createGameState(seatConfigs.length));
   const game = engine.getGame();
+  const seatBuys = seatConfigs.map(() => ({}));
 
   let turns = 0;
   let retriesUsed = 0;
@@ -276,17 +319,30 @@ function simulateGame({ seed, playerCount }) {
     }
 
     if (game.phase === "setupLandscape") {
-      retriesUsed += playLandscapePhase(game, rand);
-      engine.continueLandscapeFlow();
+      const seat = seatConfigs[game.currentPlayerIndex];
+      if (seat.kind === "ai") {
+        Ai.takeTurn(engine, game, getSeatStrategy(seat), rand);
+      } else {
+        retriesUsed += playLandscapePhase(game, rand);
+        engine.continueLandscapeFlow();
+      }
       // Both continue paths (next player, or open the build market) hand off
       // through a blocking overlay, so no overlay means no progress was made.
-      if (!game.overlay) throw new Error("continueLandscapeFlow made no progress.");
+      if (!game.overlay) throw new Error("Landscape turn made no progress.");
       turns += 1;
       continue;
     }
 
     if (game.phase === "build") {
-      playBuildTurn(game, rand);
+      const seat = seatConfigs[game.currentPlayerIndex];
+      const seatIndex = game.currentPlayerIndex;
+      if (seat.kind === "ai") {
+        Ai.takeTurn(engine, game, getSeatStrategy(seat), rand);
+      } else {
+        playBuildTurn(game, rand, (typeId) => {
+          seatBuys[seatIndex][typeId] = (seatBuys[seatIndex][typeId] || 0) + 1;
+        });
+      }
       turns += 1;
       continue;
     }
@@ -307,6 +363,16 @@ function simulateGame({ seed, playerCount }) {
     throw new Error(`Seed ${seed}: terminal state is inconsistent (phase ${game.phase}, overlay ${game.overlay?.kind}).`);
   }
 
+  // AI seats record their buys through the SmoreAi telemetry collector.
+  const aiTelemetry = Ai.getTelemetry();
+  for (const [seatIndexKey, buys] of Object.entries(aiTelemetry.buysBySeat)) {
+    const target = seatBuys[Number(seatIndexKey)];
+    for (const [typeId, count] of Object.entries(buys)) {
+      target[typeId] = (target[typeId] || 0) + count;
+    }
+  }
+
+  const ranksBySeat = computeRanksBySeat(game.players);
   const standings = game.players
     .slice()
     .sort((a, b) => b.score - a.score)
@@ -316,18 +382,56 @@ function simulateGame({ seed, playerCount }) {
     roundScores: player.roundScores.slice(),
     directorScore: player.directorScore
   }));
+  const seatStats = game.players.map((player, seatIndex) => ({
+    seatIndex,
+    policy: seatLabel(seatConfigs[seatIndex]),
+    name: player.name,
+    score: player.score,
+    money: player.money,
+    rank: ranksBySeat[seatIndex],
+    roundScores: player.roundScores.slice(),
+    directorScore: player.directorScore,
+    buys: seatBuys[seatIndex],
+    buyLog: (player.buyLog || []).slice(),
+    scoreLog: player.scoreLog
+  }));
 
   Core.setRng(null);
-  return { seed, playerCount, standings, perRound, turns, retriesUsed };
+  return {
+    seed,
+    seats: seatConfigs,
+    playerCount: seatConfigs.length,
+    standings,
+    perRound,
+    turns,
+    retriesUsed,
+    seatStats,
+    placementTelemetry: aiTelemetry.placement
+  };
+}
+
+function buildSeats(strategyList, playerCount) {
+  if (!strategyList) return Array.from({ length: playerCount }, () => ({ kind: "random" }));
+  const tokens = strategyList.split(",").map((token) => token.trim()).filter(Boolean);
+  if (!tokens.length) throw new Error("--strategies needs a comma-separated list");
+  return Array.from({ length: playerCount }, (_, index) => {
+    const token = tokens[index % tokens.length];
+    if (token === "random") return { kind: "random" };
+    if (!Ai.getStrategy(token)) {
+      throw new Error(`Unknown strategy id: ${token} (valid: random, ${Ai.STRATEGIES.map((s) => s.id).join(", ")})`);
+    }
+    return { kind: "ai", strategyId: token };
+  });
 }
 
 function parseArgs(argv) {
-  const args = { games: 1, players: 2, seedBase: 1000, determinismCheck: false };
+  const args = { games: 1, players: 2, seedBase: 1000, strategies: null, determinismCheck: false };
   for (let index = 2; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === "--games") args.games = Number(argv[++index]);
     else if (flag === "--players") args.players = Number(argv[++index]);
     else if (flag === "--seed-base") args.seedBase = Number(argv[++index]);
+    else if (flag === "--strategies") args.strategies = argv[++index];
     else if (flag === "--determinism-check") args.determinismCheck = true;
     else throw new Error(`Unknown flag: ${flag}`);
   }
@@ -337,9 +441,9 @@ function parseArgs(argv) {
   return args;
 }
 
-function runDeterminismCheck(seed, playerCount) {
-  const first = simulateGame({ seed, playerCount });
-  const second = simulateGame({ seed, playerCount });
+function runDeterminismCheck(seed, seats) {
+  const first = simulateGame({ seed, seats });
+  const second = simulateGame({ seed, seats });
   const a = JSON.stringify({ standings: first.standings, perRound: first.perRound, turns: first.turns });
   const b = JSON.stringify({ standings: second.standings, perRound: second.perRound, turns: second.turns });
   if (a !== b) {
@@ -352,20 +456,72 @@ function runDeterminismCheck(seed, playerCount) {
   console.log(a);
 }
 
+function formatHistogram(buys) {
+  const entries = Object.entries(buys).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return "(no buys)";
+  return entries.map(([typeId, count]) => `${typeId} ${count}`).join(", ");
+}
+
+function normalizedBuyDistribution(buys) {
+  const total = Object.values(buys).reduce((sum, count) => sum + count, 0);
+  if (!total) return {};
+  const normalized = {};
+  for (const [typeId, count] of Object.entries(buys)) normalized[typeId] = count / total;
+  return normalized;
+}
+
+function buyDistributionDistance(buysA, buysB) {
+  const a = normalizedBuyDistribution(buysA);
+  const b = normalizedBuyDistribution(buysB);
+  const typeIds = new Set([...Object.keys(a), ...Object.keys(b)]);
+  let distance = 0;
+  for (const typeId of typeIds) distance += Math.abs((a[typeId] || 0) - (b[typeId] || 0));
+  return distance;
+}
+
+function printPolicySummary(results) {
+  const byPolicy = new Map();
+  for (const result of results) {
+    for (const stat of result.seatStats) {
+      const bucket = byPolicy.get(stat.policy) || { scores: [], buys: {} };
+      bucket.scores.push(stat.score);
+      for (const [typeId, count] of Object.entries(stat.buys)) {
+        bucket.buys[typeId] = (bucket.buys[typeId] || 0) + count;
+      }
+      byPolicy.set(stat.policy, bucket);
+    }
+  }
+
+  console.log("--- per-strategy summary ---");
+  for (const [policy, bucket] of byPolicy) {
+    const meanScore = bucket.scores.reduce((sum, score) => sum + score, 0) / bucket.scores.length;
+    console.log(`${policy}: mean score ${meanScore.toFixed(2)} over ${bucket.scores.length} seats`);
+    console.log(`  buys: ${formatHistogram(bucket.buys)}`);
+  }
+
+  const policies = [...byPolicy.keys()];
+  if (policies.length === 2) {
+    const distance = buyDistributionDistance(byPolicy.get(policies[0]).buys, byPolicy.get(policies[1]).buys);
+    const verdict = distance >= BUY_PROFILE_DISTANCE_FLOOR ? "PASS" : "FAIL";
+    console.log(`${verdict} buy profiles differ visibly (${policies[0]} vs ${policies[1]}: L1 distance ${distance.toFixed(3)}, floor ${BUY_PROFILE_DISTANCE_FLOOR})`);
+  }
+}
+
 function main() {
   const args = parseArgs(process.argv);
+  const seats = buildSeats(args.strategies, args.players);
 
   if (args.determinismCheck) {
-    runDeterminismCheck(args.seedBase, args.players);
+    runDeterminismCheck(args.seedBase, seats);
     return;
   }
 
   const results = [];
   for (let index = 0; index < args.games; index += 1) {
     const seed = args.seedBase + index;
-    const result = simulateGame({ seed, playerCount: args.players });
+    const result = simulateGame({ seed, seats });
     results.push(result);
-    const line = result.standings.map((entry) => `${entry.name} ${entry.score}`).join(" | ");
+    const line = result.seatStats.map((entry) => `${entry.name} (${entry.policy}) ${entry.score}`).join(" | ");
     console.log(`seed ${seed}: ${line} (turns ${result.turns}, retries ${result.retriesUsed})`);
   }
 
@@ -380,9 +536,16 @@ function main() {
 
   console.log("---");
   console.log(`games: ${games}/${games} reached game over`);
-  console.log(`players: ${args.players}, seed base: ${args.seedBase}`);
+  console.log(`players: ${args.players}, seed base: ${args.seedBase}, seats: ${seats.map(seatLabel).join(",")}`);
   console.log(`mean score: ${meanScore.toFixed(2)}, mean winner score: ${meanWinner.toFixed(2)}, mean margin: ${meanMargin.toFixed(2)}`);
   console.log(`landscape retries used: ${totalRetries}`);
+
+  if (seats.some((seat) => seat.kind === "ai")) {
+    printPolicySummary(results);
+    console.log(`PASS ${games}/${games} games completed without exceptions`);
+  }
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { simulateGame, buildSeats, seatLabel, mulberry32 };
