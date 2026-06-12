@@ -2637,9 +2637,12 @@ function computeLayout(width, height) {
   const mode = getLayoutMode(width, height);
   const selectionHeavy = game.ui.selection.source === "landscape" || game.ui.selection.source === "market" || hasPendingMarketPurchase();
   const short = height <= 430;
+  const shortLandscape = mode === "mobile-landscape" && short;
 
   const topBarHeight = mode === "desktop"
     ? 70
+    : shortLandscape
+    ? 40
     : mode === "mobile-landscape"
     ? 60
     : short
@@ -2648,20 +2651,22 @@ function computeLayout(width, height) {
 
   const sceneBarHeight = mode === "desktop"
     ? 34
-    : mode === "mobile-landscape"
-    ? 34
-    : 30;
+    : shortLandscape
+    ? 36
+    : 38;
 
   const playersDrawerHeight = game.players.length > 1 && game.ui.playersPanelExpanded
-    ? (mode === "desktop" ? 84 : mode === "mobile-landscape" ? 64 : short ? 66 : 76)
+    ? (mode === "desktop" ? 84 : shortLandscape ? 48 : mode === "mobile-landscape" ? 64 : short ? 66 : 76)
     : 0;
 
   const bottomBarHeight = mode === "desktop"
     ? 84
+    : shortLandscape
+    ? 52
     : mode === "mobile-landscape"
     ? 82
     : selectionHeavy
-    ? 152
+    ? 160
     : 124;
 
   const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
@@ -2679,20 +2684,20 @@ function computeLayout(width, height) {
   };
 
   if (mode === "desktop" || mode === "mobile-landscape") {
-    const boardRatio = mode === "desktop" ? 0.63 : 0.58;
+    const boardRatio = mode === "desktop" ? 0.63 : shortLandscape ? 0.6 : 0.58;
     const boardPane = { x: content.x, y: content.y, w: Math.round(content.w * boardRatio), h: content.h };
     const contextPane = { x: boardPane.x + boardPane.w + gap, y: content.y, w: content.w - boardPane.w - gap, h: content.h };
-    return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, boardPane, contextPane };
+    return { mode, shortLandscape, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, boardPane, contextPane };
   }
 
   const mainPane = { x: content.x, y: content.y, w: content.w, h: content.h };
-  return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, mainPane };
+  return { mode, shortLandscape, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, mainPane };
 }
   
   function getBoardGeometry(panelRect) {
-    const headerHeight = runtime.layout.mode === "mobile-portrait" ? 58 : 34;
+    const headerHeight = runtime.layout.mode === "mobile-portrait" ? 58 : runtime.layout.shortLandscape ? 22 : 34;
     const inner = Core.insetRect(panelRect, 12);
-    const rackVisible = game.phase === "setupLandscape" && runtime.layout.mode !== "mobile-portrait";
+    const rackVisible = game.phase === "setupLandscape" && runtime.layout.mode !== "mobile-portrait" && !runtime.layout.shortLandscape;
     const rackHeight = rackVisible ? Core.clamp(Math.round(panelRect.h * 0.24), runtime.layout.mode === "mobile-landscape" ? 128 : 104, 168) : 0;
     const boardArea = {
       x: inner.x,
@@ -2706,14 +2711,14 @@ function computeLayout(width, height) {
   }
 
   function getBoardGeometryForArea(boardArea, rackRect = null, headerHeight = 0) {
-    const labelSize = runtime.layout.mode === "mobile-portrait" ? 16 : 22;
+    const labelSize = runtime.layout.mode === "mobile-portrait" ? 16 : runtime.layout.shortLandscape ? 14 : 22;
     const gap = Core.clamp(Math.floor(Math.min(boardArea.w / 80, boardArea.h / 40) * 6), runtime.layout.mode === "mobile-portrait" ? 2 : 3, 8);
     const availableWidth = boardArea.w - labelSize;
     const availableHeight = boardArea.h - labelSize;
-    const cellSize = Math.floor(Math.min(
+    const cellSize = Math.max(4, Math.floor(Math.min(
       (availableWidth - gap * (BOARD_COLS - 1)) / BOARD_COLS,
       (availableHeight - gap * (BOARD_ROWS - 1)) / BOARD_ROWS
-    ));
+    )));
     const boardWidth = cellSize * BOARD_COLS + gap * (BOARD_COLS - 1);
     const boardHeight = cellSize * BOARD_ROWS + gap * (BOARD_ROWS - 1);
     const originX = boardArea.x + labelSize + Math.max(0, (availableWidth - boardWidth) / 2);
@@ -2753,6 +2758,7 @@ function computeLayout(width, height) {
     Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(255, 251, 245, 0.94)", "rgba(108, 80, 54, 0.18)", 1);
     ctx.fillStyle = "#3f2d20";
     const isPortrait = runtime.layout.mode === "mobile-portrait";
+    const stackSubtitle = isPortrait || rect.w < 430;
     ctx.font = isPortrait
       ? "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -2760,20 +2766,21 @@ function computeLayout(width, height) {
     ctx.textBaseline = "top";
     ctx.fillText(title, rect.x + 10, rect.y + 6);
     if (subtitle) {
-      Core.drawWrappedText(ctx, subtitle, isPortrait ? rect.x + 10 : rect.x + rect.w - 10, rect.y + (isPortrait ? 22 : 6), isPortrait ? rect.w - 20 : Math.max(110, rect.w * 0.54), isPortrait ? 11 : 12, {
-        font: isPortrait
+      Core.drawWrappedText(ctx, subtitle, stackSubtitle ? rect.x + 10 : rect.x + rect.w - 10, rect.y + (stackSubtitle ? 22 : 6), stackSubtitle ? rect.w - 20 : Math.max(110, rect.w * 0.54), stackSubtitle ? 11 : 12, {
+        font: stackSubtitle
           ? "600 9px 'Avenir Next', 'Trebuchet MS', sans-serif"
           : "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        align: isPortrait ? "left" : "right",
+        align: stackSubtitle ? "left" : "right",
         color: "rgba(82, 61, 44, 0.72)",
-        maxLines: isPortrait ? 2 : 2
+        maxLines: 2
       });
     }
+    const headerSpace = stackSubtitle && subtitle ? 40 : isPortrait ? 40 : 30;
     return {
       x: rect.x + 8,
-      y: rect.y + (isPortrait ? 40 : 30),
+      y: rect.y + headerSpace,
       w: rect.w - 16,
-      h: rect.h - (isPortrait ? 48 : 38)
+      h: rect.h - headerSpace - 8
     };
   }
 
@@ -2812,7 +2819,12 @@ function computeLayout(width, height) {
     const radius = options.radius || (runtime.layout?.mode === "mobile-portrait" ? 8 : 6);
 
     if (onClick) {
-      registerTarget(rect, onClick, { id, enabled, scope: options.scope || "main", kind: "button" });
+      const insetX = typeof options.hitInset === "object" ? options.hitInset.x : options.hitInset || 0;
+      const insetY = typeof options.hitInset === "object" ? options.hitInset.y : options.hitInset || 0;
+      const hitRect = insetX || insetY
+        ? { x: rect.x - insetX, y: rect.y - insetY, w: rect.w + insetX * 2, h: rect.h + insetY * 2 }
+        : rect;
+      registerTarget(hitRect, onClick, { id, enabled, scope: options.scope || "main", kind: "button" });
     }
 
     Core.drawRoundedRect(ctx, rect.x, rect.y + yOffset, rect.w, rect.h, radius, palette.fill, palette.stroke, hovered && enabled ? 2 : 1.5);
@@ -2896,6 +2908,7 @@ function computeLayout(width, height) {
 
   function drawCurrentPlayerStump(geometry, player) {
     if (!player || !geometry?.boardArea) return;
+    if (runtime.layout.shortLandscape) return;
     const stumpWidth = runtime.layout.mode === "mobile-portrait"
       ? Math.min(64, geometry.boardArea.w * 0.14)
       : Math.min(76, geometry.boardArea.w * 0.11);
@@ -3063,15 +3076,19 @@ function computeLayout(width, height) {
     ctx.textBaseline = "top";
     ctx.fillText(compact ? "Smore to Explore" : "Smore to Explore", rect.x + 12, rect.y + 8);
 
-    const rightButtonY = rect.y + 8;
-    const menuRect = { x: rect.x + rect.w - 34, y: rightButtonY, w: 24, h: 24 };
-    const fullRect = { x: menuRect.x - 30, y: rightButtonY, w: 24, h: 24 };
+    const isPortraitBar = runtime.layout.mode === "mobile-portrait";
+    const iconSize = compact && !isPortraitBar ? 34 : 24;
+    const iconInset = isPortraitBar ? { x: 6, y: 10 } : compact ? { x: 3, y: 6 } : 0;
+    const rightButtonY = compact && !isPortraitBar ? rect.y + Math.max(3, Math.round((rect.h - iconSize) / 2)) : rect.y + 8;
+    const menuRect = { x: rect.x + rect.w - 10 - iconSize, y: rightButtonY, w: iconSize, h: iconSize };
+    const fullRect = { x: menuRect.x - 6 - iconSize, y: rightButtonY, w: iconSize, h: iconSize };
     if (game.players.length > 1) {
-      drawButton({ x: fullRect.x - 64, y: rightButtonY, w: 58, h: 24 }, game.ui.playersPanelExpanded ? "Hide" : "Players", () => {
+      drawButton({ x: fullRect.x - 64, y: rightButtonY, w: 58, h: iconSize }, game.ui.playersPanelExpanded ? "Hide" : "Players", () => {
         game.ui.playersPanelExpanded = !game.ui.playersPanelExpanded;
         game.ui.activePanel = game.ui.playersPanelExpanded ? "players" : null;
       }, {
         id: "shell-players-toggle",
+        hitInset: iconInset,
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     }
@@ -3088,9 +3105,10 @@ function computeLayout(width, height) {
     }, {
       id: "shell-fullscreen",
       enabled: controller.state.fullscreenSupported,
-      minimize: controller.state.isFullscreen
+      minimize: controller.state.isFullscreen,
+      hitInset: iconInset
     });
-    drawMenuButton(menuRect, openPauseMenu, { id: "shell-menu", radius: 8 });
+    drawMenuButton(menuRect, openPauseMenu, { id: "shell-menu", radius: 8, hitInset: iconInset });
 
     const roundText = game.players.length ? getCurrentRound().name : "Pass-and-Play";
     if (short) {
@@ -3218,6 +3236,11 @@ function computeLayout(width, height) {
     }
     if (scene === "score") {
       renderScorePanel(rect);
+      return;
+    }
+    const player = getPlayer();
+    if (runtime.layout.shortLandscape && game.phase === "setupLandscape" && player) {
+      renderLandscapeRack(player, rect);
       return;
     }
     renderFocusScene(rect);
@@ -3613,10 +3636,15 @@ function computeLayout(width, height) {
     }
     const isPortrait = runtime.layout.mode === "mobile-portrait";
     const gap = 8;
-    const columns = isPortrait ? 2 : Math.min(actions.length, 4);
-    const rows = Math.ceil(actions.length / columns);
+    let columns = isPortrait ? 2 : Math.min(actions.length, runtime.layout.shortLandscape ? 6 : 4);
+    let rows = Math.ceil(actions.length / columns);
+    let buttonHeight = (rect.h - gap * (rows - 1)) / rows;
+    if (isPortrait && buttonHeight < 30 && actions.length > 2) {
+      columns = 3;
+      rows = Math.ceil(actions.length / columns);
+      buttonHeight = (rect.h - gap * (rows - 1)) / rows;
+    }
     const buttonWidth = (rect.w - gap * (columns - 1)) / columns;
-    const buttonHeight = (rect.h - gap * (rows - 1)) / rows;
 
     actions.forEach((action, index) => {
       const col = index % columns;
@@ -3688,7 +3716,8 @@ function computeLayout(width, height) {
     }
 
     const gap = 10;
-    const summaryRect = { x: rect.x + 10, y: rect.y + 10, w: rect.w * 0.54, h: rect.h - 20 };
+    const summaryRatio = runtime.layout.shortLandscape ? 0.32 : 0.54;
+    const summaryRect = { x: rect.x + 10, y: rect.y + 10, w: rect.w * summaryRatio, h: rect.h - 20 };
     const buttonRect = { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 10, w: rect.w - summaryRect.w - gap - 20, h: rect.h - 20 };
 
     Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 10, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
@@ -4148,7 +4177,7 @@ function computeLayout(width, height) {
     }
 
     const entries = player.landscapeInventory.slice();
-    const columns = runtime.layout.mode === "mobile-portrait" ? 2 : 3;
+    const columns = runtime.layout.mode === "mobile-portrait" || content.w < 360 ? 2 : 3;
     const rows = Math.ceil(entries.length / columns);
     const gap = runtime.layout.mode === "mobile-portrait" ? 8 : 10;
     const cardWidth = (content.w - gap * (columns - 1)) / columns;
