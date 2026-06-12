@@ -110,18 +110,12 @@
       .map((paragraph) => paragraph.split(/\s+/).filter(Boolean));
   }
 
-  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, options = {}) {
+  const wrapLineCache = new Map();
+  const WRAP_CACHE_LIMIT = 600;
+
+  function computeWrappedLines(ctx, text, maxWidth) {
     const paragraphs = splitWords(text);
-    const font = options.font || ctx.font;
-    const align = options.align || "left";
-    const color = options.color || ctx.fillStyle;
-    const maxLines = options.maxLines || Infinity;
-    const paragraphGap = options.paragraphGap ?? Math.round(lineHeight * 0.45);
     const lines = [];
-
-    ctx.save();
-    ctx.font = font;
-
     for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex += 1) {
       const words = paragraphs[paragraphIndex];
       if (!words.length) {
@@ -140,6 +134,26 @@
       }
       lines.push(currentLine);
       if (paragraphIndex < paragraphs.length - 1) lines.push(null);
+    }
+    return lines;
+  }
+
+  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, options = {}) {
+    const font = options.font || ctx.font;
+    const align = options.align || "left";
+    const color = options.color || ctx.fillStyle;
+    const maxLines = options.maxLines || Infinity;
+    const paragraphGap = options.paragraphGap ?? Math.round(lineHeight * 0.45);
+
+    ctx.save();
+    ctx.font = font;
+
+    const cacheKey = `${font}|${Math.round(maxWidth)}|${text}`;
+    let lines = wrapLineCache.get(cacheKey);
+    if (!lines) {
+      lines = computeWrappedLines(ctx, text, maxWidth);
+      if (wrapLineCache.size >= WRAP_CACHE_LIMIT) wrapLineCache.clear();
+      wrapLineCache.set(cacheKey, lines);
     }
 
     let visibleLines = [];

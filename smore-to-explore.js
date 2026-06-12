@@ -476,7 +476,10 @@
     overlayScrollDrag: null,
     pendingClick: null,
     activeClipRect: null,
-    renderErrorCount: 0
+    renderErrorCount: 0,
+    needsRender: true,
+    lastRenderAt: 0,
+    lastPointerType: "mouse"
   };
 
   const controller = Core.createCanvasController({
@@ -1527,15 +1530,46 @@
     return false;
   }
 
-  function getBlockedMarketPurchaseReason(gameState, player, stack) {
+  function getBlockedMarketPurchaseReason(gameState, player, stack, placeAnywhereCheck = canPlaceCampTileAnywhere) {
     if (!player) return "No player is active.";
-    const blockedBigItem = stack.find((entry) => isBigMarketItem(entry.typeId) && !canPlaceCampTileAnywhere(gameState, player, entry.typeId));
+    const blockedBigItem = stack.find((entry) => isBigMarketItem(entry.typeId) && !placeAnywhereCheck(gameState, player, entry.typeId));
     if (blockedBigItem) {
       return blockedBigItem.typeId === "waterfront_site"
         ? "You cannot hire Waterfront Sites right now because your campground has no open legal two-square waterfront placement."
         : `You cannot hire ${getCampDef(blockedBigItem.typeId).name} right now because your campground has no open legal two-square placement for it.`;
     }
     return "";
+  }
+
+  const placeAnywhereRenderCache = { key: "", results: new Map() };
+
+  function getBoardSignature(player) {
+    let signature = 0;
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        const cell = getCell(player.board, row, col);
+        const index = row * BOARD_COLS + col + 1;
+        if (cell.landscapeTile) signature += index * 7 + (cell.landscapeTile.rotation || 0);
+        if (cell.campTile) signature += index * 131;
+      }
+    }
+    return signature;
+  }
+
+  function canPlaceCampTileAnywhereCached(gameState, player, typeId) {
+    const key = `${gameState.currentPlayerIndex}|${gameState.roundIndex}|${getBoardSignature(player)}`;
+    if (placeAnywhereRenderCache.key !== key) {
+      placeAnywhereRenderCache.key = key;
+      placeAnywhereRenderCache.results.clear();
+    }
+    if (!placeAnywhereRenderCache.results.has(typeId)) {
+      placeAnywhereRenderCache.results.set(typeId, canPlaceCampTileAnywhere(gameState, player, typeId));
+    }
+    return placeAnywhereRenderCache.results.get(typeId);
+  }
+
+  function getBlockedMarketPurchaseReasonForRender(gameState, player, stack) {
+    return getBlockedMarketPurchaseReason(gameState, player, stack, canPlaceCampTileAnywhereCached);
   }
 
   function getLargestCampCluster(board, campCells, predicate) {
@@ -2429,6 +2463,7 @@
 
   function handleResize() {
     runtime.layout = null;
+    runtime.needsRender = true;
   }
 
   function registerTarget(rect, onClick, options = {}) {
@@ -2495,6 +2530,7 @@
   const CLICK_SLOP_PX = 10;
 
   function handlePointerMove(point) {
+    runtime.needsRender = true;
     const pending = runtime.pendingClick;
     if (pending && !pending.moved) {
       const dx = point.x - pending.start.x;
@@ -2517,6 +2553,7 @@
   }
 
   function handlePointerDown(point, event) {
+    runtime.needsRender = true;
     runtime.lastPointerType = event?.pointerType || "mouse";
     const overlayScrollState = runtime.overlayScroll;
     if (overlayScrollState?.kind === "overlay" && overlayScrollState.maxScroll > 0) {
@@ -2591,6 +2628,7 @@
   }
 
   function handlePointerUp(point) {
+    runtime.needsRender = true;
     const pending = runtime.pendingClick;
     runtime.pendingClick = null;
     runtime.overlayScrollDrag = null;
@@ -2601,6 +2639,7 @@
   }
 
   function handleWheel(point, event) {
+    runtime.needsRender = true;
     const overlayScrollState = runtime.overlayScroll;
     if (overlayScrollState && overlayScrollState.kind === "overlay" && overlayScrollState.maxScroll > 0) {
       if (Core.pointInRect(point, overlayScrollState.rect) || (overlayScrollState.trackRect && Core.pointInRect(point, overlayScrollState.trackRect))) {
@@ -2617,6 +2656,7 @@
   }
 
   function handlePointerLeave() {
+    runtime.needsRender = true;
     runtime.hoveredTargetId = null;
     game.ui.hoveredCell = null;
     runtime.overlayScrollDrag = null;
@@ -4362,7 +4402,7 @@ function computeLayout(width, height) {
         const slotRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap + visibleSlotIndex * (rowHeight + rowGap), w: colRect.w, h: rowHeight };
         const globalColumnIndex = startIndex + visibleIndex;
         const stack = game.market.columns[globalColumnIndex].slots.slice(0, slotIndex + 1).map((entry, index) => ({ typeId: entry.typeId, slotIndex: index }));
-        const blockedPurchaseReason = buildOpen ? getBlockedMarketPurchaseReason(game, player, stack) : "";
+        const blockedPurchaseReason = buildOpen ? getBlockedMarketPurchaseReasonForRender(game, player, stack) : "";
         const blockedPurchase = !!blockedPurchaseReason;
         const selected = game.ui.selection.source === "market" && game.ui.selection.columnIndex === globalColumnIndex && game.ui.selection.slotIndex === slotIndex;
         const queued = hasPendingMarketPurchase() && game.turn.marketPurchaseColumnIndex === globalColumnIndex && slotIndex <= game.turn.marketPurchaseDepth;
@@ -4405,7 +4445,7 @@ function computeLayout(width, height) {
           if (blockedPurchase) {
             ctx.textAlign = "left";
             ctx.fillStyle = "#8f4338";
-            ctx.fillText("No legal water", textX, slotRect.y + slotRect.h - 10);
+            ctx.fillText(blockedPurchaseReason.includes("waterfront") ? "No legal water spot" : "No legal 2-square spot", textX, slotRect.y + slotRect.h - 10);
           }
         } else {
           ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -4414,7 +4454,7 @@ function computeLayout(width, height) {
           ctx.fillText(fitText(def.name, slotRect.w - miniRect.w - 28, ctx.font), textX, slotRect.y + 7);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.fillStyle = blockedPurchase ? "#8f4338" : column.category === "amenity" ? "#3f6870" : "#7d5a37";
-          ctx.fillText(blockedPurchase ? "No legal water parcel" : column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
+          ctx.fillText(blockedPurchase ? (blockedPurchaseReason.includes("waterfront") ? "No legal waterfront spot" : "Stack has an unplaceable 2-square item") : column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
           ctx.fillStyle = !buildOpen ? "rgba(68,47,32,0.52)" : blockedPurchase ? "rgba(92,65,45,0.58)" : "#442f20";
           ctx.textAlign = "right";
           ctx.fillText("$10k", priceX, slotRect.y + 7);
@@ -6008,7 +6048,19 @@ function computeLayout(width, height) {
     renderOverlay();
   }
 
+  function isAnimationActive() {
+    if (game.ui.appScreen !== APP_SCREENS.inGame) return false;
+    return !!(game.ui.lastAttempt || getEffectivePreviewCell());
+  }
+
   function renderFrame(now) {
+    const heartbeatDue = now - runtime.lastRenderAt > 500;
+    if (!runtime.needsRender && !isAnimationActive() && !heartbeatDue) {
+      requestAnimationFrame(renderFrame);
+      return;
+    }
+    runtime.needsRender = false;
+    runtime.lastRenderAt = now;
     try {
       renderFrameBody(now);
     } catch (error) {
