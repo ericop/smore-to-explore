@@ -522,9 +522,27 @@
     return { source: null, typeId: null, rotation: 0, orientation: BIG_MARKET_ITEM_ORIENTATION.horizontal, columnIndex: null, slotIndex: null };
   }
 
+  const AI_SEAT_OPTIONS = [
+    { kind: "human", label: "Human", chip: "Human" },
+    { kind: "ai", strategyId: "balanced", label: "Scout (AI)", chip: "AI Scout" },
+    { kind: "ai", strategyId: "premium", label: "Goldie (AI)", chip: "AI Goldie" },
+    { kind: "ai", strategyId: "spread", label: "Maple (AI)", chip: "AI Maple" },
+    { kind: "ai", strategyId: "objective", label: "Compass (AI)", chip: "AI Compass" },
+    { kind: "ai", strategyId: "roads", label: "Gravel (AI)", chip: "AI Gravel" }
+  ];
+
+  function createDefaultSeats() {
+    return Array.from({ length: 5 }, () => ({ optionIndex: 0 }));
+  }
+
+  function getSeatOption(seat) {
+    return AI_SEAT_OPTIONS[seat?.optionIndex || 0] || AI_SEAT_OPTIONS[0];
+  }
+
   function createUiState(playerCount = 2) {
     return {
       configuredPlayerCount: playerCount,
+      seats: createDefaultSeats(),
       appScreen: APP_SCREENS.start,
       returnScreen: APP_SCREENS.start,
       showStartScreen: true,
@@ -1952,7 +1970,15 @@
   }
 
   function beginPlaySession(playerCount) {
+    const seats = (game.ui.seats || createDefaultSeats()).slice();
     game = createGameState(playerCount);
+    game.ui.seats = seats;
+    game.players.forEach((player, index) => {
+      const option = getSeatOption(seats[index]);
+      player.isAi = option.kind === "ai";
+      player.strategyId = option.kind === "ai" ? option.strategyId : null;
+      if (player.isAi) player.name = option.label;
+    });
     setActiveScene(getDefaultSceneForGameState(game));
   }
 
@@ -5103,11 +5129,11 @@ function computeLayout(width, height) {
       });
       introHeight = introMetrics.height + (compact ? 30 : 36);
     } else {
-      introHeight = resumeAvailable ? 6 : 14;
+      introHeight = resumeAvailable ? 0 : 8;
     }
 
-    const actionGap = short && resumeAvailable ? 8 : compact ? 12 : 16;
-    const rowHeight = short ? (resumeAvailable ? 56 : 64) : compact ? 78 : 86;
+    const actionGap = short ? 6 : compact ? 12 : 16;
+    const rowHeight = short ? (resumeAvailable ? 50 : 56) : compact ? 78 : 86;
     const primaryWidth = compact ? body.w : Math.min(body.w, 620);
     const rowX = compact ? body.x : body.x + (body.w - primaryWidth) / 2;
     const sideBySidePickerWidth = compact ? Math.max(176, Math.round(primaryWidth * 0.52)) : Math.max(240, Math.round(primaryWidth * 0.46));
@@ -5116,7 +5142,7 @@ function computeLayout(width, height) {
 
     let flowY = body.y + pillHeight + introHeight;
     if (resumeAvailable) {
-      const resumeRect = { x: rowX, y: flowY, w: primaryWidth, h: short ? 40 : 52 };
+      const resumeRect = { x: rowX, y: flowY, w: primaryWidth, h: short ? 36 : 52 };
       drawScreenButton(resumeRect, "Resume Saved Game", resumeSavedGameFromMenu, {
         id: "menu-resume",
         variant: "success",
@@ -5159,8 +5185,27 @@ function computeLayout(width, height) {
     });
 
     flowY = startRect.y + startRect.h + actionGap;
+
+    const seatChipH = short ? 26 : 32;
+    const seatCount = game.ui.configuredPlayerCount || 2;
+    const seatGap = 6;
+    const seatChipW = (primaryWidth - seatGap * (seatCount - 1)) / seatCount;
+    if (!game.ui.seats) game.ui.seats = createDefaultSeats();
+    for (let seatIndex = 0; seatIndex < seatCount; seatIndex += 1) {
+      const seat = game.ui.seats[seatIndex] || (game.ui.seats[seatIndex] = { optionIndex: 0 });
+      const option = getSeatOption(seat);
+      drawScreenButton({ x: rowX + seatIndex * (seatChipW + seatGap), y: flowY, w: seatChipW, h: seatChipH }, fitText(`P${seatIndex + 1}: ${option.chip}`, seatChipW - 10, short ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"), () => {
+        seat.optionIndex = (seat.optionIndex + 1) % AI_SEAT_OPTIONS.length;
+      }, {
+        id: `menu-seat-${seatIndex}`,
+        variant: option.kind === "ai" ? "success" : undefined,
+        font: short ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    }
+    flowY += seatChipH + actionGap;
+
     const secondarySideBySide = !compact || short || primaryWidth >= 420;
-    const secondaryH = short ? (resumeAvailable ? 38 : 42) : compact ? 52 : 54;
+    const secondaryH = short ? (resumeAvailable ? 34 : 38) : compact ? 52 : 54;
     if (secondarySideBySide) {
       const secondaryWidth = (primaryWidth - actionGap) / 2;
       drawScreenButton({ x: rowX, y: flowY, w: secondaryWidth, h: secondaryH }, "How to Play", () => openHowToScreen(0), {
@@ -6295,7 +6340,44 @@ function computeLayout(width, height) {
     });
   }
 
+  const HUMAN_INTERACTION_OVERLAYS = new Set(["pause-menu", "detailed-rules", "rename-players", "restart-confirm"]);
+
+  function runAiDriver(now) {
+    if (game.ui.appScreen !== APP_SCREENS.inGame) return;
+    const Ai = GLOBAL_ROOT.SmoreAi;
+    if (!Ai || typeof Ai.takeTurn !== "function") return;
+    const player = getPlayer();
+    if (!player || !player.isAi) {
+      runtime.aiNextActAt = 0;
+      return;
+    }
+    if (game.overlay && HUMAN_INTERACTION_OVERLAYS.has(game.overlay.kind)) return;
+    if (!runtime.aiNextActAt) {
+      runtime.aiNextActAt = now + 900;
+      return;
+    }
+    if (now < runtime.aiNextActAt) return;
+    runtime.aiNextActAt = 0;
+    runtime.needsRender = true;
+    try {
+      if (game.overlay?.blocking) {
+        if (game.overlay.kind === "handoff") {
+          closeOverlay();
+        } else if (game.overlay.kind === "round-summary" && game.players.every((entry) => entry.isAi)) {
+          startNextRound();
+        }
+        return;
+      }
+      const strategy = typeof Ai.getStrategy === "function" ? Ai.getStrategy(player.strategyId) : player.strategyId;
+      Ai.takeTurn(GLOBAL_ROOT.SmoreEngine, game, strategy, Math.random);
+    } catch (error) {
+      console.error("AI turn failed; pausing the driver briefly:", error);
+      runtime.aiNextActAt = now + 5000;
+    }
+  }
+
   function renderFrame(now) {
+    runAiDriver(now);
     const heartbeatDue = now - runtime.lastRenderAt > 500;
     if (!runtime.needsRender && !isAnimationActive() && !heartbeatDue) {
       requestAnimationFrame(renderFrame);
