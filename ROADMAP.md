@@ -84,6 +84,14 @@ Goal: deliver computer opponents (workstream 4) and the harness that makes Phase
 
 Riskiest parts: landscape auto-completion legality (the AI must never finish in an illegal or unconnected state, so invest in the hard-filter plus backtrack) and the objective double-source-of-truth (blocks reliable point tuning until step 8).
 
+### Phase 1 status
+
+- Steps 1 to 3 shipped: `Core.setRng` seam; host facade (`globalThis.__SMORE_HOST__ = { headless: true }` before require) with dual exports and a `SmoreEngine` handle (also on `window` in the browser); `sim/run-headless.js` runs full random-legal games (125/125 to game over across 2p and 4p, deterministic per seed, zero landscape retries needed using the entrance-then-office-then-rest ordering).
+- Step 7 shipped: per-seat menu chips cycling Human and five AI personas (Scout/balanced, Goldie/premium, Maple/spread, Compass/objective, Gravel/roads), seat stamping in beginPlaySession, and a frame-loop AI driver (~900ms cadence) that dismisses its own handoffs and calls `SmoreAi.takeTurn`.
+- Step 8 shipped: all 72 objectives read `self.points` (verified byte-identical 100-game seeded regression; doubling a points field doubles awarded points).
+- Steps 4 to 6 shipped in `smore-ai.js` + `sim/run-batch.js`: context-diff move scoring, five strategy presets, and the batch report (win rates, buy rates, per-goal completion, seat-order gap, Spearman early-to-final correlation, placement-difficulty per tile).
+- First balance signals from the harness (random/greedy AI play, pre-tuning): canoe rental averages under 2 legal placements when bought (81 percent bought-but-tight) and waterfront sites logged the most zero-legal events by far, matching the human playtest complaint about water rules; several early goals complete at 0 percent and a few infrastructure goals at ~100 percent, flagging Phase 2 candidates.
+
 ## Phase 2: Balance, finite draw decks and sim-driven tuning
 
 Goal: convert the market to finite per-column draw decks, then tune the game to fair-and-balanced using the harness, followed by targeted goal and budget tweaks.
