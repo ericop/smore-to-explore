@@ -533,6 +533,7 @@
       selection: createSelection(),
       inspectedCell: null,
       hoveredCell: null,
+      armedCell: null,
       lastAttempt: null
     };
   }
@@ -845,6 +846,11 @@
 
   function clearSelection() {
     game.ui.selection = createSelection();
+    game.ui.armedCell = null;
+  }
+
+  function getEffectivePreviewCell() {
+    return game.ui.hoveredCell || game.ui.armedCell;
   }
 
   function clearPendingMarketPurchaseState() {
@@ -889,6 +895,7 @@
     clearSelection();
     game.ui.inspectedCell = null;
     game.ui.hoveredCell = null;
+    game.ui.armedCell = null;
     game.ui.lastAttempt = null;
   }
 
@@ -2509,7 +2516,8 @@
     game.ui.hoveredCell = target?.kind === "board-cell" ? target.data : null;
   }
 
-  function handlePointerDown(point) {
+  function handlePointerDown(point, event) {
+    runtime.lastPointerType = event?.pointerType || "mouse";
     const overlayScrollState = runtime.overlayScroll;
     if (overlayScrollState?.kind === "overlay" && overlayScrollState.maxScroll > 0) {
       if (overlayScrollState.thumbRect && Core.pointInRect(point, overlayScrollState.thumbRect)) {
@@ -3505,21 +3513,26 @@ function computeLayout(width, height) {
     const player = getPlayer();
     if (!player) return game.message;
 
+    const previewCell = getEffectivePreviewCell();
+    const armedPreview = !game.ui.hoveredCell && !!game.ui.armedCell;
+
     if (game.ui.selection.source === "landscape") {
       const def = getLandscapeDef(game.ui.selection.typeId);
-      if (game.ui.hoveredCell) {
-        const reasons = getLandscapePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
+      if (previewCell) {
+        const reasons = getLandscapePlacementReasons(game, player, previewCell.row, previewCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
         if (reasons.length) {
           return {
             tone: "error",
-            title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
+            title: `${def.name} on ${formatBoardCellLabel(previewCell.row, previewCell.col)}`,
             body: reasons[0]
           };
         }
         return {
           tone: "success",
-          title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
-          body: `Valid placement at ${game.ui.selection.rotation * 90} degrees.`
+          title: `${def.name} on ${formatBoardCellLabel(previewCell.row, previewCell.col)}`,
+          body: armedPreview
+            ? `Valid at ${game.ui.selection.rotation * 90} degrees. Tap the parcel again to place.`
+            : `Valid placement at ${game.ui.selection.rotation * 90} degrees.`
         };
       }
       const remaining = player.landscapeInventory.find((entry) => entry.typeId === def.id)?.count || 0;
@@ -3532,8 +3545,8 @@ function computeLayout(width, height) {
 
     if (game.ui.selection.source === "market") {
       const def = getCampDef(game.ui.selection.typeId);
-      if (game.ui.hoveredCell) {
-        const placement = getCampTilePlacementEvaluation(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, def.id, getSelectedMarketOrientation());
+      if (previewCell) {
+        const placement = getCampTilePlacementEvaluation(game, player, previewCell.row, previewCell.col, def.id, getSelectedMarketOrientation());
         const reasons = placement.reasons;
         const placementLabel = getCampPlacementDisplayLabel(placement.cells);
         if (reasons.length) {
@@ -3544,12 +3557,13 @@ function computeLayout(width, height) {
           };
         }
         const bonuses = scoreAdjacencyBonuses(game, player, def.id, placement.cells);
+        const validBody = bonuses.lines[0] || (isBigMarketItem(def.id)
+          ? `Valid ${getSelectedMarketOrientation()} 2-square placement.`
+          : "Valid placement on this parcel.");
         return {
           tone: "success",
           title: `${def.name} on ${placementLabel}`,
-          body: bonuses.lines[0] || (isBigMarketItem(def.id)
-            ? `Valid ${getSelectedMarketOrientation()} 2-square placement.`
-            : "Valid placement on this parcel.")
+          body: armedPreview ? `${validBody} Tap the parcel again to place.` : validBody
         };
       }
       return {
@@ -4089,11 +4103,21 @@ function computeLayout(width, height) {
     const cell = getCell(board, row, col);
     const lastAttempt = game.ui.lastAttempt && game.ui.lastAttempt.row === row && game.ui.lastAttempt.col === col;
     const inspected = game.ui.inspectedCell && game.ui.inspectedCell.row === row && game.ui.inspectedCell.col === col;
-    const hovered = game.ui.hoveredCell && game.ui.hoveredCell.row === row && game.ui.hoveredCell.col === col;
+    const previewCell = getEffectivePreviewCell();
+    const hovered = previewCell && previewCell.row === row && previewCell.col === col;
     const pulse = 0.62 + Math.sin(runtime.now / 180) * 0.15;
 
     registerTarget(rect, () => {
       game.ui.inspectedCell = { row, col };
+      const placing = game.ui.selection.source === "landscape" || game.ui.selection.source === "market";
+      if (placing && runtime.lastPointerType !== "mouse") {
+        const armed = game.ui.armedCell;
+        if (!armed || armed.row !== row || armed.col !== col) {
+          game.ui.armedCell = { row, col };
+          return;
+        }
+      }
+      game.ui.armedCell = null;
       if (game.ui.selection.source === "landscape") {
         attemptLandscapePlacement(row, col);
         return;
@@ -4133,10 +4157,11 @@ function computeLayout(width, height) {
   }
 
   function drawPlacementPreview(player, geometry) {
-    if (!game.ui.hoveredCell || !game.ui.selection.source) return;
+    const previewCell = getEffectivePreviewCell();
+    if (!previewCell || !game.ui.selection.source) return;
     if (game.ui.selection.source === "landscape") {
-      const rect = getCellRect(geometry, game.ui.hoveredCell.row, game.ui.hoveredCell.col);
-      const reasons = getLandscapePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
+      const rect = getCellRect(geometry, previewCell.row, previewCell.col);
+      const reasons = getLandscapePlacementReasons(game, player, previewCell.row, previewCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
       ctx.save();
       ctx.globalAlpha = reasons.length ? 0.5 : 0.8;
       drawLandscapeTileVisual(rect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
@@ -4145,7 +4170,7 @@ function computeLayout(width, height) {
       if (reasons.length) drawInvalidPlacementX(rect);
       return;
     }
-    const placement = getCampTilePlacementEvaluation(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, getSelectedMarketOrientation());
+    const placement = getCampTilePlacementEvaluation(game, player, previewCell.row, previewCell.col, game.ui.selection.typeId, getSelectedMarketOrientation());
     const reasons = placement.reasons;
     const allCellsReady = placement.cells.every((targetCell) => getCell(player.board, targetCell.row, targetCell.col)?.landscapeTile);
     if (allCellsReady) {

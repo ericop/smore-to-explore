@@ -236,7 +236,13 @@
     function handlePointerDown(event) {
       if (!event.isPrimary) return;
       if (event.pointerType === "mouse" && event.button !== 0) return;
-      if (event.pointerType !== "mouse") canvas.setPointerCapture?.(event.pointerId);
+      if (event.pointerType !== "mouse") {
+        try {
+          canvas.setPointerCapture?.(event.pointerId);
+        } catch (_error) {
+          // inactive pointer id (synthetic events); capture is best-effort
+        }
+      }
       if (onPointerDown) onPointerDown(toCanvasPoint(event), event);
     }
 
