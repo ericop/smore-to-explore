@@ -1619,11 +1619,16 @@
 
   function getBlockedMarketPurchaseReason(gameState, player, stack, placeAnywhereCheck = canPlaceCampTileAnywhere) {
     if (!player) return "No player is active.";
-    const blockedBigItem = stack.find((entry) => isBigMarketItem(entry.typeId) && !placeAnywhereCheck(gameState, player, entry.typeId));
-    if (blockedBigItem) {
-      return blockedBigItem.typeId === "waterfront_site"
-        ? "You cannot hire Waterfront Sites right now because your campground has no open legal two-square waterfront placement."
-        : `You cannot hire ${getCampDef(blockedBigItem.typeId).name} right now because your campground has no open legal two-square placement for it.`;
+    // A stack must be fully placeable: you cannot hire a contractor you have
+    // nowhere to put. This stops the buy-a-dead-card trap (a Canoe with no
+    // waterfront parcel, etc.) instead of letting a player pay then get stuck.
+    const blocked = stack.find((entry) => !placeAnywhereCheck(gameState, player, entry.typeId));
+    if (blocked) {
+      const def = getCampDef(blocked.typeId);
+      if (blocked.typeId === "waterfront_site") return "You cannot hire Waterfront Sites yet: your campground has no open waterfront parcel pair for a two-square placement.";
+      if (blocked.typeId === "canoe_rental") return "You cannot hire Canoe Rental yet: it needs an open waterfront (lakeside) parcel, and you do not have one.";
+      if (isBigMarketItem(blocked.typeId)) return `You cannot hire ${def.name} yet: your campground has no open legal two-square placement for it.`;
+      return `You cannot hire ${def.name} yet: your campground has no open legal parcel for it.`;
     }
     return "";
   }
@@ -1657,6 +1662,12 @@
 
   function getBlockedMarketPurchaseReasonForRender(gameState, player, stack) {
     return getBlockedMarketPurchaseReason(gameState, player, stack, canPlaceCampTileAnywhereCached);
+  }
+
+  function marketBlockedShortLabel(reason) {
+    if (/waterfront|lakeside/i.test(reason)) return "No waterfront spot";
+    if (/two-square/i.test(reason)) return "No 2-square spot";
+    return "No legal spot yet";
   }
 
   function getLargestCampCluster(board, campCells, predicate) {
@@ -4803,7 +4814,7 @@ function computeLayout(width, height) {
           if (blockedPurchase) {
             ctx.textAlign = "left";
             ctx.fillStyle = "#8f4338";
-            ctx.fillText(blockedPurchaseReason.includes("waterfront") ? "No legal water spot" : "No legal 2-square spot", textX, slotRect.y + slotRect.h - 10);
+            ctx.fillText(marketBlockedShortLabel(blockedPurchaseReason), textX, slotRect.y + slotRect.h - 10);
           }
         } else {
           ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -4812,7 +4823,7 @@ function computeLayout(width, height) {
           ctx.fillText(fitText(def.name, slotRect.w - miniRect.w - 28, ctx.font), textX, slotRect.y + 7);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.fillStyle = blockedPurchase ? "#8f4338" : column.category === "amenity" ? "#3f6870" : "#7d5a37";
-          ctx.fillText(blockedPurchase ? (blockedPurchaseReason.includes("waterfront") ? "No legal waterfront spot" : "Stack has an unplaceable 2-square item") : column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
+          ctx.fillText(blockedPurchase ? marketBlockedShortLabel(blockedPurchaseReason) : column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
           ctx.fillStyle = !buildOpen ? "rgba(68,47,32,0.52)" : blockedPurchase ? "rgba(92,65,45,0.58)" : "#442f20";
           ctx.textAlign = "right";
           ctx.fillText("$10k", priceX, slotRect.y + 7);
