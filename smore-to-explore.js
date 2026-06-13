@@ -3452,6 +3452,10 @@ function computeLayout(width, height) {
       drawBeaverSign(rect, player);
       return;
     }
+    if (theme().playerBadge === "campfire") {
+      drawCampfire(rect, player);
+      return;
+    }
     const topHeight = Math.max(20, rect.h * 0.54);
     const barkFill = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y);
     barkFill.addColorStop(0, "#7a4d2a");
@@ -3598,6 +3602,32 @@ function computeLayout(width, height) {
     }
   }
 
+  function drawSparkle(cx, cy, s) {
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 246, 205, 0.95)";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s);
+    ctx.quadraticCurveTo(cx + s * 0.2, cy - s * 0.2, cx + s, cy);
+    ctx.quadraticCurveTo(cx + s * 0.2, cy + s * 0.2, cx, cy + s);
+    ctx.quadraticCurveTo(cx - s * 0.2, cy + s * 0.2, cx - s, cy);
+    ctx.quadraticCurveTo(cx - s * 0.2, cy - s * 0.2, cx, cy - s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStarFrame(rect) {
+    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, "rgba(255, 240, 200, 0.5)", 3);
+    const count = Core.clamp(Math.round(rect.w / 160), 3, 5);
+    const base = runtime.layout?.mode === "mobile-portrait" ? 6 : 8;
+    const left = rect.x + rect.w * 0.14;
+    const span = rect.w * 0.72;
+    for (let i = 0; i < count; i += 1) {
+      const x = left + (count === 1 ? span / 2 : span * (i / (count - 1)));
+      drawSparkle(x, rect.y - 7, base * (i % 2 ? 0.78 : 1));
+    }
+  }
+
   // A little beaver holding a wooden sign that shows the current player's name,
   // money, and points. The cartoon-theme replacement for the bottom-left stump.
   function drawBeaverSign(rect, player) {
@@ -3665,10 +3695,85 @@ function computeLayout(width, height) {
     ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.68);
   }
 
+  // A campfire with sparks and rising smoke beside a dark plaque that shows the
+  // current player's name, money, and points. The night-theme player badge.
+  function drawCampfire(rect, player) {
+    const mobile = runtime.layout.mode === "mobile-portrait";
+    const fireW = Math.min(30, rect.w * 0.4);
+    const plaque = { x: rect.x + fireW - 4, y: rect.y + 2, w: rect.w - fireW + 4, h: rect.h - 4 };
+    const fx = rect.x + fireW * 0.5;
+    const baseY = rect.y + rect.h - 6;
+
+    ctx.save();
+    // rising smoke wisps (above the badge)
+    ctx.strokeStyle = "rgba(214, 214, 224, 0.26)";
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
+    for (let k = 0; k < 2; k += 1) {
+      const sx = fx + (k ? 5 : -4);
+      ctx.beginPath();
+      ctx.moveTo(sx, rect.y + 2);
+      ctx.bezierCurveTo(sx - 8, rect.y - 8, sx + 8, rect.y - 16, sx - 4, rect.y - 26);
+      ctx.stroke();
+    }
+    // sparks
+    ctx.fillStyle = "rgba(255, 196, 86, 0.95)";
+    [[-6, -4], [5, -8], [0, -14], [8, 2], [-9, 4]].forEach(([dx, dy]) => {
+      ctx.beginPath();
+      ctx.arc(fx + dx, rect.y + rect.h * 0.3 + dy, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    // crossed logs at the base
+    ctx.strokeStyle = "#7a4d2a";
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(fx - fireW * 0.32, baseY); ctx.lineTo(fx + fireW * 0.32, baseY - 5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(fx + fireW * 0.32, baseY); ctx.lineTo(fx - fireW * 0.32, baseY - 5); ctx.stroke();
+    // flames: outer orange then inner yellow
+    const fbY = baseY - 5;
+    const flame = (h, w, color) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(fx, fbY - h);
+      ctx.quadraticCurveTo(fx + w, fbY - h * 0.4, fx + w * 0.5, fbY);
+      ctx.quadraticCurveTo(fx, fbY + 2, fx - w * 0.5, fbY);
+      ctx.quadraticCurveTo(fx - w, fbY - h * 0.4, fx, fbY - h);
+      ctx.closePath();
+      ctx.fill();
+    };
+    flame(rect.h * 0.5, fireW * 0.34, "#ff7a2e");
+    flame(rect.h * 0.33, fireW * 0.22, "#ffd24a");
+    ctx.restore();
+
+    // plaque with the player's name / money / points
+    Core.drawRoundedRect(ctx, plaque.x, plaque.y, plaque.w, plaque.h, 8, "#2c2238", "rgba(255, 220, 150, 0.4)", 1.5);
+    ctx.fillStyle = "#ffe7c2";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const cx = plaque.x + plaque.w / 2;
+    const nameText = fitText(player.name, plaque.w - 10, ctx.font);
+    ctx.fillText(nameText, cx, plaque.y + plaque.h * 0.34);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, plaque.w - 10);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - nameWidth / 2, plaque.y + plaque.h * 0.34 + 7);
+    ctx.lineTo(cx + nameWidth / 2, plaque.y + plaque.h * 0.34 + 7);
+    ctx.stroke();
+    ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = "rgba(255, 231, 194, 0.85)";
+    ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, plaque.w - 6, ctx.font), cx, plaque.y + plaque.h * 0.68);
+  }
+
   function drawLogFrame(rect) {
     const decor = theme();
     if (decor.frameStyle === "birds" && decor.bird) {
       drawBirdFrame(rect, decor.bird);
+      return;
+    }
+    if (decor.frameStyle === "stars") {
+      drawStarFrame(rect);
       return;
     }
     const radius = runtime.layout?.mode === "mobile-portrait" ? 7 : 9;
@@ -3712,6 +3817,10 @@ function computeLayout(width, height) {
 
     if (bg.style === "scene") {
       renderSceneBackground(W, H, bg);
+      return;
+    }
+    if (bg.style === "night") {
+      renderNightBackground(W, H, bg);
       return;
     }
 
@@ -3798,6 +3907,74 @@ function computeLayout(width, height) {
     ctx.quadraticCurveTo(centerX, baseY - height, centerX + W * 0.55, baseY);
     ctx.closePath();
     ctx.fill();
+  }
+
+  // Fixed star field in normalized coords, generated once with a small LCG so
+  // the stars never flicker or jump between frames (Math.random would).
+  let nightStars = null;
+  function getNightStars() {
+    if (nightStars) return nightStars;
+    nightStars = [];
+    let seed = 0x5f3759;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    for (let i = 0; i < 64; i += 1) {
+      nightStars.push({ x: rnd(), y: rnd() * 0.58, r: 0.5 + rnd() * 1.3, a: 0.4 + rnd() * 0.6 });
+    }
+    return nightStars;
+  }
+
+  function renderNightBackground(W, H, bg) {
+    const horizon = H * (bg.horizon || 0.64);
+    // night sky
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    (bg.sky || ["#15213f", "#243a63", "#34526b"]).forEach((color, index, arr) => {
+      sky.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
+    });
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, horizon + 2);
+    // stars
+    if (bg.star) {
+      ctx.fillStyle = bg.star;
+      getNightStars().forEach((star) => {
+        ctx.globalAlpha = star.a;
+        ctx.beginPath();
+        ctx.arc(star.x * W, star.y * horizon, star.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+    // crescent moon, top-left, with a soft glow
+    const moonX = W * 0.16;
+    const moonY = H * 0.15;
+    const moonR = Math.max(20, Math.min(W, H) * 0.055);
+    if (bg.moonGlow) {
+      ctx.fillStyle = bg.moonGlow;
+      ctx.beginPath(); ctx.arc(moonX, moonY, moonR * 1.7, 0, Math.PI * 2); ctx.fill();
+    }
+    if (bg.moon) {
+      ctx.fillStyle = bg.moon;
+      ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2); ctx.fill();
+      // carve the crescent by overpainting with the sky
+      ctx.fillStyle = bg.sky ? bg.sky[0] : "#15213f";
+      ctx.beginPath(); ctx.arc(moonX + moonR * 0.5, moonY - moonR * 0.25, moonR * 0.92, 0, Math.PI * 2); ctx.fill();
+    }
+    // dark hills along the horizon
+    if (bg.hill1) {
+      ctx.fillStyle = bg.hill1;
+      drawHill(W, horizon, W * 0.24, -W * 0.04);
+      ctx.fillStyle = bg.hill2 || bg.hill1;
+      drawHill(W, horizon + 6, W * 0.18, W * 0.62);
+    }
+    // dark ground
+    const ground = ctx.createLinearGradient(0, horizon, 0, H);
+    (bg.ground || ["#2f4d3b", "#264033"]).forEach((color, index, arr) => {
+      ground.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
+    });
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, horizon, W, H - horizon);
   }
 
   function getShellScenes() {

@@ -135,10 +135,38 @@
       bird: { body: "#ff8fc0", wing: "#e85fa0", belly: "#fff0f7", crest: "#e05294", rail: "rgba(255,255,255,0.66)" },
       panel: LIGHT_PANEL,
       shell: LIGHT_PANEL
+    },
+
+    // Nighttime: a dark starry sky with a moon. Panels stay light (like lit
+    // lantern-boards on the table) so the dark UI text remains readable, and
+    // the player badge becomes a campfire with sparks and smoke.
+    night: {
+      id: "night",
+      label: "Night Camp",
+      pageBg: "linear-gradient(180deg, #16213f 0%, #20335a 42%, #284a4f 74%, #2f4a3c 100%)",
+      background: {
+        style: "night",
+        sky: ["#15213f", "#243a63", "#34526b"],
+        ground: ["#2f4d3b", "#264033"],
+        horizon: 0.64,
+        moon: "#fdf4cc",
+        moonGlow: "rgba(253, 244, 204, 0.28)",
+        star: "rgba(255, 255, 255, 0.95)",
+        hill1: "#26402f",
+        hill2: "#1f3527"
+      },
+      terrain: { open: "#9ab98a", forest: "#5e9a6a", water: "#5fa6c6" },
+      camp: BRIGHT_CAMP,
+      players: BRIGHT_PLAYERS,
+      buttonPrimary: { fill: "#ff9a3d", stroke: "#e0671c", text: "#fff7f1" },
+      frameStyle: "stars",
+      playerBadge: "campfire",
+      panel: LIGHT_PANEL,
+      shell: LIGHT_PANEL
     }
   };
 
-  const THEME_ORDER = ["classic", "cartoon", "frog", "candy"];
+  const THEME_ORDER = ["classic", "cartoon", "frog", "candy", "night"];
 
   const api = { THEMES, THEME_ORDER };
   const root = typeof globalThis !== "undefined" ? globalThis : window;
