@@ -898,6 +898,40 @@
     return game.ui.hoveredCell || game.ui.armedCell;
   }
 
+  // The set of board cells where the current selection can legally be placed,
+  // memoized by selection + board signature so it costs one pass per change,
+  // not one per frame. Used to tint legal parcels green so a player can see
+  // where a tile can go instead of probing cell by cell.
+  const legalCellsCache = { key: "", set: new Set() };
+
+  function getLegalSelectionCells(player) {
+    const selection = game.ui.selection;
+    if (!player || !selection.source) return null;
+    const orientation = selection.source === "market" ? getSelectedMarketOrientation() : selection.rotation;
+    const key = `${selection.source}|${selection.typeId}|${orientation}|${getBoardSignature(player)}`;
+    if (legalCellsCache.key === key) return legalCellsCache.set;
+    const set = new Set();
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        if (selection.source === "landscape") {
+          if (getLandscapePlacementReasons(game, player, row, col, selection.typeId, selection.rotation).length === 0) {
+            set.add(`${row},${col}`);
+          }
+        } else if (selection.source === "market") {
+          const orientations = isBigMarketItem(selection.typeId)
+            ? [BIG_MARKET_ITEM_ORIENTATION.horizontal, BIG_MARKET_ITEM_ORIENTATION.vertical]
+            : [BIG_MARKET_ITEM_ORIENTATION.horizontal];
+          if (orientations.some((o) => getCampTilePlacementEvaluation(game, player, row, col, selection.typeId, o).reasons.length === 0)) {
+            set.add(`${row},${col}`);
+          }
+        }
+      }
+    }
+    legalCellsCache.key = key;
+    legalCellsCache.set = set;
+    return set;
+  }
+
   function clearPendingMarketPurchaseState() {
     game.turn.marketPurchaseStack = [];
     game.turn.marketPurchaseIndex = 0;
@@ -4425,6 +4459,8 @@ function computeLayout(width, height) {
     const inspected = game.ui.inspectedCell && game.ui.inspectedCell.row === row && game.ui.inspectedCell.col === col;
     const previewCell = getEffectivePreviewCell();
     const hovered = previewCell && previewCell.row === row && previewCell.col === col;
+    const legalCells = getLegalSelectionCells(player);
+    const isLegalTarget = !!legalCells && legalCells.has(`${row},${col}`);
     const pulse = 0.62 + Math.sin(runtime.now / 180) * 0.15;
 
     registerTarget(rect, () => {
@@ -4465,6 +4501,27 @@ function computeLayout(width, height) {
       ctx.setLineDash([]);
     } else {
       drawLandscapeTileVisual(rect, cell.landscapeTile);
+    }
+    if (legalCells && legalCells.size) {
+      const radius = Math.max(8, rect.w * 0.14);
+      const marketSel = game.ui.selection.source === "market";
+      if (isLegalTarget && !hovered) {
+        // Bright emerald ring + white inner line so legal parcels read clearly
+        // against the sage road/scenic terrain, plus a corner pip. Works for
+        // empty landscape targets and developed market targets alike.
+        Core.drawRoundedRect(ctx, rect.x + 2.5, rect.y + 2.5, rect.w - 5, rect.h - 5, radius, "rgba(60, 190, 110, 0.16)", "rgba(31, 150, 70, 0.95)", 2.6);
+        Core.drawRoundedRect(ctx, rect.x + 4.5, rect.y + 4.5, rect.w - 9, rect.h - 9, radius - 2, null, "rgba(255, 255, 255, 0.5)", 1);
+        const pipR = Math.max(3, rect.w * 0.08);
+        ctx.fillStyle = "rgba(28, 150, 70, 0.95)";
+        ctx.beginPath();
+        ctx.arc(rect.x + rect.w - pipR - 5, rect.y + pipR + 5, pipR, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (marketSel && cell.landscapeTile && !isLegalTarget && !inspected && !lastAttempt) {
+        // During a market selection, dim developed parcels that cannot take the
+        // current tile so the legal ones stand out (the spotlight that answers
+        // "where can this go"). Occupied parcels get their camp tile drawn on top.
+        Core.drawRoundedRect(ctx, rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, radius, "rgba(60, 48, 36, 0.32)", null);
+      }
     }
     if (hovered) Core.drawRoundedRect(ctx, rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, Math.max(8, rect.w * 0.14), null, `rgba(215, 118, 56, ${pulse})`, 2);
     if (inspected) Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, Math.max(8, rect.w * 0.14), null, "rgba(56, 108, 69, 0.58)", 2);
