@@ -1,16 +1,160 @@
 (() => {
   "use strict";
 
-  const Core = window.SmoreCore;
-  const ObjectiveFactory = window.SmoreObjectiveFactory;
-  const appShell = document.getElementById("appShell");
-  const canvas = document.getElementById("gameCanvas");
-  const nameEditorHost = document.getElementById("nameEditorHost");
-  const fallbackMessage = document.getElementById("fallbackMessage");
+  const GLOBAL_ROOT = typeof globalThis !== "undefined" ? globalThis : window;
+  const HEADLESS = !!(GLOBAL_ROOT.__SMORE_HOST__ && GLOBAL_ROOT.__SMORE_HOST__.headless);
+  const Core = GLOBAL_ROOT.SmoreCore;
+  const ObjectiveFactory = GLOBAL_ROOT.SmoreObjectiveFactory;
+  const appShell = HEADLESS ? null : document.getElementById("appShell");
+  const canvas = HEADLESS ? null : document.getElementById("gameCanvas");
+  const nameEditorHost = HEADLESS ? null : document.getElementById("nameEditorHost");
+  const fallbackMessage = HEADLESS ? null : document.getElementById("fallbackMessage");
 
-  if (!Core || !ObjectiveFactory || !canvas || !appShell) {
+  if (!Core || !ObjectiveFactory) {
+    if (fallbackMessage) fallbackMessage.classList.add("visible");
+    throw new Error("Smore to Explore needs the core helpers and objective data.");
+  }
+  if (!HEADLESS && (!canvas || !appShell)) {
     if (fallbackMessage) fallbackMessage.classList.add("visible");
     throw new Error("Smore to Explore needs the core helpers, objective data, and the main canvas shell.");
+  }
+
+  // Theme tokens (Phase 5 facelift). Pure presentation: the active preset
+  // re-skins high-impact surfaces and any token it omits falls back to the
+  // original hardcoded value, so logic and the headless path are untouched.
+  const THEMES = (GLOBAL_ROOT.SmoreTheme && GLOBAL_ROOT.SmoreTheme.THEMES) || { classic: { id: "classic" } };
+  const THEME_ORDER = (GLOBAL_ROOT.SmoreTheme && GLOBAL_ROOT.SmoreTheme.THEME_ORDER) || ["classic"];
+  const THEME_STORAGE_KEY = "smore-to-explore-theme-v1";
+  let activeThemeId = "classic";
+  function readStoredTheme() {
+    try {
+      if (typeof localStorage === "undefined") return null;
+      const id = localStorage.getItem(THEME_STORAGE_KEY);
+      return id && THEMES[id] ? id : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+  activeThemeId = readStoredTheme() || (THEMES.cartoon ? "cartoon" : "classic");
+  function theme() {
+    return THEMES[activeThemeId] || THEMES.classic || {};
+  }
+  function setActiveTheme(id) {
+    if (!THEMES[id]) return;
+    activeThemeId = id;
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem(THEME_STORAGE_KEY, id);
+    } catch (_error) {
+      // storage unavailable; theme still applies for this session
+    }
+    applyThemeToPage();
+    if (runtime) runtime.needsRender = true;
+  }
+  function cycleTheme() {
+    const order = THEME_ORDER.length ? THEME_ORDER : Object.keys(THEMES);
+    const index = order.indexOf(activeThemeId);
+    setActiveTheme(order[(index + 1) % order.length]);
+  }
+  function applyThemeToPage() {
+    if (HEADLESS || typeof document === "undefined") return;
+    const t = theme();
+    if (t.pageBg && document.documentElement) document.documentElement.style.setProperty("--page-bg", t.pageBg);
+  }
+  // Token accessors: each returns the preset override or the supplied fallback.
+  function themeTerrainColor(typeId, fallback) {
+    const map = theme().terrain || {};
+    return map[typeId] || fallback;
+  }
+  function themeCampColor(typeId, fallback) {
+    const map = theme().camp || {};
+    return map[typeId] || fallback;
+  }
+  function themePlayerColors(fallback) {
+    return theme().players || fallback;
+  }
+
+  // Dark-mode remap. themed(color) returns its input unchanged for every theme
+  // EXCEPT an inverting one (Night Camp), where the warm panels become dark and
+  // the dark text becomes light. Because non-inverting themes pass through
+  // untouched, the four light themes stay pixel-identical and only night flips.
+  const NIGHT_INK = "#eaf1fc";        // primary headings / body text
+  const NIGHT_INK_MED = "#aebcd8";    // medium-weight labels
+  const NIGHT_SURFACE = "rgba(21, 30, 53, 0.94)";   // panels and bars
+  const NIGHT_SURFACE_DEEP = "rgba(13, 20, 38, 0.96)"; // board area, cells
+  const NIGHT_INK_SOFT_RGB = "200, 214, 240";
+  const NIGHT_LINE_RGB = "150, 172, 214";
+  const NIGHT_EXACT = {
+    "#3d2d20": NIGHT_INK, "#3b2c20": NIGHT_INK, "#3f2d20": NIGHT_INK, "#452f1e": NIGHT_INK,
+    "#432e1e": NIGHT_INK,
+    "#4a3524": NIGHT_INK, "#4b3726": NIGHT_INK, "#4a2e1b": NIGHT_INK, "#3a2c20": NIGHT_INK,
+    "#452f1e": NIGHT_INK, "#5a4330": NIGHT_INK_MED, "#5f4731": NIGHT_INK_MED, "#5b4330": NIGHT_INK_MED,
+    "#6c4325": NIGHT_INK_MED, "#5a3a1d": NIGHT_INK_MED, "#6c4825": NIGHT_INK_MED,
+    "rgba(251, 246, 236, 0.92)": NIGHT_SURFACE_DEEP,
+    // Goal/objective scenic card gradient -> a dark night-landscape card (sky,
+    // meadow, path, base) so the card reads as inverted, not a light card on a
+    // dark panel. Incomplete = muted; complete = a touch brighter and greener.
+    "rgba(191, 220, 236, 0.98)": "rgba(38, 56, 94, 0.98)",
+    "rgba(153, 188, 139, 0.98)": "rgba(46, 78, 60, 0.98)",
+    "rgba(210, 176, 132, 0.98)": "rgba(72, 62, 46, 0.98)",
+    "rgba(152, 156, 161, 0.98)": "rgba(40, 48, 64, 0.98)",
+    "rgba(171, 213, 234, 0.98)": "rgba(44, 66, 110, 0.98)",
+    "rgba(138, 184, 127, 0.98)": "rgba(54, 98, 72, 0.98)",
+    "rgba(196, 163, 118, 0.98)": "rgba(86, 76, 56, 0.98)",
+    "rgba(132, 138, 145, 0.98)": "rgba(46, 58, 76, 0.98)",
+    // Goal-card text that now sits on the dark card.
+    "rgba(56, 48, 39, 0.88)": NIGHT_INK,
+    "#2f5342": "#bfe6cf",
+    "#465158": NIGHT_INK_MED,
+    // Market column headers (pale teal/tan pills) -> raised dark pills, and the
+    // sub/empty text + empty-slot surface that ride on the dark panel.
+    "rgba(198, 224, 226, 0.96)": "rgba(34, 62, 76, 0.96)",
+    "rgba(235, 224, 202, 0.96)": "rgba(62, 56, 44, 0.96)",
+    "rgba(75, 55, 38, 0.72)": NIGHT_INK_MED,
+    "rgba(95, 74, 53, 0.6)": NIGHT_INK_MED,
+    "rgba(240, 233, 222, 0.7)": "rgba(26, 36, 60, 0.72)",
+    // Market slot cards: name/price text, the blocked-state surface and its
+    // muted text, the disabled (non-build) text, and the category sub-labels.
+    "#442f20": NIGHT_INK,
+    "rgba(92,65,45,0.58)": NIGHT_INK_MED,
+    "rgba(68,47,32,0.52)": NIGHT_INK_MED,
+    "rgba(240, 231, 225, 0.98)": "rgba(44, 38, 50, 0.96)",
+    "#3f6870": "#7fc3cf",
+    "#7d5a37": "#cbb089",
+    // How-to "Keep in mind" reminder: light-green callout -> dark-green callout.
+    "rgba(233, 243, 224, 0.98)": "rgba(40, 64, 50, 0.96)",
+    "#3f6b47": "#bfe6cf",
+    "#456049": "#cfe7d8",
+    // Feedback/summary status text (success/warning/error) lightened for the
+    // dark action bar and feed; these are text fills only, never button bodies.
+    "#3d6a46": "#7fc99a",
+    "#88622d": "#e0b066",
+    "#8f4338": "#e1897a",
+    // Light pill/chip fills -> dark tinted chips (round-name and rules subtitle
+    // pills in-game, plus the three start-screen hero pills) with light text.
+    "#efe2ca": "#3a3526",
+    "#dfead4": "#2f4030",
+    "#e2d8ef": "#3a3350",
+    "#446038": "#bfe6cf",
+    "#5e4b78": "#d8cdec",
+    // Disabled button fill (e.g. the "-" stepper at min count) -> muted dark.
+    "rgba(223, 214, 201, 0.9)": "rgba(40, 50, 74, 0.7)",
+    // Overlay panel gradient's warm-tan bottom stop (pause menu / rules / how-to).
+    "rgba(236, 222, 202, 0.98)": NIGHT_SURFACE
+  };
+  function themed(color) {
+    if (!theme().invert || typeof color !== "string") return color;
+    if (NIGHT_EXACT[color]) return NIGHT_EXACT[color];
+    // Warm-dark body/label text (several brown families, any alpha) -> soft light
+    // ink. rgba-only and warm, so it never touches hex roads/wood or neutral shadows.
+    let m = color.match(/^rgba\((?:82, 61, 44|74, 53, 36|70, 52, 37|65, 42, 25|70, 46, 25|91, 74, 56|47, 34, 23), ([0-9.]+)\)$/);
+    if (m) return `rgba(${NIGHT_INK_SOFT_RGB}, ${m[1]})`;
+    m = color.match(/^rgba\((?:108, 80, 54|95, 70, 51|64, 58, 38|73, 45, 24|116, 98, 77), ([0-9.]+)\)$/);
+    if (m) return `rgba(${NIGHT_LINE_RGB}, ${Math.min(1, Number(m[1]) + 0.06).toFixed(2)})`;
+    // warm cream surfaces (R247-255, G230-252, B200-249); excludes pure-white highlights (B 255)
+    if (/^rgba\(2(4[7-9]|5[0-5]), 2(3[0-9]|4[0-9]|5[0-2]), 2(0[0-9]|[1-4][0-9]),/.test(color)) {
+      return NIGHT_SURFACE;
+    }
+    return color;
   }
 
   const BOARD_COLS = 8;
@@ -113,6 +257,36 @@
         "Undo is easiest during landscape setup before you continue, so fix a bad road immediately."
       ],
       reminder: "If a move feels awkward, inspect the parcel before tapping. Most rules questions come down to road links, terrain matching, and planning ahead."
+    },
+    {
+      title: "Tricky Tiles: Let The Board Show You",
+      lead: "A few tiles are picky about where they go. You never have to guess: the moment you select a tile, every legal parcel lights up with a green ring and a green dot, and the parcels it cannot use dim out.",
+      bullets: [
+        "Select a landscape or camp tile, then look at the board. Green-ringed parcels are legal right now; dimmed ones are not.",
+        "If nothing lights up, you have nowhere to place that tile yet. Build the terrain it needs first.",
+        "You cannot hire a contractor you have no legal parcel for, so you will never waste money on a tile you cannot place."
+      ],
+      reminder: "When a placement feels blocked, the board is already telling you where the tile can go. Follow the green."
+    },
+    {
+      title: "Tricky Tiles: Waterfront And Water",
+      lead: "Canoe Rental and the Waterfront Site both need a waterfront parcel, which is what your Lakeside landscape tiles become once placed. Same idea, three names you will see: Lakeside terrain, a waterfront parcel, and the Waterfront Site tile that sits on it.",
+      bullets: [
+        "Lay a Lakeside tile to create a waterfront parcel. Canoe Rental must sit on one; the Waterfront Site needs at least one of its two halves on one.",
+        "Select the Canoe or Waterfront Site and the waterfront parcels light up green, so you can see your options before you commit.",
+        "Plan a lakeside spot early if you want these tiles. With only a few Lakeside tiles in a game, waterfront parcels are precious."
+      ],
+      reminder: "Lakeside tile equals waterfront parcel. If the water tiles will not place, you need more Lakeside terrain first."
+    },
+    {
+      title: "Tricky Tiles: Big Items And The Office",
+      lead: "Two more things trip up new groups: the big two-square contractors, and where the Camp Office goes.",
+      bullets: [
+        "Big items (RV Site, Group Site, Waterfront Site, Horse Riding, Event Pavilion) cover two parcels. Use Rotate to swap horizontal and vertical, and both halves must be legal, shown by the green preview.",
+        "The Entrance and Camp Office parcels are reserved: you cannot build camps on them. Place the Office where your road can still grow outward, or later seasons get boxed in.",
+        "The contractor market is finite. Each column is a small deck that runs out and never refills, and the player who opens the market rotates each summer, so watch what others take."
+      ],
+      reminder: "Think a season ahead. Leave room around the Office and grab scarce big items and waterfront parcels before they are gone."
     }
   ];
 
@@ -280,26 +454,35 @@
   ];
 
   const CAMP_TILE_DEFS = {
-    rustic_tent_forest: { id: "rustic_tent_forest", name: "Rustic Tent Forest", shortLabel: "Rustic", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#b47b4f", accent: "#7c4f2d", tags: ["tent", "rustic", "family"], description: "Flexible camping that is happiest in wooded or scenic corners.", rulesText: "Can go on almost any non-office parcel. Forest and scenic terrain score better." },
-    tent_electric: { id: "tent_electric", name: "Tent Site with Electric Hookup", shortLabel: "E-Tent", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#7db987", accent: "#477b53", tags: ["tent", "electric", "comfort"], description: "A road-adjacent tent site with more comfort built in.", rulesText: "Needs at least one road edge on the landscape below." },
-    rv_full_hookups: { id: "rv_full_hookups", name: "RV Site with Full Hookups", shortLabel: "RV", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#73a4c6", accent: "#3f6d90", tags: ["rv", "premium"], description: "A premium RV pad that wants strong drive-up access.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 2 road edges." },
-    group_site: { id: "group_site", name: "Group Site", shortLabel: "Group", marketGroup: "camp", kind: "campsite", copies: 5, cost: CAMP_TILE_COST, color: "#d5965d", accent: "#945927", tags: ["group", "family"], description: "A larger social camping zone for scouts, reunions, and clubs.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
-    cabin: { id: "cabin", name: "Cabin", shortLabel: "Cabin", marketGroup: "camp", kind: "lodging", copies: 5, cost: CAMP_TILE_COST, color: "#d07d58", accent: "#8d4a30", tags: ["cabin", "premium", "comfort"], description: "Comfort lodging that still wants proper road access.", rulesText: "Needs at least one road edge on the landscape below." },
-    waterfront_site: { id: "waterfront_site", name: "Waterfront Site", shortLabel: "Waterfront", marketGroup: "camp", kind: "lodging", copies: 5, cost: CAMP_TILE_COST, color: "#6aaec8", accent: "#2f7087", tags: ["waterfront", "premium"], description: "A premium scenic site that must sit on a water-edge landscape.", rulesText: "Big market item. Occupies 2 squares. At least 1 half must be on a water-edge parcel." },
-    horse_riding: { id: "horse_riding", name: "Horse Riding", shortLabel: "Horse", marketGroup: "camp", kind: "activity", copies: 2, cost: CAMP_TILE_COST, color: "#a97b63", accent: "#6c4c3d", tags: ["horse", "activity", "premium"], description: "A rare specialty attraction that wants road access and a scenic feel.", rulesText: "Big market item. Occupies 2 squares. Both halves need road access and scenic, forest, or border placement." },
-    firewood: { id: "firewood", name: "Firewood", shortLabel: "Wood", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#b97142", accent: "#784421", tags: ["amenity", "campfire"], description: "A flexible support amenity that thrives near tents and group camping.", rulesText: "Very flexible. Best beside tent-heavy camping areas." },
-    pool: { id: "pool", name: "Pool", shortLabel: "Pool", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#79bfde", accent: "#397394", tags: ["amenity", "family", "premium"], description: "A family favorite that wants good access and nearby campers.", rulesText: "Needs at least one road edge on the landscape below." },
-    bike_rental: { id: "bike_rental", name: "Bike Rental", shortLabel: "Bikes", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#87a56f", accent: "#4b6535", tags: ["amenity", "activity"], description: "Works best off a longer connected road network.", rulesText: "Needs at least one road edge. It loves long connected road runs." },
-    canoe_rental: { id: "canoe_rental", name: "Canoe Rental", shortLabel: "Canoes", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#72b6b0", accent: "#37746f", tags: ["amenity", "activity", "waterfront"], description: "A lakeside activity amenity that needs direct water access.", rulesText: "Needs a water-edge landscape tile." },
-    event_pavilion: { id: "event_pavilion", name: "Event Pavilion", shortLabel: "Pavilion", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#d8a96d", accent: "#9a6a31", tags: ["amenity", "family", "event"], description: "A social gathering space for busy clusters and group campers.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
+    rustic_tent_forest: { id: "rustic_tent_forest", name: "Rustic Tent Forest", shortLabel: "Rustic", marketGroup: "camp", kind: "campsite", copies: 10, cost: CAMP_TILE_COST, color: "#b47b4f", accent: "#7c4f2d", tags: ["tent", "rustic", "family"], description: "Flexible camping that is happiest in wooded or scenic corners.", rulesText: "Can go on almost any non-office parcel. Forest and scenic terrain score better." },
+    tent_electric: { id: "tent_electric", name: "Tent Site with Electric Hookup", shortLabel: "E-Tent", marketGroup: "camp", kind: "campsite", copies: 11, cost: CAMP_TILE_COST, color: "#7db987", accent: "#477b53", tags: ["tent", "electric", "comfort"], description: "A road-adjacent tent site with more comfort built in.", rulesText: "Needs at least one road edge on the landscape below." },
+    rv_full_hookups: { id: "rv_full_hookups", name: "RV Site with Full Hookups", shortLabel: "RV", marketGroup: "camp", kind: "campsite", copies: 11, cost: CAMP_TILE_COST, color: "#73a4c6", accent: "#3f6d90", tags: ["rv", "premium"], description: "A premium RV pad that wants strong drive-up access.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 2 road edges." },
+    group_site: { id: "group_site", name: "Group Site", shortLabel: "Group", marketGroup: "camp", kind: "campsite", copies: 7, cost: CAMP_TILE_COST, color: "#d5965d", accent: "#945927", tags: ["group", "family"], description: "A larger social camping zone for scouts, reunions, and clubs.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
+    cabin: { id: "cabin", name: "Cabin", shortLabel: "Cabin", marketGroup: "camp", kind: "lodging", copies: 11, cost: CAMP_TILE_COST, color: "#d07d58", accent: "#8d4a30", tags: ["cabin", "premium", "comfort"], description: "Comfort lodging that still wants proper road access.", rulesText: "Needs at least one road edge on the landscape below." },
+    waterfront_site: { id: "waterfront_site", name: "Waterfront Site", shortLabel: "Waterfront", marketGroup: "camp", kind: "lodging", copies: 10, cost: CAMP_TILE_COST, color: "#6aaec8", accent: "#2f7087", tags: ["waterfront", "premium"], description: "A premium scenic site that must sit on a waterfront (Lakeside) parcel.", rulesText: "Big market item. Occupies 2 squares. At least 1 half must be on a waterfront parcel (a Lakeside tile)." },
+    horse_riding: { id: "horse_riding", name: "Horse Riding", shortLabel: "Horse", marketGroup: "camp", kind: "activity", copies: 4, cost: CAMP_TILE_COST, color: "#a97b63", accent: "#6c4c3d", tags: ["horse", "activity", "premium"], description: "A rare specialty attraction that wants road access and a scenic feel.", rulesText: "Big market item. Occupies 2 squares. Both halves need road access and scenic, forest, or border placement." },
+    firewood: { id: "firewood", name: "Firewood", shortLabel: "Wood", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#b97142", accent: "#784421", tags: ["amenity", "campfire"], description: "A flexible support amenity that thrives near tents and group camping.", rulesText: "Very flexible. Best beside tent-heavy camping areas." },
+    pool: { id: "pool", name: "Pool", shortLabel: "Pool", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#79bfde", accent: "#397394", tags: ["amenity", "family", "premium"], description: "A family favorite that wants good access and nearby campers.", rulesText: "Needs at least one road edge on the landscape below." },
+    bike_rental: { id: "bike_rental", name: "Bike Rental", shortLabel: "Bikes", marketGroup: "amenity", kind: "amenity", copies: 3, cost: CAMP_TILE_COST, color: "#87a56f", accent: "#4b6535", tags: ["amenity", "activity"], description: "Works best off a longer connected road network.", rulesText: "Needs at least one road edge. It loves long connected road runs." },
+    canoe_rental: { id: "canoe_rental", name: "Canoe Rental", shortLabel: "Canoes", marketGroup: "amenity", kind: "amenity", copies: 3, cost: CAMP_TILE_COST, color: "#72b6b0", accent: "#37746f", tags: ["amenity", "activity", "waterfront"], description: "A lakeside activity amenity that must sit on a waterfront (Lakeside) parcel.", rulesText: "Needs a waterfront parcel (a Lakeside tile)." },
+    event_pavilion: { id: "event_pavilion", name: "Event Pavilion", shortLabel: "Pavilion", marketGroup: "amenity", kind: "amenity", copies: 3, cost: CAMP_TILE_COST, color: "#d8a96d", accent: "#9a6a31", tags: ["amenity", "family", "event"], description: "A social gathering space for busy clusters and group campers.", rulesText: "Big market item. Occupies 2 squares. Both halves need at least 1 road edge." },
     hiking_trail: { id: "hiking_trail", name: "Hiking Trail", shortLabel: "Trail", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#87ab68", accent: "#4f6a33", tags: ["amenity", "activity", "scenic"], description: "A scenic feature that likes forest parcels, edges, and quieter cells.", rulesText: "Place on scenic or border parcels. Forest parcels are especially strong." },
-    ice_cream_vending: { id: "ice_cream_vending", name: "Ice Cream Vending", shortLabel: "Ice Cream", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#efb2c8", accent: "#b56f8d", tags: ["amenity", "family", "premium"], description: "A central-traffic treat stop for busy parts of camp.", rulesText: "Needs at least one road edge and likes the middle of the board." },
-    playground: { id: "playground", name: "Playground", shortLabel: "Play", marketGroup: "amenity", kind: "amenity", copies: 2, cost: CAMP_TILE_COST, color: "#f0a26a", accent: "#b56331", tags: ["amenity", "family"], description: "Best near group and family camping.", rulesText: "Needs at least one road edge. It shines near Group Sites and tent camping." },
-    bathrooms: { id: "bathrooms", name: "Bathrooms", shortLabel: "Bath", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#b496d8", accent: "#735796", tags: ["amenity", "service"], description: "A practical campground service tile added for prototype clarity.", rulesText: "Uses the same strong-road-access rule as RV sites." }
+    ice_cream_vending: { id: "ice_cream_vending", name: "Ice Cream Vending", shortLabel: "Ice Cream", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#efb2c8", accent: "#b56f8d", tags: ["amenity", "family", "premium"], description: "A central-traffic treat stop for busy parts of camp.", rulesText: "Needs at least one road edge and likes the middle of the board." },
+    playground: { id: "playground", name: "Playground", shortLabel: "Play", marketGroup: "amenity", kind: "amenity", copies: 4, cost: CAMP_TILE_COST, color: "#f0a26a", accent: "#b56331", tags: ["amenity", "family"], description: "Best near group and family camping.", rulesText: "Needs at least one road edge. It shines near Group Sites and tent camping." },
+    bathrooms: { id: "bathrooms", name: "Bathrooms", shortLabel: "Bath", marketGroup: "amenity", kind: "amenity", copies: 5, cost: CAMP_TILE_COST, color: "#b496d8", accent: "#735796", tags: ["amenity", "service"], description: "A practical campground service tile added for prototype clarity.", rulesText: "Uses the same strong-road-access rule as RV sites." }
   };
 
-  const AMENITY_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "amenity");
-  const CAMP_MARKET_POOL = Object.values(CAMP_TILE_DEFS).filter((tile) => tile.marketGroup === "camp");
+  // Finite per-column draw decks: the component manifest for the market.
+  // Counts are literal card counts for the whole game; decks deplete and never re-roll.
+  const MARKET_COLUMN_DECKS = {
+    "amenity-1": [["bathrooms", 5], ["firewood", 4], ["event_pavilion", 3], ["ice_cream_vending", 4]],
+    "amenity-2": [["pool", 4], ["playground", 4], ["bike_rental", 3], ["canoe_rental", 3], ["hiking_trail", 2]],
+    "camp-1": [["rustic_tent_forest", 6], ["tent_electric", 6], ["group_site", 4]],
+    "camp-2": [["cabin", 7], ["tent_electric", 5], ["rustic_tent_forest", 4]],
+    "camp-3": [["rv_full_hookups", 7], ["waterfront_site", 5], ["cabin", 4]],
+    "camp-4": [["horse_riding", 4], ["waterfront_site", 5], ["rv_full_hookups", 4], ["group_site", 3]]
+  };
+  const MARKET_VISIBLE_SLOTS = 8;
   const BIG_MARKET_ITEM_IDS = new Set([
     "rv_full_hookups",
     "group_site",
@@ -335,7 +518,7 @@
     },
     {
       typeId: "waterfront_site",
-      body: "Waterfront Site: This is a lodging tile, a premium tile, and a big market item. It always occupies exactly 2 campground squares. The preview starts with the clicked parcel plus the parcel to the left, and Rotate switches it to vertical with the same kind of up-or-down fallback. The special rule is that at least 1 half must be on a water-edge landscape tile. The other half still must be open and legal, but it does not also need its own water edge.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so a Waterfront Site can satisfy it. Lakeside Premium needs 2 Waterfront Sites. Deluxe Weekend needs at least 1 Waterfront Site, at least 1 Cabin, and at least 1 of those two tiles supported by an amenity within 2 spaces. Paddle Out needs Canoe Rental within 2 spaces of a Waterfront Site. Lakeside Leisure needs Canoe Rental or Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend needs 2 Waterfront Sites plus at least 1 supporting leisure amenity, which can be Canoe Rental or Ice Cream Vending. The Waterfront Draw gives 5 director points for having at least 1 Waterfront Site and another 2 points if you reach 2 Waterfront Sites. Cooling Off can also use Waterfront Site as one of its 3 cooling attractions.\n\nGeneral goals: Waterfront Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Splash and Stay, Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, Smore to Explore, and the seasonal placement goals."
+      body: "Waterfront Site: This is a lodging tile, a premium tile, and a big market item. It always occupies exactly 2 campground squares. The preview starts with the clicked parcel plus the parcel to the left, and Rotate switches it to vertical with the same kind of up-or-down fallback. The special rule is that at least 1 half must be on a waterfront parcel (a Lakeside tile). The other half still must be open and legal, but it does not also need its own water edge.\n\nDirect goals: Glamor Guests scores as soon as you have at least 1 Cabin, RV Site, or Waterfront Site, so a Waterfront Site can satisfy it. Lakeside Premium needs 2 Waterfront Sites. Deluxe Weekend needs at least 1 Waterfront Site, at least 1 Cabin, and at least 1 of those two tiles supported by an amenity within 2 spaces. Paddle Out needs Canoe Rental within 2 spaces of a Waterfront Site. Lakeside Leisure needs Canoe Rental or Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend needs 2 Waterfront Sites plus at least 1 supporting leisure amenity, which can be Canoe Rental or Ice Cream Vending. The Waterfront Draw gives 5 director points for having at least 1 Waterfront Site and another 2 points if you reach 2 Waterfront Sites. Cooling Off can also use Waterfront Site as one of its 3 cooling attractions.\n\nGeneral goals: Waterfront Sites also help Tent Row, Welcome Row, Packed Season, End-of-Season Escape, Splash and Stay, Luxury Lane, Premium Cluster, Premium Hospitality, Destination Campground, Destination Status, Smore to Explore, and the seasonal placement goals."
     }
   ];
 
@@ -358,7 +541,7 @@
     },
     {
       typeId: "canoe_rental",
-      body: "Canoe Rental: Canoe Rental is an amenity that must be placed on a landscape tile with a water edge.\n\nDirect goals: Paddle Out needs Canoe Rental within 2 spaces of a Waterfront Site. Adventure Weekend needs Canoe Rental plus Bike Rental plus Hiking Trail. Lakeside Leisure needs Canoe Rental or Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend needs at least 1 Canoe Rental or Ice Cream Vending once you already have 2 Waterfront Sites. The Waterfront Draw gives 3 director points just for having Canoe Rental.\n\nGeneral goals: Canoe Rental also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore."
+      body: "Canoe Rental: Canoe Rental is an amenity that must be placed on a waterfront parcel (a Lakeside tile).\n\nDirect goals: Paddle Out needs Canoe Rental within 2 spaces of a Waterfront Site. Adventure Weekend needs Canoe Rental plus Bike Rental plus Hiking Trail. Lakeside Leisure needs Canoe Rental or Ice Cream Vending within 2 spaces of a Waterfront Site. Waterfront Weekend needs at least 1 Canoe Rental or Ice Cream Vending once you already have 2 Waterfront Sites. The Waterfront Draw gives 3 director points just for having Canoe Rental.\n\nGeneral goals: Canoe Rental also helps Camp Basics, Summer Activity Hub, Destination Campground, Destination Status, and Smore to Explore."
     },
     {
       typeId: "event_pavilion",
@@ -386,7 +569,7 @@
     early: [
       { id: "early-01", name: "Scout Arrival", points: "5 points", body: "Score 5 points if you have at least 2 Group Sites connected to the main road network. A Group Site counts if its own parcel is on the reachable Entrance road network, or if it sits orthogonally next to a reachable road tile.\n\nThe 2 Group Sites do not need to touch each other." },
       { id: "early-02", name: "Glamor Guests", points: "4 points", body: "Score 4 points if you have at least 1 premium guest stay tile: a Cabin, an RV Site with Full Hookups, or a Waterfront Site.\n\nYou only need 1 of those 3 types. Pool and Ice Cream Vending are premium in code, but they do not count for this card because the card only checks those three guest-stay ids." },
-      { id: "early-03", name: "Organized Check-In", points: "4 points", body: "Score 4 points if the Camp Office is connected to the Entrance by road and the shortest road path is 5 tiles or fewer. The code counts the road steps along the graph, including the Office tile.\n\nIf the Office is disconnected, or the shortest route is longer than 5, this goal fails." },
+      { id: "early-03", name: "Organized Check-In", points: "4 points", body: "Score 4 points if the Camp Office is connected to the Entrance by road and the shortest road path is 3 tiles or fewer. The code counts the road steps along the graph, including the Office tile.\n\nThe Office always has to connect to the Entrance, so the real challenge is keeping that link short: if you let the Office drift more than 3 road steps away, this goal fails. A tidy arrival loop near the Entrance wins it." },
       { id: "early-04", name: "Fire Circle Friends", points: "4 points", body: "Score 4 points if at least 1 Firewood tile is orthogonally adjacent to at least 2 campsite or lodging tiles.\n\nDiagonal tiles do not count. The nearby camps do not need to be specific types." },
       { id: "early-05", name: "Tents in the Pines", points: "4 points", body: "Score 4 points if you have at least 3 Rustic Tent Forest tiles anywhere on your board.\n\nThe code only checks the count. They do not need to be on forest parcels, on scenic parcels, or next to each other." },
       { id: "early-06", name: "Beginner's Loop", points: "5 points", body: "Score 5 points if your road network contains any closed loop.\n\nIt does not matter how large the loop is. One working cycle anywhere on the board is enough." },
@@ -473,20 +656,34 @@
     frontScroll: null,
     frontScrollDrag: null,
     overlayScroll: null,
-    overlayScrollDrag: null
+    overlayScrollDrag: null,
+    pendingClick: null,
+    activeClipRect: null,
+    renderErrorCount: 0,
+    needsRender: true,
+    lastRenderAt: 0,
+    lastPointerType: "mouse"
   };
 
-  const controller = Core.createCanvasController({
-    canvas,
-    onResize: handleResize,
-    onPointerMove: handlePointerMove,
-    onPointerDown: handlePointerDown,
-    onPointerUp: handlePointerUp,
-    onWheel: handleWheel,
-    onPointerLeave: handlePointerLeave
-  });
+  const controller = HEADLESS
+    ? {
+        canvas: null,
+        context: null,
+        state: { width: 1280, height: 800, pixelRatio: 1, isFullscreen: false, fullscreenSupported: false },
+        toggleFullscreen: async () => false,
+        resize: () => {}
+      }
+    : Core.createCanvasController({
+        canvas,
+        onResize: handleResize,
+        onPointerMove: handlePointerMove,
+        onPointerDown: handlePointerDown,
+        onPointerUp: handlePointerUp,
+        onWheel: handleWheel,
+        onPointerLeave: handlePointerLeave
+      });
 
-  const nameEditor = createNameEditorController();
+  const nameEditor = HEADLESS ? null : createNameEditorController();
 
   const ctx = controller.context;
   let game = createBootstrapState(2);
@@ -502,9 +699,27 @@
     return { source: null, typeId: null, rotation: 0, orientation: BIG_MARKET_ITEM_ORIENTATION.horizontal, columnIndex: null, slotIndex: null };
   }
 
+  const AI_SEAT_OPTIONS = [
+    { kind: "human", label: "Human", chip: "Human" },
+    { kind: "ai", strategyId: "balanced", label: "Scout (AI)", chip: "AI Scout" },
+    { kind: "ai", strategyId: "premium", label: "Goldie (AI)", chip: "AI Goldie" },
+    { kind: "ai", strategyId: "spread", label: "Maple (AI)", chip: "AI Maple" },
+    { kind: "ai", strategyId: "objective", label: "Compass (AI)", chip: "AI Compass" },
+    { kind: "ai", strategyId: "roads", label: "Gravel (AI)", chip: "AI Gravel" }
+  ];
+
+  function createDefaultSeats() {
+    return Array.from({ length: 5 }, () => ({ optionIndex: 0 }));
+  }
+
+  function getSeatOption(seat) {
+    return AI_SEAT_OPTIONS[seat?.optionIndex || 0] || AI_SEAT_OPTIONS[0];
+  }
+
   function createUiState(playerCount = 2) {
     return {
       configuredPlayerCount: playerCount,
+      seats: createDefaultSeats(),
       appScreen: APP_SCREENS.start,
       returnScreen: APP_SCREENS.start,
       showStartScreen: true,
@@ -530,6 +745,7 @@
       selection: createSelection(),
       inspectedCell: null,
       hoveredCell: null,
+      armedCell: null,
       lastAttempt: null
     };
   }
@@ -668,7 +884,7 @@
     return {
       id: `player-${index + 1}`,
       name: getStoredPlayerName(index),
-      color: PLAYER_COLORS[index % PLAYER_COLORS.length],
+      color: themePlayerColors(PLAYER_COLORS)[index % PLAYER_COLORS.length],
       board: createBoard(),
       money: STARTING_BUDGET,
       score: 0,
@@ -678,6 +894,7 @@
       landscapeInventory: cloneInventory(STARTING_LANDSCAPE_HAND),
       landscapePlacementStack: [],
       scoreLog: [],
+      buyLog: [],
       passedThisRound: false
     };
   }
@@ -842,6 +1059,45 @@
 
   function clearSelection() {
     game.ui.selection = createSelection();
+    game.ui.armedCell = null;
+  }
+
+  function getEffectivePreviewCell() {
+    return game.ui.hoveredCell || game.ui.armedCell;
+  }
+
+  // The set of board cells where the current selection can legally be placed,
+  // memoized by selection + board signature so it costs one pass per change,
+  // not one per frame. Used to tint legal parcels green so a player can see
+  // where a tile can go instead of probing cell by cell.
+  const legalCellsCache = { key: "", set: new Set() };
+
+  function getLegalSelectionCells(player) {
+    const selection = game.ui.selection;
+    if (!player || !selection.source) return null;
+    const orientation = selection.source === "market" ? getSelectedMarketOrientation() : selection.rotation;
+    const key = `${selection.source}|${selection.typeId}|${orientation}|${getBoardSignature(player)}`;
+    if (legalCellsCache.key === key) return legalCellsCache.set;
+    const set = new Set();
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        if (selection.source === "landscape") {
+          if (getLandscapePlacementReasons(game, player, row, col, selection.typeId, selection.rotation).length === 0) {
+            set.add(`${row},${col}`);
+          }
+        } else if (selection.source === "market") {
+          const orientations = isBigMarketItem(selection.typeId)
+            ? [BIG_MARKET_ITEM_ORIENTATION.horizontal, BIG_MARKET_ITEM_ORIENTATION.vertical]
+            : [BIG_MARKET_ITEM_ORIENTATION.horizontal];
+          if (orientations.some((o) => getCampTilePlacementEvaluation(game, player, row, col, selection.typeId, o).reasons.length === 0)) {
+            set.add(`${row},${col}`);
+          }
+        }
+      }
+    }
+    legalCellsCache.key = key;
+    legalCellsCache.set = set;
+    return set;
   }
 
   function clearPendingMarketPurchaseState() {
@@ -886,6 +1142,7 @@
     clearSelection();
     game.ui.inspectedCell = null;
     game.ui.hoveredCell = null;
+    game.ui.armedCell = null;
     game.ui.lastAttempt = null;
   }
 
@@ -976,28 +1233,39 @@
     return createInventoryFromTypeIds(typeIds);
   }
 
+  function buildColumnDeck(columnId) {
+    const composition = MARKET_COLUMN_DECKS[columnId] || [];
+    const cards = [];
+    composition.forEach(([typeId, count]) => {
+      for (let copy = 0; copy < count; copy += 1) cards.push({ typeId });
+    });
+    return Core.shuffle(cards);
+  }
+
   function createMarket() {
     return {
-      columns: MARKET_COLUMNS.map((column) => ({
-        ...column,
-        slots: Array.from({ length: 8 }, () => createMarketSlot(column.category))
-      }))
+      columns: MARKET_COLUMNS.map((column) => {
+        const deck = buildColumnDeck(column.id);
+        return { ...column, slots: deck.splice(0, MARKET_VISIBLE_SLOTS), deck };
+      })
     };
   }
 
-  function createMarketSlot(category) {
-    const pool = category === "amenity" ? AMENITY_MARKET_POOL : CAMP_MARKET_POOL;
-    return {
-      typeId: Core.pickWeighted(pool, (entry) => entry.copies).id
-    };
+  function topUpMarketColumn(column) {
+    if (!column.deck) column.deck = [];
+    while (column.slots.length < MARKET_VISIBLE_SLOTS && column.deck.length) {
+      column.slots.push(column.deck.shift());
+    }
   }
 
-  function refillMarketSlot(gameState, columnIndex, slotIndex) {
-    gameState.market.columns[columnIndex].slots[slotIndex] = createMarketSlot(gameState.market.columns[columnIndex].category);
+  function removeBoughtSlotsAndRefill(gameState, columnIndex, depth) {
+    const column = gameState.market.columns[columnIndex];
+    column.slots.splice(0, depth + 1);
+    topUpMarketColumn(column);
   }
 
   function refreshMarket(gameState) {
-    gameState.market = createMarket();
+    gameState.market.columns.forEach(topUpMarketColumn);
   }
 
   function setActiveRoundObjectives(gameState, roundIndex) {
@@ -1477,7 +1745,7 @@
         reasons.push("This tile needs strong road access from at least two sides on each parcel it occupies.");
       }
       if (typeId === "waterfront_site" && landscapeInfo.hasWaterEdge) waterEdgeCount += 1;
-      if (typeId === "canoe_rental" && !landscapeInfo.hasWaterEdge) reasons.push("Canoe Rental must sit on a water-edge landscape tile.");
+      if (typeId === "canoe_rental" && !landscapeInfo.hasWaterEdge) reasons.push("Canoe Rental must sit on a waterfront parcel (a Lakeside tile).");
       if (typeId === "horse_riding") {
         if (landscapeInfo.roadEdgeCount < 1) reasons.push("Horse Riding needs at least one road edge on each parcel it occupies.");
         if (!landscapeInfo.hasScenicTag && !landscapeInfo.hasForestTag && !isBorderParcel(targetCell.row, targetCell.col)) reasons.push("Horse Riding wants scenic, forest, or edge-of-camp placement for each half.");
@@ -1491,7 +1759,7 @@
     }
 
     if (typeId === "waterfront_site" && waterEdgeCount === 0) {
-      reasons.push("A Waterfront Site needs at least one half on a water-edge landscape tile.");
+      reasons.push("A Waterfront Site needs at least one half on a waterfront parcel (a Lakeside tile).");
     }
 
     return {
@@ -1517,15 +1785,57 @@
     return false;
   }
 
-  function getBlockedMarketPurchaseReason(gameState, player, stack) {
+  function getBlockedMarketPurchaseReason(gameState, player, stack, placeAnywhereCheck = canPlaceCampTileAnywhere) {
     if (!player) return "No player is active.";
-    const blockedBigItem = stack.find((entry) => isBigMarketItem(entry.typeId) && !canPlaceCampTileAnywhere(gameState, player, entry.typeId));
-    if (blockedBigItem) {
-      return blockedBigItem.typeId === "waterfront_site"
-        ? "You cannot hire Waterfront Sites right now because your campground has no open legal two-square waterfront placement."
-        : `You cannot hire ${getCampDef(blockedBigItem.typeId).name} right now because your campground has no open legal two-square placement for it.`;
+    // A stack must be fully placeable: you cannot hire a contractor you have
+    // nowhere to put. This stops the buy-a-dead-card trap (a Canoe with no
+    // waterfront parcel, etc.) instead of letting a player pay then get stuck.
+    const blocked = stack.find((entry) => !placeAnywhereCheck(gameState, player, entry.typeId));
+    if (blocked) {
+      const def = getCampDef(blocked.typeId);
+      if (blocked.typeId === "waterfront_site") return "You cannot hire Waterfront Sites yet: your campground has no open waterfront parcel pair for a two-square placement.";
+      if (blocked.typeId === "canoe_rental") return "You cannot hire Canoe Rental yet: it needs an open waterfront (lakeside) parcel, and you do not have one.";
+      if (isBigMarketItem(blocked.typeId)) return `You cannot hire ${def.name} yet: your campground has no open legal two-square placement for it.`;
+      return `You cannot hire ${def.name} yet: your campground has no open legal parcel for it.`;
     }
     return "";
+  }
+
+  const placeAnywhereRenderCache = { key: "", results: new Map() };
+
+  function getBoardSignature(player) {
+    let signature = 0;
+    for (let row = 0; row < BOARD_ROWS; row += 1) {
+      for (let col = 0; col < BOARD_COLS; col += 1) {
+        const cell = getCell(player.board, row, col);
+        const index = row * BOARD_COLS + col + 1;
+        if (cell.landscapeTile) signature += index * 7 + (cell.landscapeTile.rotation || 0);
+        if (cell.campTile) signature += index * 131;
+      }
+    }
+    return signature;
+  }
+
+  function canPlaceCampTileAnywhereCached(gameState, player, typeId) {
+    const key = `${gameState.currentPlayerIndex}|${gameState.roundIndex}|${getBoardSignature(player)}`;
+    if (placeAnywhereRenderCache.key !== key) {
+      placeAnywhereRenderCache.key = key;
+      placeAnywhereRenderCache.results.clear();
+    }
+    if (!placeAnywhereRenderCache.results.has(typeId)) {
+      placeAnywhereRenderCache.results.set(typeId, canPlaceCampTileAnywhere(gameState, player, typeId));
+    }
+    return placeAnywhereRenderCache.results.get(typeId);
+  }
+
+  function getBlockedMarketPurchaseReasonForRender(gameState, player, stack) {
+    return getBlockedMarketPurchaseReason(gameState, player, stack, canPlaceCampTileAnywhereCached);
+  }
+
+  function marketBlockedShortLabel(reason) {
+    if (/waterfront|lakeside/i.test(reason)) return "No waterfront spot";
+    if (/two-square/i.test(reason)) return "No 2-square spot";
+    return "No legal spot yet";
   }
 
   function getLargestCampCluster(board, campCells, predicate) {
@@ -1894,13 +2204,214 @@
   }
 
   function beginPlaySession(playerCount) {
+    const seats = (game.ui.seats || createDefaultSeats()).slice();
     game = createGameState(playerCount);
+    game.ui.seats = seats;
+    game.players.forEach((player, index) => {
+      const option = getSeatOption(seats[index]);
+      player.isAi = option.kind === "ai";
+      player.strategyId = option.kind === "ai" ? option.strategyId : null;
+      if (player.isAi) player.name = option.label;
+    });
     setActiveScene(getDefaultSceneForGameState(game));
   }
 
   function restartToStartScreen() {
     nameEditor?.close();
+    clearSavedGame();
     game = createBootstrapState(game.ui.configuredPlayerCount || 2);
+  }
+
+  const GAME_SAVE_STORAGE_KEY = "smore-to-explore-save-v1";
+
+  function sanitizeForSave(value, playerIndexOf) {
+    if (value === null || typeof value !== "object") {
+      return typeof value === "function" ? undefined : value;
+    }
+    if (playerIndexOf.has(value)) return { __playerRef: playerIndexOf.get(value) };
+    if (typeof value.evaluate === "function" && value.id) return { __objectiveRef: value.id };
+    if (Array.isArray(value)) return value.map((entry) => sanitizeForSave(entry, playerIndexOf));
+    const out = {};
+    for (const [key, entry] of Object.entries(value)) {
+      const sanitized = sanitizeForSave(entry, playerIndexOf);
+      if (sanitized !== undefined) out[key] = sanitized;
+    }
+    return out;
+  }
+
+  function buildSaveSnapshot() {
+    const playerIndexOf = new Map(game.players.map((player, index) => [player, index]));
+    const emptyRefs = new Map();
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      phase: game.phase,
+      roundIndex: game.roundIndex,
+      currentPlayerIndex: game.currentPlayerIndex,
+      directorRevealed: game.directorRevealed,
+      players: game.players.map((player) => sanitizeForSave(player, emptyRefs)),
+      roundDecks: sanitizeForSave(game.roundDecks, emptyRefs),
+      activeRoundObjectives: sanitizeForSave(game.activeRoundObjectives, emptyRefs),
+      directorDeck: sanitizeForSave(game.directorDeck, emptyRefs),
+      activeDirectorObjectives: sanitizeForSave(game.activeDirectorObjectives, emptyRefs),
+      market: sanitizeForSave(game.market, emptyRefs),
+      turn: sanitizeForSave(game.turn, emptyRefs),
+      message: sanitizeForSave(game.message, emptyRefs),
+      feed: sanitizeForSave(game.feed, emptyRefs),
+      overlay: game.overlay && game.overlay.kind !== "rename-players"
+        ? sanitizeForSave(game.overlay, playerIndexOf)
+        : null
+    };
+  }
+
+  function saveGameToStorage() {
+    if (game.ui?.appScreen !== APP_SCREENS.inGame || !game.players.length) return;
+    try {
+      localStorage.setItem(GAME_SAVE_STORAGE_KEY, JSON.stringify(buildSaveSnapshot()));
+    } catch (_error) {
+      // storage unavailable or full; resuming is best-effort
+    }
+  }
+
+  function readSavedGame() {
+    try {
+      const raw = localStorage.getItem(GAME_SAVE_STORAGE_KEY);
+      if (!raw) return null;
+      const snapshot = JSON.parse(raw);
+      if (!snapshot || snapshot.version !== 1) return null;
+      if (!Array.isArray(snapshot.players) || snapshot.players.length < 2 || snapshot.players.length > 5) return null;
+      return snapshot;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function clearSavedGame() {
+    runtime.savedGameAvailable = false;
+    try {
+      localStorage.removeItem(GAME_SAVE_STORAGE_KEY);
+    } catch (_error) {
+      // ignore
+    }
+  }
+
+  function buildObjectiveIndex() {
+    const index = new Map();
+    [
+      ...ObjectiveFactory.createEarlySummerObjectives(),
+      ...ObjectiveFactory.createMidSummerObjectives(),
+      ...ObjectiveFactory.createLateSummerObjectives(),
+      ...ObjectiveFactory.createDirectorObjectives()
+    ].forEach((objective) => index.set(objective.id, objective));
+    return index;
+  }
+
+  function restoreSavedGame(snapshot) {
+    const objectiveIndex = buildObjectiveIndex();
+    const revivedPlayers = [];
+    const revive = (value) => {
+      if (value === null || typeof value !== "object") return value;
+      if (value.__playerRef !== undefined) return revivedPlayers[value.__playerRef];
+      if (value.__objectiveRef !== undefined) return objectiveIndex.get(value.__objectiveRef) || null;
+      if (Array.isArray(value)) return value.map(revive);
+      const out = {};
+      for (const [key, entry] of Object.entries(value)) out[key] = revive(entry);
+      return out;
+    };
+    snapshot.players.forEach((player) => revivedPlayers.push(revive(player)));
+
+    const reviveObjectiveList = (list) => (revive(list) || []).filter(Boolean);
+    const activeRoundObjectives = reviveObjectiveList(snapshot.activeRoundObjectives);
+    const activeDirectorObjectives = reviveObjectiveList(snapshot.activeDirectorObjectives);
+    if (snapshot.activeRoundObjectives?.length && activeRoundObjectives.length !== snapshot.activeRoundObjectives.length) {
+      return false;
+    }
+
+    game = {
+      phase: snapshot.phase,
+      roundIndex: snapshot.roundIndex,
+      players: revivedPlayers,
+      currentPlayerIndex: Core.clamp(snapshot.currentPlayerIndex || 0, 0, revivedPlayers.length - 1),
+      roundDecks: {
+        early: reviveObjectiveList(snapshot.roundDecks?.early),
+        mid: reviveObjectiveList(snapshot.roundDecks?.mid),
+        late: reviveObjectiveList(snapshot.roundDecks?.late)
+      },
+      activeRoundObjectives,
+      directorDeck: reviveObjectiveList(snapshot.directorDeck),
+      activeDirectorObjectives,
+      directorRevealed: !!snapshot.directorRevealed,
+      market: revive(snapshot.market),
+      message: revive(snapshot.message) || { tone: "info", title: "Game resumed", body: "Pick up where the table left off." },
+      feed: revive(snapshot.feed) || [],
+      overlay: revive(snapshot.overlay),
+      ui: {
+        ...createUiState(revivedPlayers.length),
+        appScreen: APP_SCREENS.inGame,
+        returnScreen: APP_SCREENS.inGame,
+        showStartScreen: false,
+        gameActive: true
+      },
+      turn: revive(snapshot.turn) || createTurnState()
+    };
+
+    let maxPlacementId = 0;
+    revivedPlayers.forEach((player) => {
+      for (let row = 0; row < BOARD_ROWS; row += 1) {
+        for (let col = 0; col < BOARD_COLS; col += 1) {
+          const placementId = getCell(player.board, row, col)?.campTile?.placementId;
+          const match = typeof placementId === "string" && placementId.match(/^camp-placement-(\d+)$/);
+          if (match) maxPlacementId = Math.max(maxPlacementId, Number(match[1]));
+        }
+      }
+    });
+    nextCampPlacementId = Math.max(nextCampPlacementId, maxPlacementId + 1);
+
+    // Migrate pre-finite-deck saves: their market columns have visible slots but
+    // no draw deck, so without this the market would never refill after a buy.
+    // Rebuild each column's deck from its manifest minus the cards still visible.
+    (game.market?.columns || []).forEach((column) => {
+      if (Array.isArray(column.deck)) return;
+      const remaining = buildColumnDeck(column.id);
+      (column.slots || []).forEach((slot) => {
+        const index = remaining.findIndex((card) => card.typeId === slot.typeId);
+        if (index >= 0) remaining.splice(index, 1);
+      });
+      column.deck = remaining;
+    });
+
+    if (game.phase === "build" && game.turn.marketPurchaseStack.length > game.turn.marketPurchaseIndex) {
+      const pendingEntry = game.turn.marketPurchaseStack[game.turn.marketPurchaseIndex];
+      game.ui.selection = {
+        source: "market",
+        typeId: pendingEntry.typeId,
+        rotation: 0,
+        orientation: BIG_MARKET_ITEM_ORIENTATION.horizontal,
+        columnIndex: game.turn.marketPurchaseColumnIndex,
+        slotIndex: pendingEntry.slotIndex
+      };
+    }
+
+    setActiveScene(getDefaultSceneForGameState(game));
+    return true;
+  }
+
+  function resumeSavedGameFromMenu() {
+    const snapshot = readSavedGame();
+    if (!snapshot) {
+      runtime.savedGameAvailable = false;
+      setMessage(game, "warning", "No saved game", "The saved session could not be loaded. Start a new game instead.");
+      return;
+    }
+    try {
+      if (!restoreSavedGame(snapshot)) {
+        clearSavedGame();
+        setMessage(game, "warning", "Resume failed", "The saved session was incomplete, so it was discarded.");
+      }
+    } catch (_error) {
+      clearSavedGame();
+      setMessage(game, "warning", "Resume failed", "The saved session could not be restored, so it was discarded.");
+    }
   }
 
   function openPauseMenu() {
@@ -1912,7 +2423,7 @@
     };
   }
 
-  function openDetailedRulesOverlay(section = "sites", goalRound = "early", page = 0) {
+  function openDetailedRulesOverlay(section = "sites", goalRound = "early", page = 0, topic = null) {
     nameEditor?.close();
     resetOverlayScroll();
     game.overlay = {
@@ -1920,7 +2431,9 @@
       blocking: true,
       section,
       goalRound,
-      page
+      page,
+      topic: topic || null,
+      topicPage: 0
     };
   }
 
@@ -1950,6 +2463,56 @@
             : "Late Summer"}`,
       body: entry.body
     }));
+  }
+
+  const GOAL_ROUND_LABELS = {
+    early: "Early Summer",
+    mid: "Mid Summer",
+    late: "Late Summer",
+    director: "Camp Director"
+  };
+
+  // Topic chips filter the detailed rules across every section (sites, amenities, goals).
+  // Each chip matches an entry when any of its match words appear in the entry name or body.
+  // This is the canvas-only filter we shipped instead of an HTML text box: no DOM positioning
+  // math over the scaled canvas, robust hit-testing, and it answers the common "where can X go"
+  // questions in one tap. See the final notes for the rationale.
+  const DETAILED_RULE_TOPICS = [
+    { id: "waterfront", label: "Water / Waterfront", words: ["waterfront", "lakeside", "canoe", "water edge", "water-edge"] },
+    { id: "roads", label: "Roads", words: ["road", "dead end", "dead-end", "hub", "loop", "intersection", "longest route"] },
+    { id: "big-items", label: "Big 2-square items", words: ["2 campground squares", "two-square", "big market item", "rotate", "both halves"] },
+    { id: "office-entrance", label: "Office & Entrance", words: ["camp office", "entrance", "reserved"] },
+    { id: "scoring", label: "Scoring & goals", words: ["points", "score", "director", "bonus", "premium"] }
+  ];
+
+  function getTopicById(topicId) {
+    return DETAILED_RULE_TOPICS.find((topic) => topic.id === topicId) || null;
+  }
+
+  // Flatten every detailed-rules entry across all sections so a topic filter can span them.
+  function getAllDetailedRuleEntries() {
+    const entries = [];
+    getDetailedRuleSectionEntries("sites").forEach((entry) => {
+      entries.push({ ...entry, section: "sites", sectionLabel: "Site" });
+    });
+    getDetailedRuleSectionEntries("amenities").forEach((entry) => {
+      entries.push({ ...entry, section: "amenities", sectionLabel: "Amenity" });
+    });
+    ["early", "mid", "late", "director"].forEach((round) => {
+      getDetailedRuleSectionEntries("goals", round).forEach((entry) => {
+        entries.push({ ...entry, section: "goals", goalRound: round, sectionLabel: GOAL_ROUND_LABELS[round] });
+      });
+    });
+    return entries;
+  }
+
+  function filterDetailedRuleEntriesByTopic(topicId) {
+    const topic = getTopicById(topicId);
+    if (!topic) return [];
+    return getAllDetailedRuleEntries().filter((entry) => {
+      const haystack = `${entry.title} ${entry.body}`.toLowerCase();
+      return topic.words.some((word) => haystack.includes(word));
+    });
   }
 
   function openRenamePlayersOverlay() {
@@ -2176,6 +2739,7 @@
     pending.placementId = builtPlacement.placementId;
     pending.occupiedCells = builtPlacement.occupiedCells.map((cell) => ({ row: cell.row, col: cell.col }));
     player.roundCampPlacements[game.roundIndex] += 1;
+    (player.buyLog || (player.buyLog = [])).push({ round: game.roundIndex, typeId: pending.typeId }); // pre-buyLog saved games restore without the field
     player.passedThisRound = false;
     game.ui.inspectedCell = { row: builtPlacement.anchorRow, col: builtPlacement.anchorCol };
 
@@ -2202,9 +2766,7 @@
     const completedCount = game.turn.marketPurchaseStack.length;
     const completedCost = game.turn.marketPurchaseTotalCost;
     const completedColumnLabel = game.market.columns[game.turn.marketPurchaseColumnIndex].label;
-    for (let refillIndex = 0; refillIndex <= game.turn.marketPurchaseDepth; refillIndex += 1) {
-      refillMarketSlot(game, game.turn.marketPurchaseColumnIndex, refillIndex);
-    }
+    removeBoughtSlotsAndRefill(game, game.turn.marketPurchaseColumnIndex, game.turn.marketPurchaseDepth);
     clearPendingMarketPurchaseState();
     game.turn.actionTaken = true;
     game.turn.actionType = "build";
@@ -2238,7 +2800,9 @@
     }
 
     game.phase = "build";
-    game.currentPlayerIndex = 0;
+    // Rotate the build-phase starting player each round: the shared market
+    // gives the first buyer a real edge, so the seat that opens it must change.
+    game.currentPlayerIndex = game.roundIndex % game.players.length;
     game.turn = createTurnState();
     clearTurnUi();
     setActiveScene("market");
@@ -2419,6 +2983,7 @@
 
   function handleResize() {
     runtime.layout = null;
+    runtime.needsRender = true;
   }
 
   function registerTarget(rect, onClick, options = {}) {
@@ -2429,7 +2994,8 @@
       enabled: options.enabled !== false,
       scope: options.scope || "main",
       kind: options.kind || "button",
-      data: options.data || null
+      data: options.data || null,
+      clipRect: options.clipRect || runtime.activeClipRect
     };
     runtime.targets.push(target);
     return target.id;
@@ -2443,6 +3009,7 @@
       if (!target.enabled) continue;
       if (frontOnly && target.scope !== "front") continue;
       if (overlayOnly && target.scope !== "overlay") continue;
+      if (target.clipRect && !Core.pointInRect(point, target.clipRect)) continue;
       if (Core.pointInRect(point, target.rect)) return target;
     }
     return null;
@@ -2480,7 +3047,30 @@
     return true;
   }
 
-  function handlePointerMove(point) {
+  const CLICK_SLOP_PX = 10;
+  const CLICK_MAX_DURATION_MS = 1200;
+
+  function activeGesturePointerId() {
+    if (runtime.pendingClick) return runtime.pendingClick.pointerId;
+    if (runtime.overlayScrollDrag) return runtime.overlayScrollDrag.pointerId;
+    if (runtime.frontScrollDrag) return runtime.frontScrollDrag.pointerId;
+    return null;
+  }
+
+  function isForeignPointer(event) {
+    const owner = activeGesturePointerId();
+    return owner !== null && owner !== (event?.pointerId ?? -1);
+  }
+
+  function handlePointerMove(point, event) {
+    if (isForeignPointer(event)) return;
+    runtime.needsRender = true;
+    const pending = runtime.pendingClick;
+    if (pending && !pending.moved) {
+      const dx = point.x - pending.start.x;
+      const dy = point.y - pending.start.y;
+      if (dx * dx + dy * dy > CLICK_SLOP_PX * CLICK_SLOP_PX) pending.moved = true;
+    }
     if (runtime.overlayScrollDrag && handleOverlayScrollDrag(point)) {
       runtime.hoveredTargetId = null;
       game.ui.hoveredCell = null;
@@ -2496,13 +3086,18 @@
     game.ui.hoveredCell = target?.kind === "board-cell" ? target.data : null;
   }
 
-  function handlePointerDown(point) {
+  function handlePointerDown(point, event) {
+    if (isForeignPointer(event)) return;
+    const pointerId = event?.pointerId ?? -1;
+    runtime.needsRender = true;
+    runtime.lastPointerType = event?.pointerType || "mouse";
     const overlayScrollState = runtime.overlayScroll;
     if (overlayScrollState?.kind === "overlay" && overlayScrollState.maxScroll > 0) {
       if (overlayScrollState.thumbRect && Core.pointInRect(point, overlayScrollState.thumbRect)) {
         runtime.overlayScrollDrag = {
           kind: "overlay",
           mode: "thumb",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.overlayScroll
         };
@@ -2515,6 +3110,7 @@
         runtime.overlayScrollDrag = {
           kind: "overlay",
           mode: "thumb",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.overlayScroll
         };
@@ -2524,6 +3120,7 @@
         runtime.overlayScrollDrag = {
           kind: "overlay",
           mode: "content",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.overlayScroll
         };
@@ -2536,6 +3133,7 @@
         runtime.frontScrollDrag = {
           kind: "howto",
           mode: "thumb",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.howToScroll
         };
@@ -2548,6 +3146,7 @@
         runtime.frontScrollDrag = {
           kind: "howto",
           mode: "thumb",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.howToScroll
         };
@@ -2557,6 +3156,7 @@
         runtime.frontScrollDrag = {
           kind: "howto",
           mode: "content",
+          pointerId,
           startY: point.y,
           startScroll: game.ui.howToScroll
         };
@@ -2564,16 +3164,46 @@
     }
 
     const target = findTargetAtPoint(point);
-    if (!target || !target.onClick) return;
-    target.onClick();
+    if (target && target.onClick) {
+      runtime.pendingClick = { targetId: target.id, start: point, moved: false, pointerId, at: performance.now() };
+    } else if (isOverlayBackdropDismiss(point)) {
+      // Tap on the dimmed area outside a dismissible modal closes it.
+      runtime.pendingClick = { dismissOverlay: true, start: point, moved: false, pointerId, at: performance.now() };
+    } else {
+      runtime.pendingClick = null;
+    }
   }
 
-  function handlePointerUp() {
+  // True when a blocking, dismissible overlay (the pause menu) is open and the
+  // point is on the dimmed backdrop outside its panel.
+  function isOverlayBackdropDismiss(point) {
+    return !!(game.overlay
+      && game.overlay.kind === "pause-menu"
+      && runtime.overlayPanelRect
+      && point
+      && !Core.pointInRect(point, runtime.overlayPanelRect));
+  }
+
+  function handlePointerUp(point, event) {
+    if (isForeignPointer(event)) return;
+    runtime.needsRender = true;
+    const pending = runtime.pendingClick;
+    runtime.pendingClick = null;
     runtime.overlayScrollDrag = null;
     runtime.frontScrollDrag = null;
+    if (!pending || pending.moved || !point) return;
+    if (performance.now() - pending.at > CLICK_MAX_DURATION_MS) return;
+    if (pending.dismissOverlay) {
+      // Confirm the release is still on the backdrop before treating it as Resume.
+      if (isOverlayBackdropDismiss(point)) closeOverlay();
+      return;
+    }
+    const target = findTargetAtPoint(point);
+    if (target && target.id === pending.targetId && target.onClick) target.onClick();
   }
 
   function handleWheel(point, event) {
+    runtime.needsRender = true;
     const overlayScrollState = runtime.overlayScroll;
     if (overlayScrollState && overlayScrollState.kind === "overlay" && overlayScrollState.maxScroll > 0) {
       if (Core.pointInRect(point, overlayScrollState.rect) || (overlayScrollState.trackRect && Core.pointInRect(point, overlayScrollState.trackRect))) {
@@ -2589,11 +3219,14 @@
     return true;
   }
 
-  function handlePointerLeave() {
+  function handlePointerLeave(point, event) {
+    if (isForeignPointer(event)) return;
+    runtime.needsRender = true;
     runtime.hoveredTargetId = null;
     game.ui.hoveredCell = null;
     runtime.overlayScrollDrag = null;
     runtime.frontScrollDrag = null;
+    runtime.pendingClick = null;
   }
 
   function getPhaseLabel() {
@@ -2617,9 +3250,12 @@ function computeLayout(width, height) {
   const mode = getLayoutMode(width, height);
   const selectionHeavy = game.ui.selection.source === "landscape" || game.ui.selection.source === "market" || hasPendingMarketPurchase();
   const short = height <= 430;
+  const shortLandscape = mode === "mobile-landscape" && short;
 
   const topBarHeight = mode === "desktop"
     ? 70
+    : shortLandscape
+    ? 40
     : mode === "mobile-landscape"
     ? 60
     : short
@@ -2628,20 +3264,22 @@ function computeLayout(width, height) {
 
   const sceneBarHeight = mode === "desktop"
     ? 34
-    : mode === "mobile-landscape"
-    ? 34
-    : 30;
+    : shortLandscape
+    ? 36
+    : 38;
 
   const playersDrawerHeight = game.players.length > 1 && game.ui.playersPanelExpanded
-    ? (mode === "desktop" ? 84 : mode === "mobile-landscape" ? 64 : short ? 66 : 76)
+    ? (mode === "desktop" ? 84 : shortLandscape ? 48 : mode === "mobile-landscape" ? 64 : short ? 66 : 76)
     : 0;
 
   const bottomBarHeight = mode === "desktop"
     ? 84
+    : shortLandscape
+    ? 52
     : mode === "mobile-landscape"
     ? 82
     : selectionHeavy
-    ? 152
+    ? 160
     : 124;
 
   const topBar = { x: pad, y: pad, w: width - pad * 2, h: topBarHeight };
@@ -2659,20 +3297,20 @@ function computeLayout(width, height) {
   };
 
   if (mode === "desktop" || mode === "mobile-landscape") {
-    const boardRatio = mode === "desktop" ? 0.63 : 0.58;
+    const boardRatio = mode === "desktop" ? 0.63 : shortLandscape ? 0.6 : 0.58;
     const boardPane = { x: content.x, y: content.y, w: Math.round(content.w * boardRatio), h: content.h };
     const contextPane = { x: boardPane.x + boardPane.w + gap, y: content.y, w: content.w - boardPane.w - gap, h: content.h };
-    return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, boardPane, contextPane };
+    return { mode, shortLandscape, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, boardPane, contextPane };
   }
 
   const mainPane = { x: content.x, y: content.y, w: content.w, h: content.h };
-  return { mode, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, mainPane };
+  return { mode, shortLandscape, pad, gap, width, height, topBar, sceneBar, playersDrawer, bottomBar, content, mainPane };
 }
   
   function getBoardGeometry(panelRect) {
-    const headerHeight = runtime.layout.mode === "mobile-portrait" ? 58 : 34;
+    const headerHeight = runtime.layout.mode === "mobile-portrait" ? 58 : runtime.layout.shortLandscape ? 22 : 34;
     const inner = Core.insetRect(panelRect, 12);
-    const rackVisible = game.phase === "setupLandscape" && runtime.layout.mode !== "mobile-portrait";
+    const rackVisible = game.phase === "setupLandscape" && runtime.layout.mode !== "mobile-portrait" && !runtime.layout.shortLandscape;
     const rackHeight = rackVisible ? Core.clamp(Math.round(panelRect.h * 0.24), runtime.layout.mode === "mobile-landscape" ? 128 : 104, 168) : 0;
     const boardArea = {
       x: inner.x,
@@ -2686,14 +3324,14 @@ function computeLayout(width, height) {
   }
 
   function getBoardGeometryForArea(boardArea, rackRect = null, headerHeight = 0) {
-    const labelSize = runtime.layout.mode === "mobile-portrait" ? 16 : 22;
+    const labelSize = runtime.layout.mode === "mobile-portrait" ? 16 : runtime.layout.shortLandscape ? 14 : 22;
     const gap = Core.clamp(Math.floor(Math.min(boardArea.w / 80, boardArea.h / 40) * 6), runtime.layout.mode === "mobile-portrait" ? 2 : 3, 8);
     const availableWidth = boardArea.w - labelSize;
     const availableHeight = boardArea.h - labelSize;
-    const cellSize = Math.floor(Math.min(
+    const cellSize = Math.max(4, Math.floor(Math.min(
       (availableWidth - gap * (BOARD_COLS - 1)) / BOARD_COLS,
       (availableHeight - gap * (BOARD_ROWS - 1)) / BOARD_ROWS
-    ));
+    )));
     const boardWidth = cellSize * BOARD_COLS + gap * (BOARD_COLS - 1);
     const boardHeight = cellSize * BOARD_ROWS + gap * (BOARD_ROWS - 1);
     const originX = boardArea.x + labelSize + Math.max(0, (availableWidth - boardWidth) / 2);
@@ -2730,9 +3368,10 @@ function computeLayout(width, height) {
   }
 
   function drawPanel(rect, title, subtitle) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(255, 251, 245, 0.94)", "rgba(108, 80, 54, 0.18)", 1);
-    ctx.fillStyle = "#3f2d20";
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, themed("rgba(255, 251, 245, 0.94)"), themed("rgba(108, 80, 54, 0.18)"), 1);
+    ctx.fillStyle = themed("#3f2d20");
     const isPortrait = runtime.layout.mode === "mobile-portrait";
+    const stackSubtitle = isPortrait || rect.w < 430;
     ctx.font = isPortrait
       ? "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -2740,46 +3379,47 @@ function computeLayout(width, height) {
     ctx.textBaseline = "top";
     ctx.fillText(title, rect.x + 10, rect.y + 6);
     if (subtitle) {
-      Core.drawWrappedText(ctx, subtitle, isPortrait ? rect.x + 10 : rect.x + rect.w - 10, rect.y + (isPortrait ? 22 : 6), isPortrait ? rect.w - 20 : Math.max(110, rect.w * 0.54), isPortrait ? 11 : 12, {
-        font: isPortrait
+      Core.drawWrappedText(ctx, subtitle, stackSubtitle ? rect.x + 10 : rect.x + rect.w - 10, rect.y + (stackSubtitle ? 22 : 6), stackSubtitle ? rect.w - 20 : Math.max(110, rect.w * 0.54), stackSubtitle ? 11 : 12, {
+        font: stackSubtitle
           ? "600 9px 'Avenir Next', 'Trebuchet MS', sans-serif"
           : "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        align: isPortrait ? "left" : "right",
-        color: "rgba(82, 61, 44, 0.72)",
-        maxLines: isPortrait ? 2 : 2
+        align: stackSubtitle ? "left" : "right",
+        color: themed("rgba(82, 61, 44, 0.72)"),
+        maxLines: 2
       });
     }
+    const headerSpace = stackSubtitle && subtitle ? 40 : isPortrait ? 40 : 30;
     return {
       x: rect.x + 8,
-      y: rect.y + (isPortrait ? 40 : 30),
+      y: rect.y + headerSpace,
       w: rect.w - 16,
-      h: rect.h - (isPortrait ? 48 : 38)
+      h: rect.h - headerSpace - 8
     };
   }
 
   function getButtonPalette(variant, enabled, selected) {
     if (!enabled) {
       return {
-        fill: "rgba(223, 214, 201, 0.9)",
-        stroke: "rgba(116, 98, 77, 0.14)",
-        text: "rgba(91, 74, 56, 0.52)"
+        fill: themed("rgba(223, 214, 201, 0.9)"),
+        stroke: themed("rgba(116, 98, 77, 0.14)"),
+        text: themed("rgba(91, 74, 56, 0.52)")
       };
     }
     if (selected) {
       return {
-        fill: "#d38245",
-        stroke: "#a55723",
-        text: "#fff9f3"
+        fill: themed("#d38245"),
+        stroke: themed("#a55723"),
+        text: themed("#fff9f3")
       };
     }
-    if (variant === "primary") return { fill: "#ca6f36", stroke: "#995127", text: "#fff7f1" };
-    if (variant === "danger") return { fill: "#a95f55", stroke: "#7d3a34", text: "#fff7f6" };
-    if (variant === "success") return { fill: "#5f8d65", stroke: "#3e6544", text: "#f7fff8" };
-    if (variant === "warning") return { fill: "#d3a24d", stroke: "#9e7331", text: "#fff8ee" };
+    if (variant === "primary") return theme().buttonPrimary || { fill: themed("#ca6f36"), stroke: themed("#995127"), text: themed("#fff7f1") };
+    if (variant === "danger") return { fill: themed("#a95f55"), stroke: themed("#7d3a34"), text: themed("#fff7f6") };
+    if (variant === "success") return { fill: themed("#5f8d65"), stroke: themed("#3e6544"), text: themed("#f7fff8") };
+    if (variant === "warning") return { fill: themed("#d3a24d"), stroke: themed("#9e7331"), text: themed("#fff8ee") };
     return {
-      fill: "rgba(247, 236, 220, 0.98)",
-      stroke: "rgba(108, 80, 54, 0.18)",
-      text: "#4a3524"
+      fill: themed("rgba(247, 236, 220, 0.98)"),
+      stroke: themed("rgba(108, 80, 54, 0.18)"),
+      text: themed("#4a3524")
     };
   }
 
@@ -2792,12 +3432,17 @@ function computeLayout(width, height) {
     const radius = options.radius || (runtime.layout?.mode === "mobile-portrait" ? 8 : 6);
 
     if (onClick) {
-      registerTarget(rect, onClick, { id, enabled, scope: options.scope || "main", kind: "button" });
+      const insetX = typeof options.hitInset === "object" ? options.hitInset.x : options.hitInset || 0;
+      const insetY = typeof options.hitInset === "object" ? options.hitInset.y : options.hitInset || 0;
+      const hitRect = insetX || insetY
+        ? { x: rect.x - insetX, y: rect.y - insetY, w: rect.w + insetX * 2, h: rect.h + insetY * 2 }
+        : rect;
+      registerTarget(hitRect, onClick, { id, enabled, scope: options.scope || "main", kind: "button" });
     }
 
     Core.drawRoundedRect(ctx, rect.x, rect.y + yOffset, rect.w, rect.h, radius, palette.fill, palette.stroke, hovered && enabled ? 2 : 1.5);
     if (hovered && enabled) {
-      Core.drawRoundedRect(ctx, rect.x + 2, rect.y + yOffset + 2, rect.w - 4, rect.h - 4, radius - 2, null, "rgba(255,255,255,0.28)", 1);
+      Core.drawRoundedRect(ctx, rect.x + 2, rect.y + yOffset + 2, rect.w - 4, rect.h - 4, radius - 2, null, themed("rgba(255,255,255,0.28)"), 1);
     }
 
     ctx.fillStyle = palette.text;
@@ -2811,7 +3456,7 @@ function computeLayout(width, height) {
 
   function drawMenuButton(rect, onClick, options = {}) {
     drawButton(rect, "", onClick, options);
-    const stroke = options.selected ? "#fff9f3" : "#4a3524";
+    const stroke = options.selected ? themed("#fff9f3") : themed("#4a3524");
     const left = rect.x + rect.w * 0.28;
     const right = rect.x + rect.w * 0.72;
     const centerY = rect.y + rect.h / 2 + (options.textYOffset ?? 0);
@@ -2827,7 +3472,7 @@ function computeLayout(width, height) {
 
   function drawFullscreenButton(rect, onClick, options = {}) {
     drawButton(rect, "", onClick, options);
-    const stroke = options.selected ? "#fff9f3" : "#4a3524";
+    const stroke = options.selected ? themed("#fff9f3") : themed("#4a3524");
     const inset = rect.w * 0.26;
     const short = rect.w * 0.14;
     const left = rect.x + inset;
@@ -2876,37 +3521,54 @@ function computeLayout(width, height) {
 
   function drawCurrentPlayerStump(geometry, player) {
     if (!player || !geometry?.boardArea) return;
+    if (runtime.layout.shortLandscape) return;
     const stumpWidth = runtime.layout.mode === "mobile-portrait"
       ? Math.min(64, geometry.boardArea.w * 0.14)
       : Math.min(76, geometry.boardArea.w * 0.11);
-    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 42 : 48;
+    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 50 : 56;
     const rect = {
       x: geometry.boardArea.x + 6,
       y: geometry.boardArea.y + geometry.boardArea.h - stumpHeight - 4,
       w: stumpWidth,
       h: stumpHeight
     };
+    if (theme().playerBadge === "beaver") {
+      drawBeaverSign(rect, player);
+      return;
+    }
+    if (theme().playerBadge === "frog") {
+      drawFrogLilyPad(rect, player);
+      return;
+    }
+    if (theme().playerBadge === "fox") {
+      drawFoxBadge(rect, player);
+      return;
+    }
+    if (theme().playerBadge === "campfire") {
+      drawCampfire(rect, player);
+      return;
+    }
     const topHeight = Math.max(20, rect.h * 0.54);
     const barkFill = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y);
-    barkFill.addColorStop(0, "#7a4d2a");
-    barkFill.addColorStop(0.5, "#8b5d33");
-    barkFill.addColorStop(1, "#6c4326");
+    barkFill.addColorStop(0, themed("#7a4d2a"));
+    barkFill.addColorStop(0.5, themed("#8b5d33"));
+    barkFill.addColorStop(1, themed("#6c4326"));
 
     ctx.save();
-    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + topHeight * 0.84, rect.w - 16, rect.h - topHeight * 0.9, 12, barkFill, "rgba(73, 45, 24, 0.36)", 1.4);
-    Core.drawRoundedRect(ctx, rect.x + 14, rect.y + topHeight * 0.98, 5, rect.h - topHeight - 3, 3, "rgba(168, 118, 73, 0.16)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.52, rect.y + topHeight * 1.02, 4, rect.h - topHeight - 4, 3, "rgba(168, 118, 73, 0.14)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w - 18, rect.y + topHeight * 0.98, 4, rect.h - topHeight - 3, 3, "rgba(168, 118, 73, 0.14)");
+    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + topHeight * 0.84, rect.w - 16, rect.h - topHeight * 0.9, 12, barkFill, themed("rgba(73, 45, 24, 0.36)"), 1.4);
+    Core.drawRoundedRect(ctx, rect.x + 14, rect.y + topHeight * 0.98, 5, rect.h - topHeight - 3, 3, themed("rgba(168, 118, 73, 0.16)"));
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.52, rect.y + topHeight * 1.02, 4, rect.h - topHeight - 4, 3, themed("rgba(168, 118, 73, 0.14)"));
+    Core.drawRoundedRect(ctx, rect.x + rect.w - 18, rect.y + topHeight * 0.98, 4, rect.h - topHeight - 3, 3, themed("rgba(168, 118, 73, 0.14)"));
 
-    ctx.fillStyle = "#d9b383";
+    ctx.fillStyle = themed("#d9b383");
     ctx.beginPath();
     ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w / 2, topHeight, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "#8c5d35";
+    ctx.strokeStyle = themed("#8c5d35");
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.strokeStyle = "rgba(118, 78, 40, 0.45)";
+    ctx.strokeStyle = themed("rgba(118, 78, 40, 0.45)");
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w * 0.34, topHeight * 0.56, 0, 0, Math.PI * 2);
@@ -2915,15 +3577,16 @@ function computeLayout(width, height) {
     ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w * 0.19, topHeight * 0.3, 0, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = "#4a2e1b";
+    ctx.fillStyle = themed("#4a2e1b");
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = runtime.layout.mode === "mobile-portrait"
       ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     const textCenterX = rect.x + rect.w / 2;
-    const line1Y = rect.y + rect.h * 0.39;
-    const line2Y = rect.y + rect.h * 0.62;
+    const line1Y = rect.y + rect.h * 0.36;
+    const line2Y = rect.y + rect.h * 0.61;
+    const line3Y = rect.y + rect.h * 0.81;
     const nameText = fitText(player.name, rect.w - 14, ctx.font);
     ctx.fillText(nameText, textCenterX, line1Y);
     const nameWidth = Math.min(ctx.measureText(nameText).width, rect.w - 14);
@@ -2934,31 +3597,33 @@ function computeLayout(width, height) {
     ctx.moveTo(textCenterX - nameWidth / 2, line1Y + 8);
     ctx.lineTo(textCenterX + nameWidth / 2, line1Y + 8);
     ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
     ctx.font = "700 8px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillStyle = "rgba(65, 42, 25, 0.88)";
-    ctx.fillText(`${Core.formatMoney(player.money)} | ${player.score} pts`, textCenterX, line2Y);
+    ctx.fillStyle = themed("rgba(65, 42, 25, 0.88)");
+    ctx.fillText(fitText(Core.formatMoney(player.money), rect.w - 10, ctx.font), textCenterX, line2Y);
+    ctx.fillText(fitText(`${player.score} pts`, rect.w - 10, ctx.font), textCenterX, line3Y);
     ctx.restore();
   }
 
   function createObjectiveCardFill(cardRect, complete) {
     const gradient = ctx.createLinearGradient(0, cardRect.y, 0, cardRect.y + cardRect.h);
-    gradient.addColorStop(0, complete ? "rgba(171, 213, 234, 0.98)" : "rgba(191, 220, 236, 0.98)");
-    gradient.addColorStop(0.34, complete ? "rgba(138, 184, 127, 0.98)" : "rgba(153, 188, 139, 0.98)");
-    gradient.addColorStop(0.74, complete ? "rgba(196, 163, 118, 0.98)" : "rgba(210, 176, 132, 0.98)");
-    gradient.addColorStop(1, complete ? "rgba(132, 138, 145, 0.98)" : "rgba(152, 156, 161, 0.98)");
+    gradient.addColorStop(0, complete ? themed("rgba(171, 213, 234, 0.98)") : themed("rgba(191, 220, 236, 0.98)"));
+    gradient.addColorStop(0.34, complete ? themed("rgba(138, 184, 127, 0.98)") : themed("rgba(153, 188, 139, 0.98)"));
+    gradient.addColorStop(0.74, complete ? themed("rgba(196, 163, 118, 0.98)") : themed("rgba(210, 176, 132, 0.98)"));
+    gradient.addColorStop(1, complete ? themed("rgba(132, 138, 145, 0.98)") : themed("rgba(152, 156, 161, 0.98)"));
     return gradient;
   }
 
   function drawLogSlice(x, y, radius) {
     ctx.save();
-    ctx.fillStyle = "#8c5d35";
-    ctx.strokeStyle = "#5f3d23";
+    ctx.fillStyle = themed("#8c5d35");
+    ctx.strokeStyle = themed("#5f3d23");
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.strokeStyle = "rgba(222, 183, 124, 0.75)";
+    ctx.strokeStyle = themed("rgba(222, 183, 124, 0.75)");
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(x, y, radius * 0.56, 0, Math.PI * 2);
@@ -2966,14 +3631,462 @@ function computeLayout(width, height) {
     ctx.restore();
   }
 
+  // A small perched songbird (blue-jay silhouette) used to dress modal frames
+  // in the cartoon themes. (cx, cy) is the perch point under its feet.
+  function drawBird(cx, cy, s, palette) {
+    ctx.save();
+    // feet
+    ctx.strokeStyle = themed("#caa24a");
+    ctx.lineWidth = Math.max(1, s * 0.14);
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.16, cy - s * 0.2); ctx.lineTo(cx - s * 0.16, cy);
+    ctx.moveTo(cx + s * 0.16, cy - s * 0.2); ctx.lineTo(cx + s * 0.16, cy);
+    ctx.stroke();
+    // tail
+    ctx.fillStyle = palette.wing;
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.2, cy - s * 1.0);
+    ctx.lineTo(cx - s * 1.35, cy - s * 1.45);
+    ctx.lineTo(cx - s * 0.2, cy - s * 0.45);
+    ctx.closePath(); ctx.fill();
+    // body
+    ctx.fillStyle = palette.body;
+    ctx.beginPath(); ctx.ellipse(cx, cy - s * 1.05, s * 0.72, s * 0.98, 0, 0, Math.PI * 2); ctx.fill();
+    // belly
+    ctx.fillStyle = palette.belly;
+    ctx.beginPath(); ctx.ellipse(cx + s * 0.22, cy - s * 0.82, s * 0.38, s * 0.58, 0, 0, Math.PI * 2); ctx.fill();
+    // wing
+    ctx.fillStyle = palette.wing;
+    ctx.beginPath(); ctx.ellipse(cx - s * 0.12, cy - s * 1.12, s * 0.4, s * 0.62, -0.35, 0, Math.PI * 2); ctx.fill();
+    // head
+    ctx.fillStyle = palette.body;
+    ctx.beginPath(); ctx.arc(cx + s * 0.52, cy - s * 1.98, s * 0.6, 0, Math.PI * 2); ctx.fill();
+    // crest
+    ctx.fillStyle = palette.crest;
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.2, cy - s * 2.35);
+    ctx.lineTo(cx + s * 0.42, cy - s * 2.95);
+    ctx.lineTo(cx + s * 0.56, cy - s * 2.32);
+    ctx.lineTo(cx + s * 0.74, cy - s * 2.8);
+    ctx.lineTo(cx + s * 0.86, cy - s * 2.2);
+    ctx.closePath(); ctx.fill();
+    // beak
+    ctx.fillStyle = themed("#f3b24a");
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 1.06, cy - s * 2.0);
+    ctx.lineTo(cx + s * 1.6, cy - s * 1.86);
+    ctx.lineTo(cx + s * 1.06, cy - s * 1.74);
+    ctx.closePath(); ctx.fill();
+    // eye
+    ctx.fillStyle = themed("#21303e");
+    ctx.beginPath(); ctx.arc(cx + s * 0.66, cy - s * 2.04, s * 0.13, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBirdFrame(rect, bird) {
+    // soft rounded outline just outside the modal panel
+    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, bird.rail || themed("rgba(255,255,255,0.6)"), 3);
+    // perch a row of birds along the top edge
+    const count = Core.clamp(Math.round(rect.w / 160), 3, 5);
+    const s = runtime.layout?.mode === "mobile-portrait" ? 7 : 9;
+    const left = rect.x + rect.w * 0.14;
+    const span = rect.w * 0.72;
+    for (let i = 0; i < count; i += 1) {
+      const x = left + (count === 1 ? span / 2 : span * (i / (count - 1)));
+      drawBird(x, rect.y - 1, s, bird);
+    }
+  }
+
+  function drawSparkle(cx, cy, s) {
+    ctx.save();
+    // Decorative stars stay bright gold; not run through themed() so the night
+    // invert does not turn them dark (they are drawn on dark surfaces).
+    ctx.fillStyle = "rgba(255, 246, 205, 0.95)";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s);
+    ctx.quadraticCurveTo(cx + s * 0.2, cy - s * 0.2, cx + s, cy);
+    ctx.quadraticCurveTo(cx + s * 0.2, cy + s * 0.2, cx, cy + s);
+    ctx.quadraticCurveTo(cx - s * 0.2, cy + s * 0.2, cx - s, cy);
+    ctx.quadraticCurveTo(cx - s * 0.2, cy - s * 0.2, cx, cy - s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStarFrame(rect) {
+    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, "rgba(255, 240, 200, 0.5)", 3);
+    const count = Core.clamp(Math.round(rect.w / 160), 3, 5);
+    const base = runtime.layout?.mode === "mobile-portrait" ? 6 : 8;
+    const left = rect.x + rect.w * 0.14;
+    const span = rect.w * 0.72;
+    for (let i = 0; i < count; i += 1) {
+      const x = left + (count === 1 ? span / 2 : span * (i / (count - 1)));
+      drawSparkle(x, rect.y - 7, base * (i % 2 ? 0.78 : 1));
+    }
+  }
+
+  // A little beaver holding a wooden sign that shows the current player's name,
+  // money, and points. The cartoon-theme replacement for the bottom-left stump.
+  function drawBeaverSign(rect, player) {
+    const mobile = runtime.layout.mode === "mobile-portrait";
+    const beaverW = Math.min(28, rect.w * 0.36);
+    const sign = { x: rect.x + beaverW - 6, y: rect.y + 2, w: rect.w - beaverW + 6, h: rect.h - 4 };
+
+    // Beaver, facing the sign
+    const bx = rect.x;
+    const bw = beaverW + 8;
+    const cy = rect.y + rect.h * 0.6;
+    ctx.save();
+    // flat paddle tail
+    ctx.fillStyle = themed("#6c4628");
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.12, rect.y + rect.h * 0.82, bw * 0.2, rect.h * 0.2, -0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = themed("rgba(40,26,15,0.3)"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(bx + bw * 0.02, rect.y + rect.h * 0.78); ctx.lineTo(bx + bw * 0.24, rect.y + rect.h * 0.9); ctx.stroke();
+    // body
+    ctx.fillStyle = themed("#8a5a32");
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.4, cy, bw * 0.4, rect.h * 0.38, 0, 0, Math.PI * 2); ctx.fill();
+    // head
+    ctx.beginPath(); ctx.arc(bx + bw * 0.42, rect.y + rect.h * 0.34, bw * 0.34, 0, Math.PI * 2); ctx.fill();
+    // ears
+    ctx.beginPath();
+    ctx.arc(bx + bw * 0.24, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
+    ctx.arc(bx + bw * 0.6, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    // muzzle
+    ctx.fillStyle = themed("#cf9f68");
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.52, rect.y + rect.h * 0.42, bw * 0.2, rect.h * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    // tooth
+    ctx.fillStyle = themed("#fffdf4");
+    ctx.fillRect(bx + bw * 0.48, rect.y + rect.h * 0.46, bw * 0.08, rect.h * 0.1);
+    // nose + eye
+    ctx.fillStyle = themed("#33210f");
+    ctx.beginPath(); ctx.arc(bx + bw * 0.56, rect.y + rect.h * 0.36, bw * 0.06, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + bw * 0.36, rect.y + rect.h * 0.28, bw * 0.055, 0, Math.PI * 2); ctx.fill();
+    // paws gripping the sign edge
+    ctx.fillStyle = themed("#74492a");
+    ctx.beginPath();
+    ctx.arc(sign.x, rect.y + rect.h * 0.52, bw * 0.13, 0, Math.PI * 2);
+    ctx.arc(sign.x, rect.y + rect.h * 0.76, bw * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Sign board with the player's name / money / points
+    Core.drawRoundedRect(ctx, sign.x, sign.y, sign.w, sign.h, 8, themed("#f6e7c4"), themed("#9a6b3a"), 2);
+    ctx.fillStyle = themed("#5a3a1d");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const cx = sign.x + sign.w / 2;
+    const nameText = fitText(player.name, sign.w - 10, ctx.font);
+    ctx.fillText(nameText, cx, sign.y + sign.h * 0.26);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, sign.w - 10);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
+    ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = themed("rgba(70, 46, 25, 0.9)");
+    ctx.fillText(fitText(Core.formatMoney(player.money), sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.58);
+    ctx.fillText(fitText(`${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.80);
+  }
+
+  // A little frog perched on a lily pad beside a sign with the current player's
+  // name, money, and points. The Frog Hollow theme's bottom-left badge.
+  function drawFrogLilyPad(rect, player) {
+    const mobile = runtime.layout.mode === "mobile-portrait";
+    const frogW = Math.min(28, rect.w * 0.36);
+    const sign = { x: rect.x + frogW - 6, y: rect.y + 2, w: rect.w - frogW + 6, h: rect.h - 4 };
+    const fx = rect.x + frogW * 0.42;
+
+    ctx.save();
+    // lily pad: a flat green leaf peeking out under and left of the frog, with
+    // a wedge notch and radial veins so it reads as a lily pad.
+    const padCx = fx - frogW * 0.12;
+    const padCy = rect.y + rect.h * 0.84;
+    const padRx = frogW * 0.66;
+    const padRy = rect.h * 0.17;
+    ctx.fillStyle = themed("#46985a");
+    ctx.beginPath();
+    ctx.ellipse(padCx, padCy, padRx, padRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = themed("#36794a");
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.strokeStyle = themed("rgba(20, 58, 33, 0.3)");
+    ctx.lineWidth = 1;
+    [-0.5, 0.1, 0.7].forEach((a) => {
+      ctx.beginPath();
+      ctx.moveTo(padCx, padCy);
+      ctx.lineTo(padCx + Math.cos(a) * padRx * 0.85, padCy + Math.sin(a) * padRy * 0.85);
+      ctx.stroke();
+    });
+    // back legs tucked beside the body
+    ctx.fillStyle = themed("#56b069");
+    ctx.beginPath();
+    ctx.ellipse(fx - frogW * 0.4, rect.y + rect.h * 0.64, frogW * 0.17, rect.h * 0.12, 0.6, 0, Math.PI * 2);
+    ctx.ellipse(fx + frogW * 0.4, rect.y + rect.h * 0.64, frogW * 0.17, rect.h * 0.12, -0.6, 0, Math.PI * 2);
+    ctx.fill();
+    // body
+    ctx.fillStyle = themed("#5fbf72");
+    ctx.beginPath(); ctx.ellipse(fx, rect.y + rect.h * 0.52, frogW * 0.42, rect.h * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    // pale belly
+    ctx.fillStyle = themed("#d4eeb2");
+    ctx.beginPath(); ctx.ellipse(fx, rect.y + rect.h * 0.58, frogW * 0.26, rect.h * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+    // eye bumps on top of the head
+    ctx.fillStyle = themed("#5fbf72");
+    ctx.beginPath();
+    ctx.arc(fx - frogW * 0.23, rect.y + rect.h * 0.3, frogW * 0.2, 0, Math.PI * 2);
+    ctx.arc(fx + frogW * 0.23, rect.y + rect.h * 0.3, frogW * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // eye whites
+    ctx.fillStyle = themed("#fffdf4");
+    ctx.beginPath();
+    ctx.arc(fx - frogW * 0.23, rect.y + rect.h * 0.28, frogW * 0.1, 0, Math.PI * 2);
+    ctx.arc(fx + frogW * 0.23, rect.y + rect.h * 0.28, frogW * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    // pupils
+    ctx.fillStyle = themed("#1c2a1a");
+    ctx.beginPath();
+    ctx.arc(fx - frogW * 0.21, rect.y + rect.h * 0.29, frogW * 0.05, 0, Math.PI * 2);
+    ctx.arc(fx + frogW * 0.25, rect.y + rect.h * 0.29, frogW * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    // wide smile
+    ctx.strokeStyle = themed("#1c2a1a");
+    ctx.lineWidth = 1.3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(fx, rect.y + rect.h * 0.44, frogW * 0.24, 0.12 * Math.PI, 0.88 * Math.PI);
+    ctx.stroke();
+    // front foot reaching the sign
+    ctx.fillStyle = themed("#4f9e5f");
+    ctx.beginPath(); ctx.arc(sign.x, rect.y + rect.h * 0.64, frogW * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // Sign board with the player's name / money / points
+    Core.drawRoundedRect(ctx, sign.x, sign.y, sign.w, sign.h, 8, themed("#f6e7c4"), themed("#9a6b3a"), 2);
+    ctx.fillStyle = themed("#5a3a1d");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const cx = sign.x + sign.w / 2;
+    const nameText = fitText(player.name, sign.w - 10, ctx.font);
+    ctx.fillText(nameText, cx, sign.y + sign.h * 0.26);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, sign.w - 10);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
+    ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = themed("rgba(70, 46, 25, 0.9)");
+    ctx.fillText(fitText(Core.formatMoney(player.money), sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.58);
+    ctx.fillText(fitText(`${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.80);
+  }
+
+  // A happy pinkish-orange fox holding a sign with the current player's name,
+  // money, and points. The Sunny Bounce theme's bottom-left badge.
+  function drawFoxBadge(rect, player) {
+    const mobile = runtime.layout.mode === "mobile-portrait";
+    const foxW = Math.min(28, rect.w * 0.36);
+    const sign = { x: rect.x + foxW - 6, y: rect.y + 2, w: rect.w - foxW + 6, h: rect.h - 4 };
+    const fx = rect.x + foxW * 0.44;
+    const coral = "#fb8f6a";
+    const coralDark = "#e86f4f";
+    const cream = "#fff2ec";
+
+    ctx.save();
+    // bushy tail sweeping up and to the left, with a cream tip at the far end
+    ctx.fillStyle = themed(coral);
+    ctx.beginPath();
+    ctx.ellipse(fx - foxW * 0.34, rect.y + rect.h * 0.52, rect.h * 0.28, foxW * 0.2, Math.PI / 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = themed(cream);
+    ctx.beginPath();
+    ctx.ellipse(fx - foxW * 0.56, rect.y + rect.h * 0.3, foxW * 0.16, foxW * 0.11, Math.PI / 4, 0, Math.PI * 2);
+    ctx.fill();
+    // ears: two upright triangles with pink inners
+    ctx.fillStyle = themed(coral);
+    ctx.beginPath();
+    ctx.moveTo(fx - foxW * 0.36, rect.y + rect.h * 0.04);
+    ctx.lineTo(fx - foxW * 0.06, rect.y + rect.h * 0.32);
+    ctx.lineTo(fx - foxW * 0.02, rect.y + rect.h * 0.12);
+    ctx.closePath();
+    ctx.moveTo(fx + foxW * 0.36, rect.y + rect.h * 0.04);
+    ctx.lineTo(fx + foxW * 0.06, rect.y + rect.h * 0.32);
+    ctx.lineTo(fx + foxW * 0.02, rect.y + rect.h * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = themed("#ffc2c0");
+    ctx.beginPath();
+    ctx.moveTo(fx - foxW * 0.3, rect.y + rect.h * 0.1);
+    ctx.lineTo(fx - foxW * 0.1, rect.y + rect.h * 0.28);
+    ctx.lineTo(fx - foxW * 0.06, rect.y + rect.h * 0.15);
+    ctx.closePath();
+    ctx.moveTo(fx + foxW * 0.3, rect.y + rect.h * 0.1);
+    ctx.lineTo(fx + foxW * 0.1, rect.y + rect.h * 0.28);
+    ctx.lineTo(fx + foxW * 0.06, rect.y + rect.h * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    // head
+    ctx.fillStyle = themed(coral);
+    ctx.beginPath(); ctx.ellipse(fx, rect.y + rect.h * 0.44, foxW * 0.44, rect.h * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    // cream cheeks + pointed snout (the classic fox face mask)
+    ctx.fillStyle = themed(cream);
+    ctx.beginPath();
+    ctx.moveTo(fx - foxW * 0.42, rect.y + rect.h * 0.4);
+    ctx.quadraticCurveTo(fx - foxW * 0.2, rect.y + rect.h * 0.58, fx, rect.y + rect.h * 0.5);
+    ctx.quadraticCurveTo(fx + foxW * 0.2, rect.y + rect.h * 0.58, fx + foxW * 0.42, rect.y + rect.h * 0.4);
+    ctx.quadraticCurveTo(fx + foxW * 0.18, rect.y + rect.h * 0.74, fx, rect.y + rect.h * 0.72);
+    ctx.quadraticCurveTo(fx - foxW * 0.18, rect.y + rect.h * 0.74, fx - foxW * 0.42, rect.y + rect.h * 0.4);
+    ctx.fill();
+    // eyes
+    ctx.fillStyle = themed("#3a2418");
+    ctx.beginPath();
+    ctx.arc(fx - foxW * 0.19, rect.y + rect.h * 0.42, foxW * 0.07, 0, Math.PI * 2);
+    ctx.arc(fx + foxW * 0.19, rect.y + rect.h * 0.42, foxW * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    // eye sparkles
+    ctx.fillStyle = themed("#fffdf8");
+    ctx.beginPath();
+    ctx.arc(fx - foxW * 0.17, rect.y + rect.h * 0.4, foxW * 0.025, 0, Math.PI * 2);
+    ctx.arc(fx + foxW * 0.21, rect.y + rect.h * 0.4, foxW * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+    // nose
+    ctx.fillStyle = themed("#3a2418");
+    ctx.beginPath(); ctx.arc(fx, rect.y + rect.h * 0.58, foxW * 0.07, 0, Math.PI * 2); ctx.fill();
+    // happy smile
+    ctx.strokeStyle = themed("#3a2418");
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(fx, rect.y + rect.h * 0.63);
+    ctx.quadraticCurveTo(fx - foxW * 0.12, rect.y + rect.h * 0.72, fx - foxW * 0.2, rect.y + rect.h * 0.66);
+    ctx.moveTo(fx, rect.y + rect.h * 0.63);
+    ctx.quadraticCurveTo(fx + foxW * 0.12, rect.y + rect.h * 0.72, fx + foxW * 0.2, rect.y + rect.h * 0.66);
+    ctx.stroke();
+    ctx.restore();
+
+    // Sign board with the player's name / money / points
+    Core.drawRoundedRect(ctx, sign.x, sign.y, sign.w, sign.h, 8, themed("#fff0f4"), themed("#e07aa0"), 2);
+    ctx.fillStyle = themed("#7a3a52");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const cx = sign.x + sign.w / 2;
+    const nameText = fitText(player.name, sign.w - 10, ctx.font);
+    ctx.fillText(nameText, cx, sign.y + sign.h * 0.26);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, sign.w - 10);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
+    ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = themed("rgba(122, 58, 82, 0.9)");
+    ctx.fillText(fitText(Core.formatMoney(player.money), sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.58);
+    ctx.fillText(fitText(`${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.80);
+  }
+
+  // A campfire with sparks and rising smoke beside a dark plaque that shows the
+  // current player's name, money, and points. The night-theme player badge.
+  function drawCampfire(rect, player) {
+    const mobile = runtime.layout.mode === "mobile-portrait";
+    const fireW = Math.min(30, rect.w * 0.4);
+    const plaque = { x: rect.x + fireW - 4, y: rect.y + 2, w: rect.w - fireW + 4, h: rect.h - 4 };
+    const fx = rect.x + fireW * 0.5;
+    const baseY = rect.y + rect.h - 6;
+
+    ctx.save();
+    // rising smoke wisps (above the badge)
+    ctx.strokeStyle = themed("rgba(214, 214, 224, 0.26)");
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
+    for (let k = 0; k < 2; k += 1) {
+      const sx = fx + (k ? 5 : -4);
+      ctx.beginPath();
+      ctx.moveTo(sx, rect.y + 2);
+      ctx.bezierCurveTo(sx - 8, rect.y - 8, sx + 8, rect.y - 16, sx - 4, rect.y - 26);
+      ctx.stroke();
+    }
+    // sparks
+    ctx.fillStyle = themed("rgba(255, 196, 86, 0.95)");
+    [[-6, -4], [5, -8], [0, -14], [8, 2], [-9, 4]].forEach(([dx, dy]) => {
+      ctx.beginPath();
+      ctx.arc(fx + dx, rect.y + rect.h * 0.3 + dy, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    // crossed logs at the base
+    ctx.strokeStyle = themed("#7a4d2a");
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(fx - fireW * 0.32, baseY); ctx.lineTo(fx + fireW * 0.32, baseY - 5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(fx + fireW * 0.32, baseY); ctx.lineTo(fx - fireW * 0.32, baseY - 5); ctx.stroke();
+    // flames: outer orange then inner yellow
+    const fbY = baseY - 5;
+    const flame = (h, w, color) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(fx, fbY - h);
+      ctx.quadraticCurveTo(fx + w, fbY - h * 0.4, fx + w * 0.5, fbY);
+      ctx.quadraticCurveTo(fx, fbY + 2, fx - w * 0.5, fbY);
+      ctx.quadraticCurveTo(fx - w, fbY - h * 0.4, fx, fbY - h);
+      ctx.closePath();
+      ctx.fill();
+    };
+    flame(rect.h * 0.5, fireW * 0.34, themed("#ff7a2e"));
+    flame(rect.h * 0.33, fireW * 0.22, themed("#ffd24a"));
+    ctx.restore();
+
+    // plaque with the player's name / money / points
+    Core.drawRoundedRect(ctx, plaque.x, plaque.y, plaque.w, plaque.h, 8, themed("#2c2238"), themed("rgba(255, 220, 150, 0.4)"), 1.5);
+    ctx.fillStyle = themed("#ffe7c2");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const cx = plaque.x + plaque.w / 2;
+    const nameText = fitText(player.name, plaque.w - 10, ctx.font);
+    ctx.fillText(nameText, cx, plaque.y + plaque.h * 0.26);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, plaque.w - 10);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - nameWidth / 2, plaque.y + plaque.h * 0.26 + 7);
+    ctx.lineTo(cx + nameWidth / 2, plaque.y + plaque.h * 0.26 + 7);
+    ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
+    ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = themed("rgba(255, 231, 194, 0.85)");
+    ctx.fillText(fitText(Core.formatMoney(player.money), plaque.w - 6, ctx.font), cx, plaque.y + plaque.h * 0.58);
+    ctx.fillText(fitText(`${player.score} pts`, plaque.w - 6, ctx.font), cx, plaque.y + plaque.h * 0.80);
+  }
+
   function drawLogFrame(rect) {
+    const decor = theme();
+    if (decor.frameStyle === "birds" && decor.bird) {
+      drawBirdFrame(rect, decor.bird);
+      return;
+    }
+    if (decor.frameStyle === "stars") {
+      drawStarFrame(rect);
+      return;
+    }
     const radius = runtime.layout?.mode === "mobile-portrait" ? 7 : 9;
     const spacing = radius * 1.95;
     const railThickness = radius * 1.8;
-    Core.drawRoundedRect(ctx, rect.x - railThickness * 0.8, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, "rgba(122, 80, 45, 0.96)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w - railThickness * 0.2, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, "rgba(122, 80, 45, 0.96)");
-    Core.drawRoundedRect(ctx, rect.x + 12, rect.y - railThickness * 0.8, rect.w - 24, railThickness, railThickness / 2, "rgba(122, 80, 45, 0.96)");
-    Core.drawRoundedRect(ctx, rect.x + 12, rect.y + rect.h - railThickness * 0.2, rect.w - 24, railThickness, railThickness / 2, "rgba(122, 80, 45, 0.96)");
+    Core.drawRoundedRect(ctx, rect.x - railThickness * 0.8, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, themed("rgba(122, 80, 45, 0.96)"));
+    Core.drawRoundedRect(ctx, rect.x + rect.w - railThickness * 0.2, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, themed("rgba(122, 80, 45, 0.96)"));
+    Core.drawRoundedRect(ctx, rect.x + 12, rect.y - railThickness * 0.8, rect.w - 24, railThickness, railThickness / 2, themed("rgba(122, 80, 45, 0.96)"));
+    Core.drawRoundedRect(ctx, rect.x + 12, rect.y + rect.h - railThickness * 0.2, rect.w - 24, railThickness, railThickness / 2, themed("rgba(122, 80, 45, 0.96)"));
 
     for (let x = rect.x + 18; x <= rect.x + rect.w - 18; x += spacing) {
       drawLogSlice(x, rect.y - 4, radius);
@@ -3002,20 +4115,170 @@ function computeLayout(width, height) {
   }
 
   function renderBackground() {
-    const gradient = ctx.createLinearGradient(0, 0, 0, runtime.layout.height);
-    gradient.addColorStop(0, "#f7eedf");
-    gradient.addColorStop(0.48, "#efe2c5");
-    gradient.addColorStop(1, "#e2cca1");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
+    const W = runtime.layout.width;
+    const H = runtime.layout.height;
+    const bg = theme().background || { style: "soft", sky: [themed("#f7eedf"), themed("#efe2c5"), themed("#e2cca1")], orb: themed("rgba(255,255,255,0.22)") };
 
-    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    if (bg.style === "scene") {
+      renderSceneBackground(W, H, bg);
+      return;
+    }
+    if (bg.style === "night") {
+      renderNightBackground(W, H, bg);
+      return;
+    }
+
+    const sky = bg.sky || [themed("#f7eedf"), themed("#efe2c5"), themed("#e2cca1")];
+    const gradient = ctx.createLinearGradient(0, 0, 0, H);
+    gradient.addColorStop(0, sky[0]);
+    gradient.addColorStop(0.48, sky[1] || sky[0]);
+    gradient.addColorStop(1, sky[2] || sky[1] || sky[0]);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = bg.orb || themed("rgba(255,255,255,0.22)");
     ctx.beginPath();
-    ctx.arc(runtime.layout.width * 0.18, runtime.layout.height * 0.08, runtime.layout.width * 0.18, 0, Math.PI * 2);
+    ctx.arc(W * 0.18, H * 0.08, W * 0.18, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(runtime.layout.width * 0.86, runtime.layout.height * 0.14, runtime.layout.width * 0.12, 0, Math.PI * 2);
+    ctx.arc(W * 0.86, H * 0.14, W * 0.12, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  function renderSceneBackground(W, H, bg) {
+    const horizon = H * (bg.horizon || 0.62);
+    // Sky
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    (bg.sky || [themed("#a9e4ff"), themed("#cdeeff"), themed("#e7f7ff")]).forEach((color, index, arr) => {
+      sky.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
+    });
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, horizon + 2);
+
+    // Sun with a soft ring, tucked top-right
+    const sunX = W * 0.84;
+    const sunY = H * 0.16;
+    const sunR = Math.max(26, Math.min(W, H) * 0.07);
+    if (bg.sunRing) {
+      ctx.fillStyle = bg.sunRing;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (bg.sun) {
+      ctx.fillStyle = bg.sun;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // A couple of soft rounded clouds
+    if (bg.cloud) {
+      ctx.fillStyle = bg.cloud;
+      drawCloud(W * 0.2, H * 0.12, Math.max(34, W * 0.05));
+      drawCloud(W * 0.56, H * 0.07, Math.max(26, W * 0.04));
+    }
+
+    // Rolling hills along the horizon
+    if (bg.hill1) {
+      ctx.fillStyle = bg.hill1;
+      drawHill(W, horizon, W * 0.26, -W * 0.05);
+      ctx.fillStyle = bg.hill2 || bg.hill1;
+      drawHill(W, horizon + 6, W * 0.2, W * 0.6);
+    }
+
+    // Meadow ground
+    const meadow = ctx.createLinearGradient(0, horizon, 0, H);
+    (bg.meadow || [themed("#d6f0bb"), themed("#a9dd7e")]).forEach((color, index, arr) => {
+      meadow.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
+    });
+    ctx.fillStyle = meadow;
+    ctx.fillRect(0, horizon, W, H - horizon);
+  }
+
+  function drawCloud(x, y, r) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x + r * 0.9, y + r * 0.1, r * 0.78, 0, Math.PI * 2);
+    ctx.arc(x - r * 0.9, y + r * 0.12, r * 0.7, 0, Math.PI * 2);
+    ctx.arc(x, y + r * 0.4, r * 0.85, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawHill(W, baseY, height, centerX) {
+    ctx.beginPath();
+    ctx.moveTo(centerX - W * 0.55, baseY);
+    ctx.quadraticCurveTo(centerX, baseY - height, centerX + W * 0.55, baseY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Fixed star field in normalized coords, generated once with a small LCG so
+  // the stars never flicker or jump between frames (Math.random would).
+  let nightStars = null;
+  function getNightStars() {
+    if (nightStars) return nightStars;
+    nightStars = [];
+    let seed = 0x5f3759;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    for (let i = 0; i < 64; i += 1) {
+      nightStars.push({ x: rnd(), y: rnd() * 0.58, r: 0.5 + rnd() * 1.3, a: 0.4 + rnd() * 0.6 });
+    }
+    return nightStars;
+  }
+
+  function renderNightBackground(W, H, bg) {
+    const horizon = H * (bg.horizon || 0.64);
+    // night sky
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    (bg.sky || [themed("#15213f"), themed("#243a63"), themed("#34526b")]).forEach((color, index, arr) => {
+      sky.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
+    });
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, horizon + 2);
+    // stars
+    if (bg.star) {
+      ctx.fillStyle = bg.star;
+      getNightStars().forEach((star) => {
+        ctx.globalAlpha = star.a;
+        ctx.beginPath();
+        ctx.arc(star.x * W, star.y * horizon, star.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+    // crescent moon, top-left, with a soft glow
+    const moonX = W * 0.16;
+    const moonY = H * 0.15;
+    const moonR = Math.max(20, Math.min(W, H) * 0.055);
+    if (bg.moonGlow) {
+      ctx.fillStyle = bg.moonGlow;
+      ctx.beginPath(); ctx.arc(moonX, moonY, moonR * 1.7, 0, Math.PI * 2); ctx.fill();
+    }
+    if (bg.moon) {
+      ctx.fillStyle = bg.moon;
+      ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2); ctx.fill();
+      // carve the crescent by overpainting with the sky
+      ctx.fillStyle = bg.sky ? bg.sky[0] : themed("#15213f");
+      ctx.beginPath(); ctx.arc(moonX + moonR * 0.5, moonY - moonR * 0.25, moonR * 0.92, 0, Math.PI * 2); ctx.fill();
+    }
+    // dark hills along the horizon
+    if (bg.hill1) {
+      ctx.fillStyle = bg.hill1;
+      drawHill(W, horizon, W * 0.24, -W * 0.04);
+      ctx.fillStyle = bg.hill2 || bg.hill1;
+      drawHill(W, horizon + 6, W * 0.18, W * 0.62);
+    }
+    // dark ground
+    const ground = ctx.createLinearGradient(0, horizon, 0, H);
+    (bg.ground || [themed("#2f4d3b"), themed("#264033")]).forEach((color, index, arr) => {
+      ground.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
+    });
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, horizon, W, H - horizon);
   }
 
   function getShellScenes() {
@@ -3028,30 +4291,34 @@ function computeLayout(width, height) {
   }
 
   function renderShellSurface(rect, options = {}) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, options.radius || 8, options.fill || "rgba(255, 250, 244, 0.94)", options.stroke || "rgba(108, 80, 54, 0.16)", options.lineWidth || 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, options.radius || 8, options.fill || themed("rgba(255, 250, 244, 0.94)"), options.stroke || themed("rgba(108, 80, 54, 0.16)"), options.lineWidth || 1);
   }
 
   function renderGameTopBar(rect) {
     const player = getPlayer();
     const compact = runtime.layout.mode !== "desktop";
     const short = isVeryShortViewport();
-    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.95)" });
+    renderShellSurface(rect, { radius: 10, fill: themed("rgba(255, 252, 247, 0.95)") });
 
-    ctx.fillStyle = "#3b2c20";
+    ctx.fillStyle = themed("#3b2c20");
     ctx.font = compact ? "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(compact ? "Smore to Explore" : "Smore to Explore", rect.x + 12, rect.y + 8);
 
-    const rightButtonY = rect.y + 8;
-    const menuRect = { x: rect.x + rect.w - 34, y: rightButtonY, w: 24, h: 24 };
-    const fullRect = { x: menuRect.x - 30, y: rightButtonY, w: 24, h: 24 };
+    const isPortraitBar = runtime.layout.mode === "mobile-portrait";
+    const iconSize = compact && !isPortraitBar ? 34 : 24;
+    const iconInset = isPortraitBar ? { x: 6, y: 10 } : compact ? { x: 3, y: 6 } : 0;
+    const rightButtonY = compact && !isPortraitBar ? rect.y + Math.max(3, Math.round((rect.h - iconSize) / 2)) : rect.y + 8;
+    const menuRect = { x: rect.x + rect.w - 10 - iconSize, y: rightButtonY, w: iconSize, h: iconSize };
+    const fullRect = { x: menuRect.x - 6 - iconSize, y: rightButtonY, w: iconSize, h: iconSize };
     if (game.players.length > 1) {
-      drawButton({ x: fullRect.x - 64, y: rightButtonY, w: 58, h: 24 }, game.ui.playersPanelExpanded ? "Hide" : "Players", () => {
+      drawButton({ x: fullRect.x - 64, y: rightButtonY, w: 58, h: iconSize }, game.ui.playersPanelExpanded ? "Hide" : "Players", () => {
         game.ui.playersPanelExpanded = !game.ui.playersPanelExpanded;
         game.ui.activePanel = game.ui.playersPanelExpanded ? "players" : null;
       }, {
         id: "shell-players-toggle",
+        hitInset: iconInset,
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     }
@@ -3068,35 +4335,36 @@ function computeLayout(width, height) {
     }, {
       id: "shell-fullscreen",
       enabled: controller.state.fullscreenSupported,
-      minimize: controller.state.isFullscreen
+      minimize: controller.state.isFullscreen,
+      hitInset: iconInset
     });
-    drawMenuButton(menuRect, openPauseMenu, { id: "shell-menu", radius: 8 });
+    drawMenuButton(menuRect, openPauseMenu, { id: "shell-menu", radius: 8, hitInset: iconInset });
 
     const roundText = game.players.length ? getCurrentRound().name : "Pass-and-Play";
     if (short) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.76)");
       ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(`${roundText} | ${getPhaseLabel()}`, rect.x + 12, rect.y + 27);
     } else {
       const pillY = rect.y + (compact ? 30 : 34);
-      const roundFill = "rgba(239, 226, 202, 0.96)";
-      const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
-      const roundWidth = drawPill(rect.x + 12, pillY, roundText, roundFill, "#5f4731", {
+      const roundFill = themed("rgba(239, 226, 202, 0.96)");
+      const phaseFill = game.phase === "build" ? themed("#d77837") : game.phase === "setupLandscape" ? themed("#7c9c63") : themed("#8e6a9f");
+      const roundWidth = drawPill(rect.x + 12, pillY, roundText, roundFill, themed("#5f4731"), {
         height: compact ? 18 : 20,
         paddingX: 10,
         radius: 8,
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
-      const phaseWidth = drawPill(rect.x + 16 + roundWidth, pillY, getPhaseLabel(), phaseFill, "#fff9f3", {
+      const phaseWidth = drawPill(rect.x + 16 + roundWidth, pillY, getPhaseLabel(), phaseFill, themed("#fff9f3"), {
         height: compact ? 18 : 20,
         paddingX: 10,
         radius: 8,
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
       if (player) {
-        drawPill(rect.x + 20 + roundWidth + phaseWidth, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
+        drawPill(rect.x + 20 + roundWidth + phaseWidth, pillY, getTurnReadyLabel(player), themed("rgba(233, 223, 208, 0.98)"), themed("#5b4330"), {
           height: compact ? 18 : 20,
           paddingX: 10,
           radius: 8,
@@ -3107,7 +4375,7 @@ function computeLayout(width, height) {
   }
 
   function renderShellSceneTabs(rect) {
-    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.92)" });
+    renderShellSurface(rect, { radius: 10, fill: themed("rgba(255, 252, 247, 0.92)") });
     const tabs = getShellScenes();
     const gap = 4;
     const width = (rect.w - 8 - gap * (tabs.length - 1)) / tabs.length;
@@ -3128,8 +4396,8 @@ function computeLayout(width, height) {
 
   function renderPlayersDrawer(rect) {
     if (!rect || game.players.length <= 1) return;
-    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.92)" });
-    ctx.fillStyle = "#4a3524";
+    renderShellSurface(rect, { radius: 10, fill: themed("rgba(255, 252, 247, 0.92)") });
+    ctx.fillStyle = themed("#4a3524");
     ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -3146,10 +4414,10 @@ function computeLayout(width, height) {
       const row = Math.floor(index / columns);
       const rowRect = { x: content.x + col * (itemWidth + gap), y: content.y + row * (rowHeight + gap), w: itemWidth, h: rowHeight };
       const active = index === game.currentPlayerIndex;
-      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 8, active ? "rgba(255, 238, 219, 0.98)" : "rgba(249, 243, 235, 0.98)", active ? "#cc7a3f" : "rgba(108,80,54,0.12)", active ? 1.2 : 1);
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 8, active ? themed("rgba(255, 238, 219, 0.98)") : themed("rgba(249, 243, 235, 0.98)"), active ? themed("#cc7a3f") : themed("rgba(108,80,54,0.12)"), active ? 1.2 : 1);
       ctx.fillStyle = entry.color.fill;
       ctx.fillRect(rowRect.x, rowRect.y, 4, rowRect.h);
-      ctx.fillStyle = "#4a3524";
+      ctx.fillStyle = themed("#4a3524");
       ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -3165,20 +4433,20 @@ function computeLayout(width, height) {
     const content = drawPanel(rect, "Turn Focus", player ? `${player.name} | ${getPhaseLabel()}` : "Setup");
     const summary = getBottomSummary();
     const noteRect = { x: content.x, y: content.y, w: content.w, h: Math.min(76, content.h) };
-    Core.drawRoundedRect(ctx, noteRect.x, noteRect.y, noteRect.w, noteRect.h, 10, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
-    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    Core.drawRoundedRect(ctx, noteRect.x, noteRect.y, noteRect.w, noteRect.h, 10, themed("rgba(248, 241, 231, 0.98)"), themed("rgba(108,80,54,0.12)"), 1);
+    ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : summary.tone === "warning" ? themed("#88622d") : themed("#4a3524");
     ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(fitText(summary.title, noteRect.w - 20, ctx.font), noteRect.x + 10, noteRect.y + 8);
     Core.drawWrappedText(ctx, summary.body, noteRect.x + 10, noteRect.y + 26, noteRect.w - 20, 13, {
       font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       maxLines: 3
     });
 
     const hintsY = noteRect.y + noteRect.h + 10;
-    ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+    ctx.fillStyle = themed("rgba(82, 61, 44, 0.76)");
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillText("Use the scene tabs to switch focus.", content.x, hintsY);
     ctx.fillText(runtime.layout.mode === "desktop"
@@ -3198,6 +4466,11 @@ function computeLayout(width, height) {
     }
     if (scene === "score") {
       renderScorePanel(rect);
+      return;
+    }
+    const player = getPlayer();
+    if (runtime.layout.shortLandscape && game.phase === "setupLandscape" && player) {
+      renderLandscapeRack(player, rect);
       return;
     }
     renderFocusScene(rect);
@@ -3229,7 +4502,7 @@ function computeLayout(width, height) {
     const menuX = rect.x + rect.w - pad - menuWidth;
     const fullscreenX = menuX - 8 - fullWidth;
 
-    ctx.fillStyle = "#3b2c20";
+    ctx.fillStyle = themed("#3b2c20");
     ctx.font = titleFont;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -3265,26 +4538,26 @@ function computeLayout(width, height) {
     if (!player) {
       Core.drawWrappedText(ctx, "Pass one phone around the table and build each campground one turn at a time.", rect.x + pad, rect.y + 48, rect.w - pad * 2 - menuWidth - fullWidth - 16, 14, {
         font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.8)",
+        color: themed("rgba(82, 61, 44, 0.8)"),
         maxLines: 2
       });
       return;
     }
 
     const roundName = getCurrentRound().name;
-    const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
+    const phaseFill = game.phase === "build" ? themed("#d77837") : game.phase === "setupLandscape" ? themed("#7c9c63") : themed("#8e6a9f");
     const pillY = rect.y + 42;
-    const roundWidth = drawPill(rect.x + pad, pillY, roundName, "#efe2ca", "#5f4731", {
+    const roundWidth = drawPill(rect.x + pad, pillY, roundName, themed("#efe2ca"), themed("#5f4731"), {
       height: 24,
       paddingX: 12,
       font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
-    const phaseWidth = drawPill(rect.x + pad + roundWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+    const phaseWidth = drawPill(rect.x + pad + roundWidth + 8, pillY, getPhaseLabel(), phaseFill, themed("#fffaf6"), {
       height: 24,
       paddingX: 12,
       font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
-    drawPill(rect.x + pad + roundWidth + phaseWidth + 16, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
+    drawPill(rect.x + pad + roundWidth + phaseWidth + 16, pillY, getTurnReadyLabel(player), themed("rgba(233, 223, 208, 0.98)"), themed("#5b4330"), {
       height: 24,
       paddingX: 12,
       font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -3296,8 +4569,8 @@ function computeLayout(width, height) {
       w: rect.w - pad * 2,
       h: 54
     };
-    Core.drawRoundedRect(ctx, heroRect.x, heroRect.y, heroRect.w, heroRect.h, 20, player.color.fill, "rgba(0,0,0,0.08)", 1.5);
-    Core.drawRoundedRect(ctx, heroRect.x + 1, heroRect.y + 1, heroRect.w - 2, heroRect.h - 2, 19, null, "rgba(255,255,255,0.22)", 1);
+    Core.drawRoundedRect(ctx, heroRect.x, heroRect.y, heroRect.w, heroRect.h, 20, player.color.fill, themed("rgba(0,0,0,0.08)"), 1.5);
+    Core.drawRoundedRect(ctx, heroRect.x + 1, heroRect.y + 1, heroRect.w - 2, heroRect.h - 2, 19, null, themed("rgba(255,255,255,0.22)"), 1);
 
     ctx.fillStyle = player.color.text;
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -3316,7 +4589,7 @@ function computeLayout(width, height) {
     const others = game.players.filter((_, index) => index !== game.currentPlayerIndex);
     if (!others.length) return;
 
-    ctx.fillStyle = "rgba(74, 53, 36, 0.76)";
+    ctx.fillStyle = themed("rgba(74, 53, 36, 0.76)");
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -3336,9 +4609,9 @@ function computeLayout(width, height) {
         w: chipWidth,
         h: chipHeight
       };
-      Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 14, "rgba(248, 240, 228, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 14, themed("rgba(248, 240, 228, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
       Core.drawRoundedRect(ctx, chipRect.x + 6, chipRect.y + 6, 6, chipRect.h - 12, 3, entry.color.fill);
-      ctx.fillStyle = "#4a3524";
+      ctx.fillStyle = themed("#4a3524");
       ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -3349,14 +4622,14 @@ function computeLayout(width, height) {
 
   function renderTopBar(rect) {
     const player = getPlayer();
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 26, "rgba(255, 250, 243, 0.97)", "rgba(108, 80, 54, 0.16)", 1.5);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 26, themed("rgba(255, 250, 243, 0.97)"), themed("rgba(108, 80, 54, 0.16)"), 1.5);
 
     if (runtime.layout.mode === "mobile-portrait") {
       renderPortraitTopBar(rect, player);
       return;
     }
 
-    ctx.fillStyle = "#3b2c20";
+    ctx.fillStyle = themed("#3b2c20");
     ctx.font = runtime.layout.mode === "mobile-portrait"
       ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -3364,21 +4637,21 @@ function computeLayout(width, height) {
     ctx.textBaseline = "top";
     ctx.fillText("Smore to Explore", rect.x + 18, rect.y + 14);
 
-    const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
+    const phaseFill = game.phase === "build" ? themed("#d77837") : game.phase === "setupLandscape" ? themed("#7c9c63") : themed("#8e6a9f");
     const roundName = game.players.length ? getCurrentRound().name : "Campground Pass-and-Play";
     const pillY = rect.y + 54;
-    const roundPillWidth = drawPill(rect.x + 18, pillY, roundName, "#efe2ca", "#5f4731", {
+    const roundPillWidth = drawPill(rect.x + 18, pillY, roundName, themed("#efe2ca"), themed("#5f4731"), {
       height: 26,
       paddingX: 13,
       font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
-    const phasePillWidth = drawPill(rect.x + 18 + roundPillWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+    const phasePillWidth = drawPill(rect.x + 18 + roundPillWidth + 8, pillY, getPhaseLabel(), phaseFill, themed("#fffaf6"), {
       height: 26,
       paddingX: 13,
       font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
     if (player) {
-      drawPill(rect.x + 18 + roundPillWidth + phasePillWidth + 16, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
+      drawPill(rect.x + 18 + roundPillWidth + phasePillWidth + 16, pillY, getTurnReadyLabel(player), themed("rgba(233, 223, 208, 0.98)"), themed("#5b4330"), {
         height: 26,
         paddingX: 13,
         font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -3436,9 +4709,9 @@ function computeLayout(width, height) {
         h: rosterRect.h
       };
       const active = index === game.currentPlayerIndex;
-      const fill = active ? entry.color.fill : "rgba(243, 232, 216, 0.96)";
-      const stroke = active ? "rgba(0,0,0,0.08)" : "rgba(108,80,54,0.14)";
-      const text = active ? entry.color.text : "#5b4330";
+      const fill = active ? entry.color.fill : themed("rgba(243, 232, 216, 0.96)");
+      const stroke = active ? themed("rgba(0,0,0,0.08)") : themed("rgba(108,80,54,0.14)");
+      const text = active ? entry.color.text : themed("#5b4330");
       Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 20, fill, stroke, active ? 1.6 : 1);
       if (!active) {
         Core.drawRoundedRect(ctx, chipRect.x + 6, chipRect.y + 6, 8, chipRect.h - 12, 4, entry.color.fill, null, 0);
@@ -3462,21 +4735,26 @@ function computeLayout(width, height) {
     const player = getPlayer();
     if (!player) return game.message;
 
+    const previewCell = getEffectivePreviewCell();
+    const armedPreview = !game.ui.hoveredCell && !!game.ui.armedCell;
+
     if (game.ui.selection.source === "landscape") {
       const def = getLandscapeDef(game.ui.selection.typeId);
-      if (game.ui.hoveredCell) {
-        const reasons = getLandscapePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
+      if (previewCell) {
+        const reasons = getLandscapePlacementReasons(game, player, previewCell.row, previewCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
         if (reasons.length) {
           return {
             tone: "error",
-            title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
+            title: `${def.name} on ${formatBoardCellLabel(previewCell.row, previewCell.col)}`,
             body: reasons[0]
           };
         }
         return {
           tone: "success",
-          title: `${def.name} on ${formatBoardCellLabel(game.ui.hoveredCell.row, game.ui.hoveredCell.col)}`,
-          body: `Valid placement at ${game.ui.selection.rotation * 90} degrees.`
+          title: `${def.name} on ${formatBoardCellLabel(previewCell.row, previewCell.col)}`,
+          body: armedPreview
+            ? `Valid at ${game.ui.selection.rotation * 90} degrees. Tap the parcel again to place.`
+            : `Valid placement at ${game.ui.selection.rotation * 90} degrees.`
         };
       }
       const remaining = player.landscapeInventory.find((entry) => entry.typeId === def.id)?.count || 0;
@@ -3489,8 +4767,8 @@ function computeLayout(width, height) {
 
     if (game.ui.selection.source === "market") {
       const def = getCampDef(game.ui.selection.typeId);
-      if (game.ui.hoveredCell) {
-        const placement = getCampTilePlacementEvaluation(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, def.id, getSelectedMarketOrientation());
+      if (previewCell) {
+        const placement = getCampTilePlacementEvaluation(game, player, previewCell.row, previewCell.col, def.id, getSelectedMarketOrientation());
         const reasons = placement.reasons;
         const placementLabel = getCampPlacementDisplayLabel(placement.cells);
         if (reasons.length) {
@@ -3501,12 +4779,13 @@ function computeLayout(width, height) {
           };
         }
         const bonuses = scoreAdjacencyBonuses(game, player, def.id, placement.cells);
+        const validBody = bonuses.lines[0] || (isBigMarketItem(def.id)
+          ? `Valid ${getSelectedMarketOrientation()} 2-square placement.`
+          : "Valid placement on this parcel.");
         return {
           tone: "success",
           title: `${def.name} on ${placementLabel}`,
-          body: bonuses.lines[0] || (isBigMarketItem(def.id)
-            ? `Valid ${getSelectedMarketOrientation()} 2-square placement.`
-            : "Valid placement on this parcel.")
+          body: armedPreview ? `${validBody} Tap the parcel again to place.` : validBody
         };
       }
       return {
@@ -3584,7 +4863,7 @@ function computeLayout(width, height) {
 
   function drawActionGrid(rect, actions) {
     if (!actions.length) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.64)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.64)");
       ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -3593,10 +4872,15 @@ function computeLayout(width, height) {
     }
     const isPortrait = runtime.layout.mode === "mobile-portrait";
     const gap = 8;
-    const columns = isPortrait ? 2 : Math.min(actions.length, 4);
-    const rows = Math.ceil(actions.length / columns);
+    let columns = isPortrait ? 2 : Math.min(actions.length, runtime.layout.shortLandscape ? 6 : 4);
+    let rows = Math.ceil(actions.length / columns);
+    let buttonHeight = (rect.h - gap * (rows - 1)) / rows;
+    if (isPortrait && buttonHeight < 30 && actions.length > 2) {
+      columns = 3;
+      rows = Math.ceil(actions.length / columns);
+      buttonHeight = (rect.h - gap * (rows - 1)) / rows;
+    }
     const buttonWidth = (rect.w - gap * (columns - 1)) / columns;
-    const buttonHeight = (rect.h - gap * (rows - 1)) / rows;
 
     actions.forEach((action, index) => {
       const col = index % columns;
@@ -3614,14 +4898,14 @@ function computeLayout(width, height) {
   }
 
   function drawSelectionTray(rect, summary) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
     const previewRect = { x: rect.x + 8, y: rect.y + 8, w: 44, h: 44 };
     if (game.ui.selection.source === "landscape") {
       drawLandscapeTileVisual(previewRect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
     } else if (game.ui.selection.source === "market") {
       drawCampTileVisual(previewRect, { typeId: game.ui.selection.typeId });
     }
-    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : "#4a3524";
+    ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : themed("#4a3524");
     ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -3630,14 +4914,14 @@ function computeLayout(width, height) {
     ctx.fillText(fitText(summary.title, textWidth, ctx.font), textX, rect.y + 10);
     Core.drawWrappedText(ctx, summary.body, textX, rect.y + 24, textWidth, 12, {
       font: "600 10px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       maxLines: 2
     });
   }
 
   function renderBottomBar(rect) {
     const player = getPlayer();
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(255, 248, 239, 0.97)", "rgba(108, 80, 54, 0.16)", 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, themed("rgba(255, 248, 239, 0.97)"), themed("rgba(108, 80, 54, 0.16)"), 1);
     const summary = getBottomSummary();
     const actions = getBottomActions(player);
 
@@ -3650,15 +4934,15 @@ function computeLayout(width, height) {
         actionRect = { x: inner.x, y: trayRect.y + trayRect.h + 8, w: inner.w, h: rect.y + rect.h - (trayRect.y + trayRect.h + 18) };
       } else {
         const summaryRect = { x: inner.x, y: inner.y, w: inner.w, h: 42 };
-        Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 8, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-        ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+        Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 8, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
+        ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : summary.tone === "warning" ? themed("#88622d") : themed("#4a3524");
         ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.fillText(fitText(summary.title, summaryRect.w - 20, ctx.font), summaryRect.x + 10, summaryRect.y + 8);
         Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 22, summaryRect.w - 20, 11, {
           font: "600 9px 'Avenir Next', 'Trebuchet MS', sans-serif",
-          color: "rgba(82, 61, 44, 0.86)",
+          color: themed("rgba(82, 61, 44, 0.86)"),
           maxLines: 1
         });
         actionRect = { x: inner.x, y: summaryRect.y + summaryRect.h + 8, w: inner.w, h: rect.y + rect.h - (summaryRect.y + summaryRect.h + 18) };
@@ -3668,25 +4952,26 @@ function computeLayout(width, height) {
     }
 
     const gap = 10;
-    const summaryRect = { x: rect.x + 10, y: rect.y + 10, w: rect.w * 0.54, h: rect.h - 20 };
+    const summaryRatio = runtime.layout.shortLandscape ? 0.32 : 0.54;
+    const summaryRect = { x: rect.x + 10, y: rect.y + 10, w: rect.w * summaryRatio, h: rect.h - 20 };
     const buttonRect = { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 10, w: rect.w - summaryRect.w - gap - 20, h: rect.h - 20 };
 
-    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 10, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 10, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
+    ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : summary.tone === "warning" ? themed("#88622d") : themed("#4a3524");
     ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(summary.title, summaryRect.x + 10, summaryRect.y + 8);
     Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 23, summaryRect.w - 20, 13, {
       font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.86)",
+      color: themed("rgba(82, 61, 44, 0.86)"),
       maxLines: 2
     });
     drawActionGrid(buttonRect, actions);
   }
 
   function renderPortraitTabBar(rect) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, "rgba(255,249,240,0.95)", "rgba(108,80,54,0.16)", 1.2);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, themed("rgba(255,249,240,0.95)"), themed("rgba(108,80,54,0.16)"), 1.2);
     const tabs = [
       { id: "board", label: "Board" },
       { id: "market", label: "Market" },
@@ -3713,7 +4998,7 @@ function computeLayout(width, height) {
   }
 
   function renderSegmentTabs(rect, tabs, activeId, onSelect, scopePrefix) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(249, 242, 232, 0.96)", "rgba(108,80,54,0.14)", 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, themed("rgba(249, 242, 232, 0.96)"), themed("rgba(108,80,54,0.14)"), 1);
     const gap = runtime.layout.mode === "mobile-portrait" ? 5 : 4;
     const width = (rect.w - gap * (tabs.length - 1) - 8) / tabs.length;
     tabs.forEach((tab, index) => {
@@ -3735,7 +5020,9 @@ function computeLayout(width, height) {
   }
 
   function drawBoardLabels(geometry) {
-    ctx.fillStyle = "rgba(70, 52, 37, 0.72)";
+    // Column letters (A-H) and row numbers: a clearly readable light ink on the
+    // dark night board, the original warm brown otherwise.
+    ctx.fillStyle = theme().invert ? "rgba(202, 214, 238, 0.96)" : themed("rgba(70, 52, 37, 0.72)");
     ctx.font = geometry.cellSize >= 54
       ? "700 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -3753,7 +5040,7 @@ function computeLayout(width, height) {
   }
 
   function drawWaterEdges(rect, info) {
-    const fill = "rgba(103, 167, 200, 0.92)";
+    const fill = themed("rgba(103, 167, 200, 0.92)");
     const thickness = Math.max(8, rect.w * 0.14);
     for (const side of SIDES) {
       if (info.edges[side] !== "water") continue;
@@ -3801,12 +5088,12 @@ function computeLayout(width, height) {
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#8f5f37";
+    ctx.strokeStyle = themed("#8f5f37");
     ctx.lineWidth = outerWidth;
     ctx.beginPath();
     pathBuilder();
     ctx.stroke();
-    ctx.strokeStyle = "#d8b27a";
+    ctx.strokeStyle = themed("#d8b27a");
     ctx.lineWidth = innerWidth;
     ctx.beginPath();
     pathBuilder();
@@ -3873,7 +5160,7 @@ function computeLayout(width, height) {
     }
     for (const side of SIDES) {
       if (info.edges[side] !== "entrance") continue;
-      ctx.strokeStyle = "#874721";
+      ctx.strokeStyle = themed("#874721");
       ctx.lineWidth = Math.max(3, rect.w * 0.06);
       ctx.beginPath();
       const offset = Math.max(10, rect.w * 0.18);
@@ -3899,8 +5186,8 @@ function computeLayout(width, height) {
   }
 
   function drawCornerBadge(rect, text) {
-    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w * 0.42, 18, 9, "rgba(255,255,255,0.74)");
-    ctx.fillStyle = "#5a4430";
+    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w * 0.42, 18, 9, themed("rgba(255,255,255,0.74)"));
+    ctx.fillStyle = themed("#5a4430");
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -3908,7 +5195,7 @@ function computeLayout(width, height) {
   }
 
   function drawMiniBadge(rect, text, fill, textColor) {
-    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.18, rect.y + rect.h - 24, rect.w * 0.64, 18, 9, fill, "rgba(0,0,0,0.08)", 1);
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.18, rect.y + rect.h - 24, rect.w * 0.64, 18, 9, fill, themed("rgba(0,0,0,0.08)"), 1);
     ctx.fillStyle = textColor;
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
@@ -3921,7 +5208,7 @@ function computeLayout(width, height) {
     const strokeWidth = Math.max(5, rect.w * 0.11);
     ctx.save();
     ctx.lineCap = "round";
-    ctx.strokeStyle = "rgba(255, 245, 240, 0.95)";
+    ctx.strokeStyle = themed("rgba(255, 245, 240, 0.95)");
     ctx.lineWidth = strokeWidth + 3;
     ctx.beginPath();
     ctx.moveTo(rect.x + inset, rect.y + inset);
@@ -3929,7 +5216,7 @@ function computeLayout(width, height) {
     ctx.moveTo(rect.x + rect.w - inset, rect.y + inset);
     ctx.lineTo(rect.x + inset, rect.y + rect.h - inset);
     ctx.stroke();
-    ctx.strokeStyle = "rgba(195, 47, 47, 0.94)";
+    ctx.strokeStyle = themed("rgba(195, 47, 47, 0.94)");
     ctx.lineWidth = strokeWidth;
     ctx.beginPath();
     ctx.moveTo(rect.x + inset, rect.y + inset);
@@ -3942,13 +5229,18 @@ function computeLayout(width, height) {
 
   function drawLandscapeTileVisual(rect, tile) {
     const info = getLandscapeInfoFromTile(tile);
-    const fill = info.hasForestTag ? "#9fba7d" : info.hasWaterEdge ? "#c4dee2" : "#c8dca3";
-    Core.drawRoundedRect(ctx, rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6, Math.max(8, rect.w * 0.18), fill, "rgba(64, 58, 38, 0.12)", 1.2);
+    const terrain = theme().terrain || {};
+    const fill = info.hasForestTag
+      ? (terrain.forest || themed("#9fba7d"))
+      : info.hasWaterEdge
+        ? (terrain.water || themed("#c4dee2"))
+        : (terrain.open || themed("#c8dca3"));
+    Core.drawRoundedRect(ctx, rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6, Math.max(8, rect.w * 0.18), fill, themed("rgba(64, 58, 38, 0.12)"), 1.2);
     drawWaterEdges(rect, info);
     drawRoadEdges(rect, info);
     if (rect.w >= 58) {
-      if (info.isOffice) drawMiniBadge(rect, "Office", "#fff0bf", "#7e5f2f");
-      else if (info.isEntrance) drawMiniBadge(rect, "Gate", "#ffe2be", "#8d5227");
+      if (info.isOffice) drawMiniBadge(rect, "Office", themed("#fff0bf"), themed("#7e5f2f"));
+      else if (info.isEntrance) drawMiniBadge(rect, "Gate", themed("#ffe2be"), themed("#8d5227"));
       else if (info.hasForestTag) drawCornerBadge(rect, "Forest");
       else if (info.hasWaterEdge) drawCornerBadge(rect, "Lake");
     }
@@ -3956,7 +5248,7 @@ function computeLayout(width, height) {
 
   function drawCampTileVisual(rect, campTile) {
     const def = getCampDef(campTile.typeId);
-    const stroke = def.tags.includes("premium") ? "rgba(255, 236, 175, 0.94)" : "rgba(64, 45, 31, 0.16)";
+    const stroke = def.tags.includes("premium") ? themed("rgba(255, 236, 175, 0.94)") : themed("rgba(64, 45, 31, 0.16)");
     const bigPlacement = Array.isArray(campTile.occupiedCells) && campTile.occupiedCells.length > 1;
     const insetX = bigPlacement ? rect.w * 0.08 : rect.w * 0.18;
     const insetY = bigPlacement ? rect.h * 0.12 : rect.h * 0.18;
@@ -3966,10 +5258,10 @@ function computeLayout(width, height) {
       w: rect.w - insetX * 2,
       h: rect.h - insetY * 2
     };
-    Core.drawRoundedRect(ctx, bodyRect.x, bodyRect.y, bodyRect.w, bodyRect.h, Math.max(8, Math.min(bodyRect.w, bodyRect.h) * 0.16), def.color, stroke, 2);
+    Core.drawRoundedRect(ctx, bodyRect.x, bodyRect.y, bodyRect.w, bodyRect.h, Math.max(8, Math.min(bodyRect.w, bodyRect.h) * 0.16), themeCampColor(campTile.typeId, def.color), stroke, 2);
     if (bigPlacement) {
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.34)";
+      ctx.strokeStyle = themed("rgba(255,255,255,0.34)");
       ctx.lineWidth = Math.max(2, Math.min(bodyRect.w, bodyRect.h) * 0.04);
       ctx.beginPath();
       if (campTile.orientation === BIG_MARKET_ITEM_ORIENTATION.vertical) {
@@ -3982,14 +5274,14 @@ function computeLayout(width, height) {
       ctx.stroke();
       ctx.restore();
     }
-    ctx.fillStyle = "#fffdf8";
+    ctx.fillStyle = themed("#fffdf8");
     ctx.font = Math.max(rect.w, rect.h) >= 58 ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     Core.drawWrappedText(ctx, def.shortLabel, rect.x + rect.w / 2, rect.y + rect.h * (bigPlacement ? 0.36 : 0.31), rect.w * (bigPlacement ? 0.72 : 0.52), Math.max(rect.w, rect.h) >= 58 ? 12 : 10, {
       font: ctx.font,
       align: "center",
-      color: "#fffdf8",
+      color: themed("#fffdf8"),
       maxLines: 2
     });
   }
@@ -4040,11 +5332,23 @@ function computeLayout(width, height) {
     const cell = getCell(board, row, col);
     const lastAttempt = game.ui.lastAttempt && game.ui.lastAttempt.row === row && game.ui.lastAttempt.col === col;
     const inspected = game.ui.inspectedCell && game.ui.inspectedCell.row === row && game.ui.inspectedCell.col === col;
-    const hovered = game.ui.hoveredCell && game.ui.hoveredCell.row === row && game.ui.hoveredCell.col === col;
+    const previewCell = getEffectivePreviewCell();
+    const hovered = previewCell && previewCell.row === row && previewCell.col === col;
+    const legalCells = getLegalSelectionCells(player);
+    const isLegalTarget = !!legalCells && legalCells.has(`${row},${col}`);
     const pulse = 0.62 + Math.sin(runtime.now / 180) * 0.15;
 
     registerTarget(rect, () => {
       game.ui.inspectedCell = { row, col };
+      const placing = game.ui.selection.source === "landscape" || game.ui.selection.source === "market";
+      if (placing && runtime.lastPointerType !== "mouse") {
+        const armed = game.ui.armedCell;
+        if (!armed || armed.row !== row || armed.col !== col) {
+          game.ui.armedCell = { row, col };
+          return;
+        }
+      }
+      game.ui.armedCell = null;
       if (game.ui.selection.source === "landscape") {
         attemptLandscapePlacement(row, col);
         return;
@@ -4063,9 +5367,9 @@ function computeLayout(width, height) {
       data: { row, col }
     });
 
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.max(10, rect.w * 0.16), "rgba(251, 246, 236, 0.92)", "rgba(95, 70, 51, 0.12)", 1.4);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.max(10, rect.w * 0.16), themed("rgba(251, 246, 236, 0.92)"), themed("rgba(95, 70, 51, 0.12)"), 1.4);
     if (!cell.landscapeTile) {
-      ctx.strokeStyle = "rgba(95, 70, 51, 0.2)";
+      ctx.strokeStyle = themed("rgba(95, 70, 51, 0.2)");
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 4]);
       ctx.strokeRect(rect.x + 10, rect.y + 10, rect.w - 20, rect.h - 20);
@@ -4073,30 +5377,52 @@ function computeLayout(width, height) {
     } else {
       drawLandscapeTileVisual(rect, cell.landscapeTile);
     }
+    if (legalCells && legalCells.size) {
+      const radius = Math.max(8, rect.w * 0.14);
+      const marketSel = game.ui.selection.source === "market";
+      if (isLegalTarget && !hovered) {
+        // Bright emerald ring + white inner line so legal parcels read clearly
+        // against the sage road/scenic terrain, plus a corner pip. Works for
+        // empty landscape targets and developed market targets alike.
+        Core.drawRoundedRect(ctx, rect.x + 2.5, rect.y + 2.5, rect.w - 5, rect.h - 5, radius, themed("rgba(60, 190, 110, 0.16)"), themed("rgba(31, 150, 70, 0.95)"), 2.6);
+        Core.drawRoundedRect(ctx, rect.x + 4.5, rect.y + 4.5, rect.w - 9, rect.h - 9, radius - 2, null, themed("rgba(255, 255, 255, 0.5)"), 1);
+        const pipR = Math.max(3, rect.w * 0.08);
+        ctx.fillStyle = themed("rgba(28, 150, 70, 0.95)");
+        ctx.beginPath();
+        ctx.arc(rect.x + rect.w - pipR - 5, rect.y + pipR + 5, pipR, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (marketSel && cell.landscapeTile && !isLegalTarget && !inspected && !lastAttempt) {
+        // During a market selection, dim developed parcels that cannot take the
+        // current tile so the legal ones stand out (the spotlight that answers
+        // "where can this go"). Occupied parcels get their camp tile drawn on top.
+        Core.drawRoundedRect(ctx, rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, radius, themed("rgba(60, 48, 36, 0.32)"), null);
+      }
+    }
     if (hovered) Core.drawRoundedRect(ctx, rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, Math.max(8, rect.w * 0.14), null, `rgba(215, 118, 56, ${pulse})`, 2);
-    if (inspected) Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, Math.max(8, rect.w * 0.14), null, "rgba(56, 108, 69, 0.58)", 2);
+    if (inspected) Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, Math.max(8, rect.w * 0.14), null, themed("rgba(56, 108, 69, 0.58)"), 2);
     if (lastAttempt) {
       const invalid = game.ui.lastAttempt.reasons.length > 0;
-      const color = invalid ? "rgba(185, 75, 60, 0.72)" : "rgba(56, 120, 77, 0.72)";
-      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), invalid ? "rgba(185,75,60,0.14)" : "rgba(56,120,77,0.14)", color, 2);
+      const color = invalid ? themed("rgba(185, 75, 60, 0.72)") : themed("rgba(56, 120, 77, 0.72)");
+      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), invalid ? themed("rgba(185,75,60,0.14)") : themed("rgba(56,120,77,0.14)"), color, 2);
       if (invalid && game.ui.selection.source === "landscape") drawInvalidPlacementX(rect);
     }
   }
 
   function drawPlacementPreview(player, geometry) {
-    if (!game.ui.hoveredCell || !game.ui.selection.source) return;
+    const previewCell = getEffectivePreviewCell();
+    if (!previewCell || !game.ui.selection.source) return;
     if (game.ui.selection.source === "landscape") {
-      const rect = getCellRect(geometry, game.ui.hoveredCell.row, game.ui.hoveredCell.col);
-      const reasons = getLandscapePlacementReasons(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
+      const rect = getCellRect(geometry, previewCell.row, previewCell.col);
+      const reasons = getLandscapePlacementReasons(game, player, previewCell.row, previewCell.col, game.ui.selection.typeId, game.ui.selection.rotation);
       ctx.save();
       ctx.globalAlpha = reasons.length ? 0.5 : 0.8;
       drawLandscapeTileVisual(rect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
       ctx.restore();
-      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
+      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? themed("rgba(185,75,60,0.78)") : themed("rgba(56,120,77,0.78)"), 2);
       if (reasons.length) drawInvalidPlacementX(rect);
       return;
     }
-    const placement = getCampTilePlacementEvaluation(game, player, game.ui.hoveredCell.row, game.ui.hoveredCell.col, game.ui.selection.typeId, getSelectedMarketOrientation());
+    const placement = getCampTilePlacementEvaluation(game, player, previewCell.row, previewCell.col, game.ui.selection.typeId, getSelectedMarketOrientation());
     const reasons = placement.reasons;
     const allCellsReady = placement.cells.every((targetCell) => getCell(player.board, targetCell.row, targetCell.col)?.landscapeTile);
     if (allCellsReady) {
@@ -4113,13 +5439,13 @@ function computeLayout(width, height) {
     }
     placement.cells.forEach((targetCell) => {
       const targetRect = getCellRect(geometry, targetCell.row, targetCell.col);
-      Core.drawRoundedRect(ctx, targetRect.x + 8, targetRect.y + 8, targetRect.w - 16, targetRect.h - 16, Math.max(8, targetRect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
+      Core.drawRoundedRect(ctx, targetRect.x + 8, targetRect.y + 8, targetRect.w - 16, targetRect.h - 16, Math.max(8, targetRect.w * 0.14), null, reasons.length ? themed("rgba(185,75,60,0.78)") : themed("rgba(56,120,77,0.78)"), 2);
     });
   }
 
   function renderLandscapeRackCards(player, content) {
     if (!player.landscapeInventory.length) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.72)");
       ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -4128,7 +5454,7 @@ function computeLayout(width, height) {
     }
 
     const entries = player.landscapeInventory.slice();
-    const columns = runtime.layout.mode === "mobile-portrait" ? 2 : 3;
+    const columns = runtime.layout.mode === "mobile-portrait" || content.w < 360 ? 2 : 3;
     const rows = Math.ceil(entries.length / columns);
     const gap = runtime.layout.mode === "mobile-portrait" ? 8 : 10;
     const cardWidth = (content.w - gap * (columns - 1)) / columns;
@@ -4140,7 +5466,7 @@ function computeLayout(width, height) {
       const cardRect = { x: content.x + col * (cardWidth + gap), y: content.y + row * (cardHeight + gap), w: cardWidth, h: cardHeight };
       const selected = game.ui.selection.source === "landscape" && game.ui.selection.typeId === entry.typeId;
       registerTarget(cardRect, () => selectLandscapeTile(entry.typeId), { id: `landscape-${entry.typeId}`, kind: "landscape-card" });
-      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, selected ? "rgba(255, 229, 197, 0.98)" : "rgba(250, 242, 230, 0.98)", selected ? "#cc7a3f" : "rgba(108,80,54,0.16)", selected ? 2 : 1.2);
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, selected ? themed("rgba(255, 229, 197, 0.98)") : themed("rgba(250, 242, 230, 0.98)"), selected ? themed("#cc7a3f") : themed("rgba(108,80,54,0.16)"), selected ? 2 : 1.2);
       const previewSize = Math.max(44, Math.min(cardRect.h - 12, runtime.layout.mode === "mobile-portrait" ? 56 : 68));
       const miniRect = {
         x: cardRect.x + 8,
@@ -4150,7 +5476,7 @@ function computeLayout(width, height) {
       };
       drawLandscapeTileVisual(miniRect, { typeId: entry.typeId, rotation: selected ? game.ui.selection.rotation : 0 });
       const def = getLandscapeDef(entry.typeId);
-      ctx.fillStyle = "#452f1e";
+      ctx.fillStyle = themed("#452f1e");
       ctx.font = runtime.layout.mode === "mobile-portrait"
         ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
         : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -4159,12 +5485,12 @@ function computeLayout(width, height) {
       const textX = miniRect.x + miniRect.w + 12;
       const inlineLabel = `${def.name} x${entry.count}`;
       ctx.fillText(fitText(inlineLabel, cardRect.w - (textX - cardRect.x) - 10, ctx.font), textX, cardRect.y + 12);
-      ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.78)");
       ctx.font = runtime.layout.mode === "mobile-portrait"
         ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
         : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       if (selected) {
-        ctx.fillStyle = "#b9642a";
+        ctx.fillStyle = themed("#b9642a");
         ctx.fillText(`Selected | ${game.ui.selection.rotation * 90} deg`, textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 30 : 34));
       }
     });
@@ -4232,12 +5558,13 @@ function computeLayout(width, height) {
     const startIndex = game.ui.marketPage * columnsPerPage;
     const visibleColumns = game.market.columns.slice(startIndex, startIndex + columnsPerPage);
     const slotsPerPage = isPortrait ? 4 : 8;
-    const totalSlotPages = Math.max(1, Math.ceil(8 / slotsPerPage));
+    const maxVisibleSlotCount = Math.max(1, ...visibleColumns.map((column) => column.slots.length));
+    const totalSlotPages = Math.max(1, Math.ceil(maxVisibleSlotCount / slotsPerPage));
     game.ui.marketSlotPage = Core.clamp(game.ui.marketSlotPage || 0, 0, totalSlotPages - 1);
     const slotStartIndex = game.ui.marketSlotPage * slotsPerPage;
 
     const headerHeight = isPortrait ? 68 : 34;
-    ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+    ctx.fillStyle = themed("rgba(82, 61, 44, 0.76)");
     ctx.font = isPortrait
       ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -4255,7 +5582,7 @@ function computeLayout(width, height) {
       }, { id: "market-next", enabled: game.ui.marketPage < totalPages - 1 });
     }
     if (isPortrait && totalSlotPages > 1) {
-      ctx.fillText(`Contractors ${slotStartIndex + 1}-${Math.min(8, slotStartIndex + slotsPerPage)} of 8`, content.x + content.w / 2, content.y + 46);
+      ctx.fillText(`Contractors ${slotStartIndex + 1}-${Math.min(maxVisibleSlotCount, slotStartIndex + slotsPerPage)} of ${maxVisibleSlotCount}`, content.x + content.w / 2, content.y + 46);
       drawButton({ x: content.x, y: content.y + 32, w: 42, h: 30 }, "<", () => {
         game.ui.marketSlotPage = Math.max(0, game.ui.marketSlotPage - 1);
       }, { id: "market-slot-prev", enabled: game.ui.marketSlotPage > 0 });
@@ -4273,14 +5600,34 @@ function computeLayout(width, height) {
 
     visibleColumns.forEach((column, visibleIndex) => {
       const colRect = { x: bodyRect.x + visibleIndex * (colWidth + colGap), y: bodyRect.y, w: colWidth, h: bodyRect.h };
-      Core.drawRoundedRect(ctx, colRect.x, colRect.y, colRect.w, rowHeight, 16, column.category === "amenity" ? "rgba(198, 224, 226, 0.96)" : "rgba(235, 224, 202, 0.96)", "rgba(108,80,54,0.16)", 1);
-      ctx.fillStyle = "#4b3726";
-      ctx.font = isPortrait
-        ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
-        : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      Core.drawRoundedRect(ctx, colRect.x, colRect.y, colRect.w, rowHeight, 16, column.category === "amenity" ? themed("rgba(198, 224, 226, 0.96)") : themed("rgba(235, 224, 202, 0.96)"), themed("rgba(108,80,54,0.16)"), 1);
+      ctx.fillStyle = themed("#4b3726");
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(fitText(column.label, colRect.w - 16, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2);
+      const deckCount = column.deck ? column.deck.length : 0;
+      // Two stacked lines only when the header pill is tall enough; otherwise a
+      // single "Label (N)" line so short-landscape phones do not overlap row 1.
+      if (rowHeight >= 30) {
+        ctx.font = isPortrait
+          ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+          : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.fillText(fitText(column.label, colRect.w - 16, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 - 7);
+        ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.fillStyle = themed("rgba(75, 55, 38, 0.72)");
+        ctx.fillText(deckCount ? `${deckCount} more in deck` : "Last cards out", colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 + 9);
+      } else {
+        ctx.font = "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        const compactLabel = deckCount ? `${column.label} (${deckCount})` : `${column.label} (last)`;
+        ctx.fillText(fitText(compactLabel, colRect.w - 12, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2);
+      }
+
+      if (!column.slots.length) {
+        const emptyRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap, w: colRect.w, h: rowHeight };
+        Core.drawRoundedRect(ctx, emptyRect.x, emptyRect.y, emptyRect.w, emptyRect.h, 16, themed("rgba(240, 233, 222, 0.7)"), themed("rgba(108,80,54,0.12)"), 1);
+        ctx.fillStyle = themed("rgba(95, 74, 53, 0.6)");
+        ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.fillText("Sold out for this game", emptyRect.x + emptyRect.w / 2, emptyRect.y + emptyRect.h / 2);
+      }
 
       column.slots.slice(slotStartIndex, slotStartIndex + slotsPerPage).forEach((slot, visibleSlotIndex) => {
         const def = getCampDef(slot.typeId);
@@ -4288,7 +5635,7 @@ function computeLayout(width, height) {
         const slotRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap + visibleSlotIndex * (rowHeight + rowGap), w: colRect.w, h: rowHeight };
         const globalColumnIndex = startIndex + visibleIndex;
         const stack = game.market.columns[globalColumnIndex].slots.slice(0, slotIndex + 1).map((entry, index) => ({ typeId: entry.typeId, slotIndex: index }));
-        const blockedPurchaseReason = buildOpen ? getBlockedMarketPurchaseReason(game, player, stack) : "";
+        const blockedPurchaseReason = buildOpen ? getBlockedMarketPurchaseReasonForRender(game, player, stack) : "";
         const blockedPurchase = !!blockedPurchaseReason;
         const selected = game.ui.selection.source === "market" && game.ui.selection.columnIndex === globalColumnIndex && game.ui.selection.slotIndex === slotIndex;
         const queued = hasPendingMarketPurchase() && game.turn.marketPurchaseColumnIndex === globalColumnIndex && slotIndex <= game.turn.marketPurchaseDepth;
@@ -4304,8 +5651,8 @@ function computeLayout(width, height) {
           slotRect.w,
           slotRect.h,
           16,
-          blockedPurchase ? "rgba(240, 231, 225, 0.98)" : selected ? "rgba(255, 232, 204, 0.98)" : queued ? "rgba(255, 243, 223, 0.98)" : "rgba(250, 243, 233, 0.98)",
-          blockedPurchase ? "rgba(143,67,56,0.28)" : selected ? "#cc7a3f" : queued ? "rgba(204,122,63,0.42)" : "rgba(108,80,54,0.16)",
+          blockedPurchase ? themed("rgba(240, 231, 225, 0.98)") : selected ? themed("rgba(255, 232, 204, 0.98)") : queued ? themed("rgba(255, 243, 223, 0.98)") : themed("rgba(250, 243, 233, 0.98)"),
+          blockedPurchase ? themed("rgba(143,67,56,0.28)") : selected ? themed("#cc7a3f") : queued ? themed("rgba(204,122,63,0.42)") : themed("rgba(108,80,54,0.16)"),
           selected ? 2 : queued ? 1.5 : 1.1
         );
         const iconSize = Math.max(16, slotRect.h - 10);
@@ -4315,7 +5662,7 @@ function computeLayout(width, height) {
         drawCampTileVisual(miniRect, { typeId: def.id });
         ctx.restore();
         const compact = slotRect.h < 54 || slotRect.w < 150;
-        ctx.fillStyle = !buildOpen ? "rgba(68,47,32,0.52)" : blockedPurchase ? "rgba(92,65,45,0.58)" : "#442f20";
+        ctx.fillStyle = !buildOpen ? themed("rgba(68,47,32,0.52)") : blockedPurchase ? themed("rgba(92,65,45,0.58)") : themed("#442f20");
         const textX = miniRect.x + miniRect.w + 8;
         const priceX = slotRect.x + slotRect.w - 10;
         if (compact) {
@@ -4330,8 +5677,8 @@ function computeLayout(width, height) {
           ctx.fillText("$10k", priceX, slotRect.y + slotRect.h / 2 + 0.5);
           if (blockedPurchase) {
             ctx.textAlign = "left";
-            ctx.fillStyle = "#8f4338";
-            ctx.fillText("No legal water", textX, slotRect.y + slotRect.h - 10);
+            ctx.fillStyle = themed("#8f4338");
+            ctx.fillText(marketBlockedShortLabel(blockedPurchaseReason), textX, slotRect.y + slotRect.h - 10);
           }
         } else {
           ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -4339,14 +5686,14 @@ function computeLayout(width, height) {
           ctx.textBaseline = "top";
           ctx.fillText(fitText(def.name, slotRect.w - miniRect.w - 28, ctx.font), textX, slotRect.y + 7);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
-          ctx.fillStyle = blockedPurchase ? "#8f4338" : column.category === "amenity" ? "#3f6870" : "#7d5a37";
-          ctx.fillText(blockedPurchase ? "No legal water parcel" : column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
-          ctx.fillStyle = !buildOpen ? "rgba(68,47,32,0.52)" : blockedPurchase ? "rgba(92,65,45,0.58)" : "#442f20";
+          ctx.fillStyle = blockedPurchase ? themed("#8f4338") : column.category === "amenity" ? themed("#3f6870") : themed("#7d5a37");
+          ctx.fillText(blockedPurchase ? marketBlockedShortLabel(blockedPurchaseReason) : column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
+          ctx.fillStyle = !buildOpen ? themed("rgba(68,47,32,0.52)") : blockedPurchase ? themed("rgba(92,65,45,0.58)") : themed("#442f20");
           ctx.textAlign = "right";
           ctx.fillText("$10k", priceX, slotRect.y + 7);
         }
         if (queued) {
-          ctx.fillStyle = selected ? "#b7632c" : "rgba(183,99,44,0.76)";
+          ctx.fillStyle = selected ? themed("#b7632c") : themed("rgba(183,99,44,0.76)");
           ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.textAlign = "right";
           ctx.textBaseline = "bottom";
@@ -4358,7 +5705,7 @@ function computeLayout(width, height) {
 
   function renderObjectiveCards(player, objectives, rect, variant, page, cardsPerPage) {
     if (!objectives.length) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.72)");
       ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -4375,7 +5722,7 @@ function computeLayout(width, height) {
       const cardRect = { x: rect.x, y: rect.y + index * (cardHeight + gap), w: rect.w, h: cardHeight };
       const complete = entry.result.points >= entry.objective.points;
       const fill = createObjectiveCardFill(cardRect, complete);
-      const stroke = complete ? "rgba(63, 104, 73, 0.54)" : "rgba(84, 77, 68, 0.26)";
+      const stroke = complete ? themed("rgba(63, 104, 73, 0.54)") : themed("rgba(84, 77, 68, 0.26)");
       const inset = runtime.layout.mode === "mobile-portrait" ? 10 : 14;
       const titleFont = runtime.layout.mode === "mobile-portrait"
         ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -4391,9 +5738,9 @@ function computeLayout(width, height) {
       const detailLineHeight = runtime.layout.mode === "mobile-portrait" ? 13 : 15;
       const footerHeight = runtime.layout.mode === "desktop" ? 42 : 48;
       Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 16, fill, stroke, 1.1);
-      Core.drawRoundedRect(ctx, cardRect.x + 4, cardRect.y + 4, cardRect.w - 8, Math.max(34, cardRect.h * 0.26), 14, "rgba(255, 255, 255, 0.10)");
+      Core.drawRoundedRect(ctx, cardRect.x + 4, cardRect.y + 4, cardRect.w - 8, Math.max(34, cardRect.h * 0.26), 14, themed("rgba(255, 255, 255, 0.10)"));
       const footerBandY = cardRect.y + cardRect.h - footerHeight - 4;
-      Core.drawRoundedRect(ctx, cardRect.x + 6, footerBandY, cardRect.w - 12, footerHeight - 6, 14, "rgba(90, 98, 105, 0.20)");
+      Core.drawRoundedRect(ctx, cardRect.x + 6, footerBandY, cardRect.w - 12, footerHeight - 6, 14, themed("rgba(90, 98, 105, 0.20)"));
       const pillText = `${entry.result.points}/${entry.objective.points}`;
       const pillWidth = (() => {
         ctx.save();
@@ -4405,10 +5752,10 @@ function computeLayout(width, height) {
       const titleWidth = Math.max(116, cardRect.w - pillWidth - inset * 2 - 10);
       Core.drawWrappedText(ctx, entry.objective.name, cardRect.x + inset, cardRect.y + inset, titleWidth, titleLineHeight, {
         font: titleFont,
-        color: "#452f1e",
+        color: themed("#452f1e"),
         maxLines: 2
       });
-      drawPill(cardRect.x + cardRect.w - pillWidth - inset, cardRect.y + inset, pillText, complete ? "#496f4f" : variant === "director" ? "#607789" : "#7b6852", "#fff9f3", {
+      drawPill(cardRect.x + cardRect.w - pillWidth - inset, cardRect.y + inset, pillText, complete ? themed("#496f4f") : variant === "director" ? themed("#607789") : themed("#7b6852"), themed("#fff9f3"), {
         paddingX: 12,
         height: runtime.layout.mode === "mobile-portrait" ? 26 : 30,
         font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -4418,11 +5765,11 @@ function computeLayout(width, height) {
       const footerY = cardRect.y + cardRect.h - footerHeight;
       Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + inset, descriptionY, cardRect.w - inset * 2, bodyLineHeight, {
         font: bodyFont,
-        color: "rgba(56, 48, 39, 0.88)",
+        color: themed("rgba(56, 48, 39, 0.88)"),
         maxLines: runtime.layout.mode === "desktop" ? 3 : 5
       });
 
-      ctx.strokeStyle = "rgba(82, 90, 96, 0.24)";
+      ctx.strokeStyle = themed("rgba(82, 90, 96, 0.24)");
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(cardRect.x + inset, footerY - 8);
@@ -4431,7 +5778,7 @@ function computeLayout(width, height) {
 
       Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + inset, footerY, cardRect.w - inset * 2, detailLineHeight, {
         font: detailFont,
-        color: complete ? "#2f5342" : "#465158",
+        color: complete ? themed("#2f5342") : themed("#465158"),
         maxLines: runtime.layout.mode === "mobile-portrait" ? 2 : 2
       });
     });
@@ -4458,7 +5805,7 @@ function computeLayout(width, height) {
     const pagerY = content.y + 40;
     if (totalPages > 1) {
       const indicatorText = `Showing ${game.ui.objectivePages[tabKey] * cardsPerPage + 1}-${Math.min(objectives.length, (game.ui.objectivePages[tabKey] + 1) * cardsPerPage)} of ${objectives.length}`;
-      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.72)");
       ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -4497,23 +5844,23 @@ function computeLayout(width, height) {
     const rowHeight = 52;
     standings.forEach((entry, index) => {
       const rowRect = { x: content.x, y: content.y + index * (rowHeight + 8), w: content.w, h: rowHeight };
-      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(249, 241, 229, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, themed("rgba(249, 241, 229, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
       Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, entry.color.fill);
       ctx.fillStyle = entry.color.text;
       ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
-      ctx.fillStyle = "#432e1e";
+      ctx.fillStyle = themed("#432e1e");
       ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(fitText(entry.name, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
       ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.76)");
       const status = game.phase === "build" && entry.passedThisRound ? " | passed this round" : "";
       ctx.fillText(`${Core.formatMoney(entry.money)} | ${entry.roundCampPlacements[game.roundIndex]} placed this round${status}`, rowRect.x + 56, rowRect.y + 29);
-      ctx.fillStyle = "#432e1e";
+      ctx.fillStyle = themed("#432e1e");
       ctx.font = "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(`${entry.score} pts`, rowRect.x + rowRect.w - 14, rowRect.y + 16);
@@ -4524,15 +5871,15 @@ function computeLayout(width, height) {
     const player = getPlayer();
     const content = drawPanel(rect, "Current Focus", player ? `${player.name} | ${getPhaseLabel()}` : "Setup");
     const summary = getBottomSummary();
-    Core.drawRoundedRect(ctx, content.x, content.y, content.w, content.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    Core.drawRoundedRect(ctx, content.x, content.y, content.w, content.h, 18, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
+    ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : summary.tone === "warning" ? themed("#88622d") : themed("#4a3524");
     ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(summary.title, content.x + 12, content.y + 10);
     Core.drawWrappedText(ctx, summary.body, content.x + 12, content.y + 30, content.w - 24, 15, {
       font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       maxLines: 4
     });
   }
@@ -4569,6 +5916,7 @@ function computeLayout(width, height) {
     ctx.beginPath();
     ctx.rect(clipRect.x, clipRect.y, clipRect.w, clipRect.h);
     ctx.clip();
+    runtime.activeClipRect = clipRect;
 
     return {
       clipRect,
@@ -4580,6 +5928,7 @@ function computeLayout(width, height) {
 
   function endOverlayScrollViewport(viewport, scrollMeta) {
     ctx.restore();
+    runtime.activeClipRect = null;
     runtime.overlayScroll = null;
 
     if (scrollMeta.maxScroll <= 0) return;
@@ -4595,8 +5944,8 @@ function computeLayout(width, height) {
     const thumbY = trackRect.y + (scrollMeta.scrollY / scrollMeta.maxScroll) * travel;
     const thumbRect = { x: trackRect.x, y: thumbY, w: trackRect.w, h: thumbHeight };
 
-    Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, "rgba(108,80,54,0.1)");
-    Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, "rgba(202, 111, 54, 0.72)");
+    Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, themed("rgba(108,80,54,0.1)"));
+    Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, themed("rgba(202, 111, 54, 0.72)"));
 
     runtime.overlayScroll = {
       kind: "overlay",
@@ -4618,14 +5967,14 @@ function computeLayout(width, height) {
 
     visibleRows.forEach((row, index) => {
       const rowRect = { x: rect.x + 18, y: startY + index * (rowHeight + rowGap), w: rect.w - 36, h: rowHeight };
-      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
       Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
       ctx.fillStyle = row.player.color.text;
       ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
-      ctx.fillStyle = "#432e1e";
+      ctx.fillStyle = themed("#432e1e");
       ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
@@ -4634,7 +5983,7 @@ function computeLayout(width, height) {
     });
 
     if (rows.length > visibleRows.length) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.74)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.74)");
       ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -4659,11 +6008,18 @@ function computeLayout(width, height) {
   function drawFrontScreenShell(title, subtitle = "", options = {}) {
     const compact = isFrontScreenCompact();
     const short = isVeryShortViewport();
+    // On roomy (desktop) viewports the shell becomes a centered card so the
+    // themed background scene (night sky, meadow, stars) shows around it.
+    // Mobile and short layouts stay full-bleed to keep room for content.
+    const pad = runtime.layout.pad;
+    const fullBleed = compact;
+    const shellW = fullBleed ? runtime.layout.width - pad * 2 : Math.min(runtime.layout.width - pad * 2, 900);
+    const shellH = fullBleed ? runtime.layout.height - pad * 2 : Math.min(runtime.layout.height - pad * 2, 660);
     const shell = {
-      x: runtime.layout.pad,
-      y: runtime.layout.pad,
-      w: runtime.layout.width - runtime.layout.pad * 2,
-      h: runtime.layout.height - runtime.layout.pad * 2
+      x: Math.round((runtime.layout.width - shellW) / 2),
+      y: fullBleed ? pad : Math.round((runtime.layout.height - shellH) / 2),
+      w: shellW,
+      h: shellH
     };
     const titleY = shell.y + (short ? 14 : 20);
     const titleFont = options.titleFont || (short
@@ -4681,10 +6037,10 @@ function computeLayout(width, height) {
     const subtitleLines = short ? 2 : compact ? 3 : 2;
     const bodyTop = shell.y + (subtitle ? (short ? 88 : 120) : (short ? 64 : 82));
     const bodyBottomInset = subtitle ? (short ? 96 : 142) : (short ? 78 : 104);
-    Core.drawRoundedRect(ctx, shell.x, shell.y, shell.w, shell.h, 30, "rgba(255, 248, 239, 0.97)", "rgba(108,80,54,0.18)", 1.6);
-    Core.drawRoundedRect(ctx, shell.x + 1, shell.y + 1, shell.w - 2, shell.h - 2, 29, null, "rgba(255,255,255,0.22)", 1);
+    Core.drawRoundedRect(ctx, shell.x, shell.y, shell.w, shell.h, 30, themed("rgba(255, 248, 239, 0.97)"), themed("rgba(108,80,54,0.18)"), 1.6);
+    Core.drawRoundedRect(ctx, shell.x + 1, shell.y + 1, shell.w - 2, shell.h - 2, 29, null, themed("rgba(255,255,255,0.22)"), 1);
 
-    ctx.fillStyle = "rgba(233, 213, 184, 0.45)";
+    ctx.fillStyle = themed("rgba(233, 213, 184, 0.45)");
     ctx.beginPath();
     ctx.arc(shell.x + shell.w * 0.15, shell.y + shell.h * 0.14, Math.min(shell.w, shell.h) * 0.12, 0, Math.PI * 2);
     ctx.fill();
@@ -4692,7 +6048,7 @@ function computeLayout(width, height) {
     ctx.arc(shell.x + shell.w * 0.84, shell.y + shell.h * 0.18, Math.min(shell.w, shell.h) * 0.09, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#3d2d20";
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = titleFont;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -4701,7 +6057,7 @@ function computeLayout(width, height) {
     if (subtitle) {
       Core.drawWrappedText(ctx, subtitle, shell.x + 22, subtitleY, Math.min(shell.w - 44, runtime.layout.mode === "desktop" ? 620 : shell.w - 44), subtitleLineHeight, {
         font: subtitleFont,
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         maxLines: subtitleLines
       });
     }
@@ -4726,9 +6082,9 @@ function computeLayout(width, height) {
 
   function renderHeroPillRow(body) {
     const pills = [
-      { text: "2-5 Players", fill: "#efe2ca", textColor: "#5f4731" },
-      { text: "Pass-and-Play", fill: "#dfead4", textColor: "#446038" },
-      { text: "3 Summer Rounds", fill: "#e2d8ef", textColor: "#5e4b78" }
+      { text: "2-5 Players", fill: themed("#efe2ca"), textColor: themed("#5f4731") },
+      { text: "Pass-and-Play", fill: themed("#dfead4"), textColor: themed("#446038") },
+      { text: "3 Summer Rounds", fill: themed("#e2d8ef"), textColor: themed("#5e4b78") }
     ];
     let x = body.x;
     let y = body.y;
@@ -4754,78 +6110,131 @@ function computeLayout(width, height) {
 
   function renderMainMenuScreen() {
     const compact = isFrontScreenCompact();
+    const short = isVeryShortViewport();
     const { shell, body } = drawFrontScreenShell("Smore to Explore", GAME_PITCH);
     const pillHeight = renderHeroPillRow(body);
 
-    const introMetrics = Core.drawWrappedText(ctx, GAME_INTRO, body.x, body.y + pillHeight + 16, Math.min(body.w, compact ? body.w : 560), compact ? 18 : 20, {
-      font: compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.86)",
-      maxLines: 2
-    });
+    const resumeAvailable = !!runtime.savedGameAvailable;
+    let introHeight = 0;
+    if (!short) {
+      const introMetrics = Core.drawWrappedText(ctx, GAME_INTRO, body.x, body.y + pillHeight + 16, Math.min(body.w, compact ? body.w : 560), compact ? 18 : 20, {
+        font: compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif",
+        color: themed("rgba(82, 61, 44, 0.86)"),
+        maxLines: 2
+      });
+      introHeight = introMetrics.height + (compact ? 30 : 36);
+    } else {
+      introHeight = resumeAvailable ? 0 : 8;
+    }
 
-    const actionTop = body.y + pillHeight + introMetrics.height + (compact ? 30 : 36);
-    const actionGap = compact ? 12 : 16;
-    const rowHeight = compact ? 78 : 86;
+    const actionGap = short ? 6 : compact ? 12 : 16;
+    const rowHeight = short ? (resumeAvailable ? 50 : 56) : compact ? 78 : 86;
     const primaryWidth = compact ? body.w : Math.min(body.w, 620);
     const rowX = compact ? body.x : body.x + (body.w - primaryWidth) / 2;
-    const pickerWidth = compact ? Math.max(176, Math.round(primaryWidth * 0.52)) : Math.max(240, Math.round(primaryWidth * 0.46));
-    const startWidth = primaryWidth - pickerWidth - actionGap;
-    const pickerRect = { x: rowX, y: actionTop, w: pickerWidth, h: rowHeight };
-    const startRect = { x: pickerRect.x + pickerRect.w + actionGap, y: actionTop, w: startWidth, h: rowHeight };
+    const sideBySidePickerWidth = compact ? Math.max(176, Math.round(primaryWidth * 0.52)) : Math.max(240, Math.round(primaryWidth * 0.46));
+    const stackPrimary = primaryWidth - sideBySidePickerWidth - actionGap < 120;
+    const pickerWidth = stackPrimary ? primaryWidth : sideBySidePickerWidth;
 
-    Core.drawRoundedRect(ctx, pickerRect.x, pickerRect.y, pickerRect.w, pickerRect.h, 22, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
-    ctx.fillStyle = "#4a3524";
+    let flowY = body.y + pillHeight + introHeight;
+    if (resumeAvailable) {
+      const resumeRect = { x: rowX, y: flowY, w: primaryWidth, h: short ? 36 : 52 };
+      drawScreenButton(resumeRect, "Resume Saved Game", resumeSavedGameFromMenu, {
+        id: "menu-resume",
+        variant: "success",
+        font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      flowY = resumeRect.y + resumeRect.h + actionGap;
+    }
+    const pickerRect = { x: rowX, y: flowY, w: pickerWidth, h: rowHeight };
+    const labelTop = short ? 8 : 10;
+    const buttonTop = short ? 30 : compact ? 38 : 42;
+    const buttonH = short ? 26 : compact ? 28 : 32;
+    const buttonW = compact ? 52 : 58;
+    const countMid = short ? 44 : compact ? 54 : 58;
+
+    Core.drawRoundedRect(ctx, pickerRect.x, pickerRect.y, pickerRect.w, pickerRect.h, 22, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+    ctx.fillStyle = themed("#4a3524");
     ctx.font = compact ? "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText("Player Count", pickerRect.x + pickerRect.w / 2, pickerRect.y + 10);
-    drawScreenButton({ x: pickerRect.x + 14, y: pickerRect.y + (compact ? 38 : 42), w: compact ? 52 : 58, h: compact ? 28 : 32 }, "-", () => adjustConfiguredPlayerCount(-1), {
+    ctx.fillText("Player Count", pickerRect.x + pickerRect.w / 2, pickerRect.y + labelTop);
+    drawScreenButton({ x: pickerRect.x + 14, y: pickerRect.y + buttonTop, w: buttonW, h: buttonH }, "-", () => adjustConfiguredPlayerCount(-1), {
       id: "menu-player-minus",
       enabled: game.ui.configuredPlayerCount > 2
     });
-    drawScreenButton({ x: pickerRect.x + pickerRect.w - (compact ? 66 : 72), y: pickerRect.y + (compact ? 38 : 42), w: compact ? 52 : 58, h: compact ? 28 : 32 }, "+", () => adjustConfiguredPlayerCount(1), {
+    drawScreenButton({ x: pickerRect.x + pickerRect.w - buttonW - 14, y: pickerRect.y + buttonTop, w: buttonW, h: buttonH }, "+", () => adjustConfiguredPlayerCount(1), {
       id: "menu-player-plus",
       enabled: game.ui.configuredPlayerCount < 5
     });
-    ctx.font = compact ? "800 24px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 30px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.font = short ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif" : compact ? "800 24px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 30px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(game.ui.configuredPlayerCount), pickerRect.x + pickerRect.w / 2, pickerRect.y + (compact ? 54 : 58));
+    ctx.fillText(String(game.ui.configuredPlayerCount), pickerRect.x + pickerRect.w / 2, pickerRect.y + countMid);
 
+    const startRect = stackPrimary
+      ? { x: rowX, y: pickerRect.y + pickerRect.h + actionGap, w: primaryWidth, h: short ? 48 : 56 }
+      : { x: pickerRect.x + pickerRect.w + actionGap, y: pickerRect.y, w: primaryWidth - pickerWidth - actionGap, h: rowHeight };
     drawScreenButton(startRect, "Start New Game", startNewGameFromMenu, {
       id: "menu-start",
       variant: "primary",
       font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
 
-    const secondaryTop = startRect.y + startRect.h + actionGap;
-    if (compact) {
-      drawScreenButton({ x: rowX, y: secondaryTop, w: primaryWidth, h: 52 }, "How to Play", () => openHowToScreen(0), {
+    flowY = startRect.y + startRect.h + actionGap;
+
+    const seatChipH = short ? 26 : 32;
+    const seatCount = game.ui.configuredPlayerCount || 2;
+    const seatGap = 6;
+    const seatChipW = (primaryWidth - seatGap * (seatCount - 1)) / seatCount;
+    if (!game.ui.seats) game.ui.seats = createDefaultSeats();
+    for (let seatIndex = 0; seatIndex < seatCount; seatIndex += 1) {
+      const seat = game.ui.seats[seatIndex] || (game.ui.seats[seatIndex] = { optionIndex: 0 });
+      const option = getSeatOption(seat);
+      drawScreenButton({ x: rowX + seatIndex * (seatChipW + seatGap), y: flowY, w: seatChipW, h: seatChipH }, fitText(`P${seatIndex + 1}: ${option.chip}`, seatChipW - 10, short ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"), () => {
+        seat.optionIndex = (seat.optionIndex + 1) % AI_SEAT_OPTIONS.length;
+      }, {
+        id: `menu-seat-${seatIndex}`,
+        variant: option.kind === "ai" ? "success" : undefined,
+        font: short ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+    }
+    flowY += seatChipH + actionGap;
+
+    const secondarySideBySide = !compact || short || primaryWidth >= 420;
+    const secondaryH = short ? (resumeAvailable ? 34 : 38) : compact ? 52 : 54;
+    if (secondarySideBySide) {
+      const secondaryWidth = (primaryWidth - actionGap) / 2;
+      drawScreenButton({ x: rowX, y: flowY, w: secondaryWidth, h: secondaryH }, "How to Play", () => openHowToScreen(0), {
         id: "menu-howto",
         variant: "warning",
-        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
-      drawScreenButton({ x: rowX, y: secondaryTop + 64, w: primaryWidth, h: 46 }, "About", openAboutScreen, {
+      drawScreenButton({ x: rowX + secondaryWidth + actionGap, y: flowY, w: secondaryWidth, h: secondaryH }, "About", openAboutScreen, {
         id: "menu-about",
-        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: compact ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     } else {
-      const secondaryWidth = (primaryWidth - actionGap) / 2;
-      drawScreenButton({ x: rowX, y: secondaryTop, w: secondaryWidth, h: 54 }, "How to Play", () => openHowToScreen(0), {
+      drawScreenButton({ x: rowX, y: flowY, w: primaryWidth, h: secondaryH }, "How to Play", () => openHowToScreen(0), {
         id: "menu-howto",
         variant: "warning",
-        font: "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
-      drawScreenButton({ x: rowX + secondaryWidth + actionGap, y: secondaryTop, w: secondaryWidth, h: 54 }, "About", openAboutScreen, {
+      drawScreenButton({ x: rowX, y: flowY + secondaryH + actionGap, w: primaryWidth, h: 46 }, "About", openAboutScreen, {
         id: "menu-about",
-        font: "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif"
+        font: "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
     }
 
-    ctx.fillStyle = "rgba(82, 61, 44, 0.7)";
-    ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Local prototype | Best on one shared device around the table", shell.x + shell.w / 2, shell.y + shell.h - 20);
+    const menuBottom = flowY + secondaryH + (secondarySideBySide ? 0 : secondaryH + actionGap + 4);
+    const footerY = shell.y + shell.h - 20;
+    if (footerY - 10 > menuBottom) {
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.7)");
+      ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const footerText = "Local prototype | Best on one shared device around the table";
+      const footerFits = ctx.measureText(footerText).width <= shell.w - 24;
+      ctx.fillText(footerFits ? footerText : "Local prototype | Pass-and-play", shell.x + shell.w / 2, footerY);
+    }
   }
 
   function getTutorialStepLayout(step, width, compact) {
@@ -4893,7 +6302,7 @@ function computeLayout(width, height) {
     ctx.clip();
     ctx.translate(0, -scrollY);
 
-    ctx.fillStyle = "#5a4330";
+    ctx.fillStyle = themed("#5a4330");
     ctx.font = compact ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -4903,49 +6312,49 @@ function computeLayout(width, height) {
     HOW_TO_STEPS.forEach((_, index) => {
       const active = index === game.ui.howToStep;
       const dotX = viewport.x + contentWidth - 12 - (HOW_TO_STEPS.length - 1 - index) * (compact ? 14 : 16);
-      ctx.fillStyle = active ? "#ca6f36" : "rgba(108,80,54,0.22)";
+      ctx.fillStyle = active ? themed("#ca6f36") : themed("rgba(108,80,54,0.22)");
       ctx.beginPath();
       ctx.arc(dotX, dotsY + 6, active ? 5 : 4, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    ctx.fillStyle = "#3d2d20";
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = compact ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillText(step.title, viewport.x, viewport.y + metrics.titleTop);
     Core.drawWrappedText(ctx, step.lead, viewport.x, viewport.y + metrics.leadTop, contentWidth, metrics.leadLineHeight, {
       font: metrics.leadFont,
-      color: "rgba(82, 61, 44, 0.86)",
+      color: themed("rgba(82, 61, 44, 0.86)"),
       maxLines: compact ? 6 : 4
     });
 
     let cursorY = viewport.y + metrics.leadTop + metrics.leadHeight + 16;
     step.bullets.forEach((bullet, index) => {
       const cardRect = { x: viewport.x, y: cursorY, w: contentWidth, h: metrics.bulletHeights[index] };
-      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
-      Core.drawRoundedRect(ctx, cardRect.x + 10, cardRect.y + 10, metrics.bulletBadgeSize, metrics.bulletBadgeSize, metrics.bulletBadgeSize / 2, "rgba(202, 111, 54, 0.16)");
-      ctx.fillStyle = "#b7632c";
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, themed("rgba(248, 241, 231, 0.98)"), themed("rgba(108,80,54,0.12)"), 1);
+      Core.drawRoundedRect(ctx, cardRect.x + 10, cardRect.y + 10, metrics.bulletBadgeSize, metrics.bulletBadgeSize, metrics.bulletBadgeSize / 2, themed("rgba(202, 111, 54, 0.16)"));
+      ctx.fillStyle = themed("#b7632c");
       ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(index + 1), cardRect.x + 10 + metrics.bulletBadgeSize / 2, cardRect.y + 10 + metrics.bulletBadgeSize / 2);
       Core.drawWrappedText(ctx, bullet, cardRect.x + 44, cardRect.y + metrics.bulletPadY, cardRect.w - 56, metrics.bulletLineHeight, {
         font: metrics.bulletFont,
-        color: "#4a3524",
+        color: themed("#4a3524"),
         maxLines: 4
       });
       cursorY += cardRect.h + metrics.bulletGap;
     });
 
     const reminderRect = { x: viewport.x, y: cursorY + 2, w: contentWidth, h: metrics.reminderHeight };
-    Core.drawRoundedRect(ctx, reminderRect.x, reminderRect.y, reminderRect.w, reminderRect.h, 18, "rgba(233, 243, 224, 0.98)", "rgba(95, 141, 101, 0.22)", 1.1);
-    ctx.fillStyle = "#3f6b47";
+    Core.drawRoundedRect(ctx, reminderRect.x, reminderRect.y, reminderRect.w, reminderRect.h, 18, themed("rgba(233, 243, 224, 0.98)"), themed("rgba(95, 141, 101, 0.22)"), 1.1);
+    ctx.fillStyle = themed("#3f6b47");
     ctx.font = compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText("Keep in mind", reminderRect.x + 12, reminderRect.y + metrics.reminderPadY);
     Core.drawWrappedText(ctx, step.reminder, reminderRect.x + 12, reminderRect.y + metrics.reminderPadY + 20, reminderRect.w - 24, metrics.reminderLineHeight, {
       font: metrics.reminderFont,
-      color: "#456049",
+      color: themed("#456049"),
       maxLines: 4
     });
 
@@ -4958,8 +6367,8 @@ function computeLayout(width, height) {
       const thumbY = trackRect.y + (scrollY / maxScroll) * Math.max(0, trackRect.h - thumbHeight);
       const thumbRect = { x: trackRect.x, y: thumbY, w: trackRect.w, h: thumbHeight };
 
-      Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, "rgba(108,80,54,0.1)");
-      Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, "rgba(202, 111, 54, 0.72)");
+      Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, themed("rgba(108,80,54,0.1)"));
+      Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, themed("rgba(202, 111, 54, 0.72)"));
 
       runtime.frontScroll = {
         kind: "howto",
@@ -5041,15 +6450,15 @@ function computeLayout(width, height) {
     const cardHeight = compact ? 92 : 100;
     cards.forEach((card, index) => {
       const rect = { x: body.x, y: body.y + index * (cardHeight + cardGap), w: body.w, h: cardHeight };
-      Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
-      ctx.fillStyle = "#3d2d20";
+      Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, themed("rgba(248, 241, 231, 0.98)"), themed("rgba(108,80,54,0.12)"), 1);
+      ctx.fillStyle = themed("#3d2d20");
       ctx.font = compact ? "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 17px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(card.title, rect.x + 14, rect.y + 12);
       Core.drawWrappedText(ctx, card.text, rect.x + 14, rect.y + 38, rect.w - 28, compact ? 16 : 18, {
         font: compact ? "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.86)",
+        color: themed("rgba(82, 61, 44, 0.86)"),
         maxLines: compact ? 3 : 3
       });
     });
@@ -5074,12 +6483,18 @@ function computeLayout(width, height) {
   }
 
   function renderOverlay() {
-    if (!game.overlay) return;
+    if (!game.overlay) {
+      runtime.overlayPanelRect = null;
+      return;
+    }
     runtime.overlayScroll = null;
-    ctx.fillStyle = "rgba(47, 34, 23, 0.58)";
+    ctx.fillStyle = themed("rgba(47, 34, 23, 0.58)");
     ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
 
-    if (game.overlay.kind === "rename-players") return;
+    if (game.overlay.kind === "rename-players") {
+      runtime.overlayPanelRect = null;
+      return;
+    }
 
     const isPortrait = runtime.layout.mode === "mobile-portrait";
     const isMobileOverlay = runtime.layout.mode !== "desktop";
@@ -5092,7 +6507,7 @@ function computeLayout(width, height) {
       : game.overlay.kind === "handoff"
         ? (isPortrait ? 322 : 290)
         : game.overlay.kind === "pause-menu"
-          ? (isPortrait ? 360 : 334)
+          ? (isPortrait ? 360 : 452)
           : game.overlay.kind === "restart-confirm"
             ? (isPortrait ? 270 : 246)
             : game.overlay.kind === "about"
@@ -5122,13 +6537,14 @@ function computeLayout(width, height) {
           h: panelHeight
         };
 
+    runtime.overlayPanelRect = rect;
     drawLogFrame(rect);
     const panelFill = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
-    panelFill.addColorStop(0, "rgba(255, 250, 244, 0.98)");
-    panelFill.addColorStop(0.5, "rgba(248, 238, 223, 0.98)");
-    panelFill.addColorStop(1, "rgba(236, 222, 202, 0.98)");
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 28, panelFill, "rgba(108,80,54,0.20)", 1.8);
-    ctx.fillStyle = "#3d2d20";
+    panelFill.addColorStop(0, themed("rgba(255, 250, 244, 0.98)"));
+    panelFill.addColorStop(0.5, themed("rgba(248, 238, 223, 0.98)"));
+    panelFill.addColorStop(1, themed("rgba(236, 222, 202, 0.98)"));
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 28, panelFill, themed("rgba(108,80,54,0.20)"), 1.8);
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -5173,7 +6589,7 @@ function computeLayout(width, height) {
     ctx.fillText("Smore to Explore", rect.x + rect.w / 2, titleY);
     const introMetrics = Core.drawWrappedText(ctx, "Build the best campground over three summer rounds as each player shapes a separate board on the same device. Draft from the shared contractor market, chase seasonal goals, and pass the game to the next player after each turn.", rect.x + rect.w / 2, introY, rect.w - horizontalInset * 2, isPortrait ? 17 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.86)",
+      color: themed("rgba(82, 61, 44, 0.86)"),
       align: "center",
       maxLines: compact ? 3 : (isPortrait ? 4 : 3)
     });
@@ -5192,8 +6608,8 @@ function computeLayout(width, height) {
       w: rowW - buttonWidth - rowGap,
       h: rowHeight
     };
-    Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
-    ctx.fillStyle = "#4a3524";
+    Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+    ctx.fillStyle = themed("#4a3524");
     ctx.font = compact ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -5212,7 +6628,7 @@ function computeLayout(width, height) {
       scope: "overlay",
       enabled: game.ui.configuredPlayerCount < 5
     });
-    ctx.fillStyle = "#4a3524";
+    ctx.fillStyle = themed("#4a3524");
     ctx.font = compact ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -5235,6 +6651,11 @@ function computeLayout(width, height) {
   function renderHandoffOverlay(rect) {
     const compact = isCompactOverlayRect(rect);
     const player = getPlayer();
+    const aiTurn = !!(player && player.isAi);
+    const readyLabel = aiTurn ? "AI is taking its turn ..." : "Ready";
+    const readyOpts = aiTurn
+      ? { id: "overlay-ready", scope: "overlay", enabled: false }
+      : { id: "overlay-ready", scope: "overlay", variant: "primary" };
     if (compact) {
       const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
       const badgeText = `${getCurrentRound().name} | ${getPhaseLabel()}`;
@@ -5250,8 +6671,8 @@ function computeLayout(width, height) {
 
       ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
       const badgeRect = { x: rect.x + 32, y: oy(viewport.y + 34), w: rect.w - 64, h: 30 };
-      Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, "rgba(222, 162, 102, 0.20)", "rgba(177, 111, 54, 0.34)", 1.4);
-      ctx.fillStyle = "#6c4325";
+      Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, themed("rgba(222, 162, 102, 0.20)"), themed("rgba(177, 111, 54, 0.34)"), 1.4);
+      ctx.fillStyle = themed("#6c4325");
       ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -5259,16 +6680,12 @@ function computeLayout(width, height) {
 
       Core.drawWrappedText(ctx, linesText, rect.x + rect.w / 2, oy(viewport.y + 76), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 8
       });
 
-      drawButton({ x: rect.x + Math.max(24, (rect.w - 180) / 2), y: oy(buttonTop), w: Math.min(180, rect.w - 48), h: 34 }, "Ready", closeOverlay, {
-        id: "overlay-ready",
-        scope: "overlay",
-        variant: "primary"
-      });
+      drawButton({ x: rect.x + Math.max(24, (rect.w - 200) / 2), y: oy(buttonTop), w: Math.min(200, rect.w - 48), h: 34 }, readyLabel, aiTurn ? undefined : closeOverlay, readyOpts);
 
       endOverlayScrollViewport(viewport, scrollMeta);
       return;
@@ -5287,8 +6704,8 @@ function computeLayout(width, height) {
       : Math.min(rect.w - 120, Math.max(250, ctx.measureText(badgeText).width + 48));
     ctx.restore();
     const badgeRect = { x: rect.x + (rect.w - badgeWidth) / 2, y: rect.y + (compact ? 46 : 68), w: badgeWidth, h: compact ? 30 : 44 };
-    Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, "rgba(222, 162, 102, 0.20)", "rgba(177, 111, 54, 0.34)", 1.4);
-    ctx.fillStyle = "#6c4325";
+    Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, themed("rgba(222, 162, 102, 0.20)"), themed("rgba(177, 111, 54, 0.34)"), 1.4);
+    ctx.fillStyle = themed("#6c4325");
     ctx.font = compact
       ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : runtime.layout.mode === "mobile-portrait"
@@ -5300,17 +6717,13 @@ function computeLayout(width, height) {
 
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n\n"), rect.x + rect.w / 2, rect.y + (compact ? 86 : 132), rect.w - (compact ? 40 : 72), compact ? 14 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 4 : 6
     });
 
-    const buttonWidth = Math.min(rect.w - (compact ? 48 : 172), compact ? 180 : runtime.layout.mode === "mobile-portrait" ? 220 : 280);
-    drawButton({ x: rect.x + (rect.w - buttonWidth) / 2, y: rect.y + rect.h - (compact ? 48 : 74), w: buttonWidth, h: compact ? 34 : 42 }, "Ready", closeOverlay, {
-      id: "overlay-ready",
-      scope: "overlay",
-      variant: "primary"
-    });
+    const buttonWidth = Math.min(rect.w - (compact ? 48 : 172), compact ? 200 : runtime.layout.mode === "mobile-portrait" ? 240 : 300);
+    drawButton({ x: rect.x + (rect.w - buttonWidth) / 2, y: rect.y + rect.h - (compact ? 48 : 74), w: buttonWidth, h: compact ? 34 : 42 }, readyLabel, aiTurn ? undefined : closeOverlay, readyOpts);
   }
 
   function renderPauseMenuOverlay(rect) {
@@ -5327,6 +6740,7 @@ function computeLayout(width, height) {
         { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
         { label: "Detailed Rules", onClick: () => openDetailedRulesOverlay("sites"), id: "overlay-detailed-rules" },
         { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
+        { label: `Theme: ${theme().label || "Classic"}`, onClick: cycleTheme, id: "overlay-theme" },
         { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
         { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
       ];
@@ -5342,7 +6756,7 @@ function computeLayout(width, height) {
       ctx.fillText("Pause Menu", rect.x + rect.w / 2, oy(viewport.y + 2));
       Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(viewport.y + 34), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 4
       });
@@ -5370,7 +6784,7 @@ function computeLayout(width, height) {
     ctx.fillText("Pause Menu", rect.x + rect.w / 2, rect.y + 20);
     Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, rect.y + 62, rect.w - 72, 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: 3
     });
@@ -5380,6 +6794,7 @@ function computeLayout(width, height) {
       { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
       { label: "Detailed Rules", onClick: () => openDetailedRulesOverlay("sites"), id: "overlay-detailed-rules" },
       { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
+      { label: `Theme: ${theme().label || "Classic"}`, onClick: cycleTheme, id: "overlay-theme" },
       { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
       { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
     ];
@@ -5400,6 +6815,185 @@ function computeLayout(width, height) {
     });
   }
 
+  // Lay out the topic-filter chips (wrapping rows) and return the rows plus total height.
+  // Pure layout: the caller draws and registers the click targets so it controls scroll offset.
+  function layoutDetailedTopicChips(viewport, compact, activeTopicId) {
+    const chipHeight = compact ? 26 : 30;
+    const chipGap = compact ? 6 : 8;
+    const rowGap = compact ? 6 : 8;
+    const chipFont = compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const paddingX = compact ? 12 : 14;
+    const chips = [{ id: null, label: "All rules" }].concat(DETAILED_RULE_TOPICS);
+    ctx.save();
+    ctx.font = chipFont;
+    const measured = chips.map((chip) => ({
+      chip,
+      width: Math.ceil(ctx.measureText(chip.label).width) + paddingX * 2
+    }));
+    ctx.restore();
+
+    const rows = [];
+    let row = [];
+    let rowWidth = 0;
+    measured.forEach((item) => {
+      const next = rowWidth === 0 ? item.width : rowWidth + chipGap + item.width;
+      if (rowWidth > 0 && next > viewport.w) {
+        rows.push(row);
+        row = [item];
+        rowWidth = item.width;
+      } else {
+        row.push(item);
+        rowWidth = next;
+      }
+    });
+    if (row.length) rows.push(row);
+
+    const totalHeight = rows.length * chipHeight + Math.max(0, rows.length - 1) * rowGap;
+    return { rows, chipHeight, chipGap, rowGap, chipFont, totalHeight, activeTopicId };
+  }
+
+  function drawDetailedTopicChips(viewport, topY, layout) {
+    let y = topY;
+    layout.rows.forEach((rowItems) => {
+      let x = viewport.x;
+      rowItems.forEach((item) => {
+        const selected = (item.chip.id || null) === (layout.activeTopicId || null);
+        drawButton({ x, y, w: item.width, h: layout.chipHeight }, item.chip.label, () => {
+          const section = game.overlay.section || "sites";
+          const goalRound = game.overlay.goalRound || "early";
+          openDetailedRulesOverlay(section, goalRound, game.overlay.page || 0, item.chip.id || null);
+        }, {
+          id: `overlay-detailed-topic-${item.chip.id || "all"}`,
+          scope: "overlay",
+          variant: selected ? "primary" : undefined,
+          selected,
+          font: layout.chipFont,
+          radius: 999
+        });
+        x += item.width + layout.chipGap;
+      });
+      y += layout.chipHeight + layout.rowGap;
+    });
+  }
+
+  // Filtered list view: one topic active, results span sites, amenities, and goals.
+  function renderDetailedRulesFilteredView(rect, viewport, compact, topicId, chipLayout, chipTopY) {
+    const topic = getTopicById(topicId);
+    const results = filterDetailedRuleEntriesByTopic(topicId);
+    const layoutWidth = viewport.w - 16;
+    const cardPaddingX = compact ? 14 : 18;
+    const cardGap = compact ? 10 : 12;
+    const titleFont = compact ? "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 19px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const titleLineHeight = compact ? 19 : 22;
+    const bodyFont = compact ? "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const bodyLineHeight = compact ? 14 : 15;
+    const buttonHeight = compact ? 32 : 38;
+    const bottomGap = compact ? 8 : 12;
+
+    const countY = chipTopY + chipLayout.totalHeight + (compact ? 14 : 18);
+    const listTop = countY + (compact ? 22 : 26);
+
+    // Measure each result card.
+    const cards = results.map((entry) => {
+      const titleHeight = measureWrappedTextHeight(entry.title, layoutWidth - cardPaddingX * 2, titleLineHeight, { font: titleFont });
+      const bodyHeight = measureWrappedTextHeight(entry.body, layoutWidth - cardPaddingX * 2, bodyLineHeight, { font: bodyFont });
+      const height = 16 + titleHeight + 24 + 12 + bodyHeight + 16;
+      return { entry, titleHeight, bodyHeight, height };
+    });
+
+    let cardsHeight = 0;
+    cards.forEach((card, index) => {
+      cardsHeight += card.height + (index < cards.length - 1 ? cardGap : 0);
+    });
+    if (!cards.length) cardsHeight = compact ? 60 : 72;
+
+    const buttonY = listTop + cardsHeight + (compact ? 14 : 18);
+    const navHeight = compact ? buttonHeight * 2 + 8 : buttonHeight;
+    const contentHeight = (buttonY - viewport.y) + navHeight + bottomGap;
+    const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+    const oy = (value) => value - scrollMeta.scrollY;
+
+    ctx.fillStyle = themed("#3d2d20");
+    ctx.font = compact ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("Detailed Rules", rect.x + rect.w / 2, oy(viewport.y));
+
+    drawDetailedTopicChips(viewport, oy(chipTopY), chipLayout);
+
+    ctx.fillStyle = themed("rgba(82, 61, 44, 0.86)");
+    ctx.font = compact ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const countLabel = results.length === 1
+      ? `1 match for "${topic ? topic.label : topicId}"`
+      : `${results.length} matches for "${topic ? topic.label : topicId}"`;
+    ctx.fillText(countLabel, rect.x + rect.w / 2, oy(countY));
+
+    let cursorY = listTop;
+    if (!cards.length) {
+      const emptyRect = { x: viewport.x, y: oy(cursorY), w: scrollMeta.contentWidth, h: compact ? 60 : 72 };
+      Core.drawRoundedRect(ctx, emptyRect.x, emptyRect.y, emptyRect.w, emptyRect.h, 18, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+      ctx.fillStyle = themed("rgba(74, 53, 36, 0.86)");
+      ctx.font = bodyFont;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("No rules matched this topic.", emptyRect.x + emptyRect.w / 2, emptyRect.y + emptyRect.h / 2);
+    }
+
+    cards.forEach((card) => {
+      const cardRect = { x: viewport.x, y: oy(cursorY), w: scrollMeta.contentWidth, h: card.height };
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 20, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+      Core.drawWrappedText(ctx, card.entry.title, cardRect.x + cardPaddingX, cardRect.y + 14, cardRect.w - cardPaddingX * 2, titleLineHeight, {
+        font: titleFont,
+        color: themed("#3d2d20"),
+        align: "left"
+      });
+      drawPill(cardRect.x + cardPaddingX, cardRect.y + 16 + card.titleHeight, card.entry.sectionLabel, themed("#efe2ca"), themed("#5f4731"), {
+        height: compact ? 20 : 22,
+        paddingX: compact ? 10 : 12,
+        font: compact ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      Core.drawWrappedText(ctx, card.entry.body, cardRect.x + cardPaddingX, cardRect.y + 16 + card.titleHeight + 24 + 12, cardRect.w - cardPaddingX * 2, bodyLineHeight, {
+        font: bodyFont,
+        color: themed("rgba(74, 53, 36, 0.92)"),
+        align: "left"
+      });
+      cursorY += card.height + cardGap;
+    });
+
+    if (compact) {
+      const stackedWidth = rect.w - 48;
+      drawButton({ x: rect.x + 24, y: oy(buttonY), w: stackedWidth, h: buttonHeight }, "Back", openPauseMenu, {
+        id: "overlay-detailed-back",
+        scope: "overlay"
+      });
+      drawButton({ x: rect.x + 24, y: oy(buttonY + buttonHeight + 8), w: stackedWidth, h: buttonHeight }, "Clear filter", () => {
+        openDetailedRulesOverlay(game.overlay.section || "sites", game.overlay.goalRound || "early", game.overlay.page || 0, null);
+      }, {
+        id: "overlay-detailed-clear",
+        scope: "overlay",
+        variant: "primary"
+      });
+    } else {
+      const navGap = 16;
+      const navWidth = Math.max(132, Math.floor((rect.w - 48 * 2 - navGap) / 2));
+      drawButton({ x: rect.x + 24, y: oy(buttonY), w: navWidth, h: buttonHeight }, "Back", openPauseMenu, {
+        id: "overlay-detailed-back",
+        scope: "overlay"
+      });
+      drawButton({ x: rect.x + rect.w - navWidth - 24, y: oy(buttonY), w: navWidth, h: buttonHeight }, "Clear filter", () => {
+        openDetailedRulesOverlay(game.overlay.section || "sites", game.overlay.goalRound || "early", game.overlay.page || 0, null);
+      }, {
+        id: "overlay-detailed-clear",
+        scope: "overlay",
+        variant: "primary"
+      });
+    }
+
+    endOverlayScrollViewport(viewport, scrollMeta);
+  }
+
   function renderDetailedRulesOverlay(rect) {
     const section = game.overlay.section || "sites";
     const goalRound = game.overlay.goalRound || "early";
@@ -5407,12 +7001,24 @@ function computeLayout(width, height) {
     const safePage = Core.clamp(game.overlay.page || 0, 0, Math.max(sectionEntries.length - 1, 0));
     const entry = sectionEntries[safePage] || { title: "No entry", subtitle: "Rules", body: "No rules are available for this page yet." };
     const compact = isCompactOverlayRect(rect);
+    // Bottom inset clears the 28px panel corner radius so scrolled text never
+    // spills into the rounded corner notch outside the cream container.
     const viewport = {
       x: rect.x + (compact ? 16 : 24),
       y: rect.y + (compact ? 12 : 16),
       w: rect.w - (compact ? 32 : 48),
-      h: rect.h - (compact ? 24 : 32)
+      h: rect.h - (compact ? 46 : 58)
     };
+    const activeTopicId = game.overlay.topic || null;
+    const chipLayout = layoutDetailedTopicChips(viewport, compact, activeTopicId);
+    // Filtered view has no intro paragraph, so its chips sit just under the title.
+    const filteredChipTopY = viewport.y + (compact ? 30 : 40);
+
+    if (activeTopicId) {
+      renderDetailedRulesFilteredView(rect, viewport, compact, activeTopicId, chipLayout, filteredChipTopY);
+      return;
+    }
+
     const layoutWidth = viewport.w - 16;
     const introText = section === "sites"
       ? "Each site page explains how that market item scores, which goals it can satisfy, and what the code is actually checking. Big market items in the site group are RV Site with Full Hookups, Group Site, and Waterfront Site."
@@ -5447,7 +7053,10 @@ function computeLayout(width, height) {
     const bodyHeight = measureWrappedTextHeight(entry.body, layoutWidth - cardPaddingX * 2, bodyLineHeight, {
       font: bodyFont
     });
-    const sectionTabsY = viewport.y + (compact ? 62 : 80) + introHeight;
+    // Normal view layout chain: title -> intro -> topic chips -> section tabs.
+    const introTop = viewport.y + (compact ? 32 : 42);
+    const chipsTopNormal = introTop + introHeight + (compact ? 10 : 12);
+    const sectionTabsY = chipsTopNormal + chipLayout.totalHeight + (compact ? 10 : 12);
     const goalTabsY = sectionTabsY + tabHeight + 12;
     const cardY = section === "goals" ? goalTabsY + tabHeight + 12 : sectionTabsY + tabHeight + 12;
     const cardHeight = 24 + entryTitleHeight + 32 + 20 + bodyHeight + 20;
@@ -5466,16 +7075,18 @@ function computeLayout(width, height) {
 
     game.overlay.page = safePage;
 
-    ctx.fillStyle = "#3d2d20";
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = titleFont;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText("Detailed Rules", rect.x + rect.w / 2, oy(viewport.y));
-    Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(viewport.y + (compact ? 32 : 42)), scrollMeta.contentWidth, introLineHeight, {
+    Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(introTop), scrollMeta.contentWidth, introLineHeight, {
       font: introFont,
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center"
     });
+
+    drawDetailedTopicChips(viewport, oy(chipsTopNormal), chipLayout);
 
     ["sites", "amenities", "goals"].forEach((tabId, index) => {
       drawButton({
@@ -5511,28 +7122,28 @@ function computeLayout(width, height) {
       });
     }
 
-    Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 24, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
-    ctx.fillStyle = "#3d2d20";
+    Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 24, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = compact ? "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     Core.drawWrappedText(ctx, entry.title, cardRect.x + cardPaddingX, cardRect.y + 18, cardRect.w - cardPaddingX * 2, cardTitleLineHeight, {
       font: compact ? "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "#3d2d20",
+      color: themed("#3d2d20"),
       align: "left"
     });
-    drawPill(cardRect.x + cardPaddingX, cardRect.y + 24 + entryTitleHeight, entry.subtitle, "#efe2ca", "#5f4731", {
+    drawPill(cardRect.x + cardPaddingX, cardRect.y + 24 + entryTitleHeight, entry.subtitle, themed("#efe2ca"), themed("#5f4731"), {
       height: compact ? 22 : 24,
       paddingX: compact ? 10 : 12,
       font: compact ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
     Core.drawWrappedText(ctx, entry.body, cardRect.x + cardPaddingX, cardRect.y + 56 + entryTitleHeight, cardRect.w - cardPaddingX * 2, bodyLineHeight, {
       font: bodyFont,
-      color: "rgba(74, 53, 36, 0.92)",
+      color: themed("rgba(74, 53, 36, 0.92)"),
       align: "left"
     });
 
-    ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+    ctx.fillStyle = themed("rgba(82, 61, 44, 0.78)");
     ctx.font = compact ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -5603,7 +7214,7 @@ function computeLayout(width, height) {
       ctx.fillText("Restart game?", rect.x + rect.w / 2, oy(viewport.y + 4));
       Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, oy(viewport.y + 38), scrollMeta.contentWidth, 16, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 6
       });
@@ -5623,7 +7234,7 @@ function computeLayout(width, height) {
     ctx.fillText("Restart game?", rect.x + rect.w / 2, rect.y + (compact ? 16 : 24));
     Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, rect.y + (compact ? 50 : 78), rect.w - (compact ? 40 : 72), compact ? 16 : 20, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 3 : 4
     });
@@ -5669,7 +7280,7 @@ function computeLayout(width, height) {
       ctx.fillText("About", rect.x + rect.w / 2, oy(viewport.y + 2));
       Core.drawWrappedText(ctx, text, rect.x + rect.w / 2, oy(viewport.y + 34), scrollMeta.contentWidth, 16, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 10
       });
@@ -5685,7 +7296,7 @@ function computeLayout(width, height) {
     ctx.fillText("About", rect.x + rect.w / 2, rect.y + (compact ? 14 : 22));
     Core.drawWrappedText(ctx, "This game was made by EOP and his wife with the help of Codex to test out a board game idea in the browser. Hope you enjoy testing it with them ;)", rect.x + rect.w / 2, rect.y + (compact ? 48 : 78), rect.w - (compact ? 40 : 72), compact ? 16 : 22, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 6 : 7
     });
@@ -5717,21 +7328,21 @@ function computeLayout(width, height) {
       ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
       Core.drawWrappedText(ctx, summaryText, rect.x + rect.w / 2, oy(viewport.y + 30), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 6
       });
 
       game.overlay.rows.forEach((row, index) => {
         const rowRect = { x: viewport.x, y: oy(rowStart + index * (rowHeight + rowGap)), w: scrollMeta.contentWidth, h: rowHeight };
-        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
         Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
         ctx.fillStyle = row.player.color.text;
         ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
@@ -5752,7 +7363,7 @@ function computeLayout(width, height) {
     ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 20));
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + (compact ? 42 : 60), rect.w - (compact ? 36 : 64), compact ? 14 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 2 : 3
     });
@@ -5761,22 +7372,22 @@ function computeLayout(width, height) {
       const rowHeight = 54;
       game.overlay.rows.forEach((row, index) => {
         const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
-        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
         Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
         ctx.fillStyle = row.player.color.text;
         ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
         ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-        ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+        ctx.fillStyle = themed("rgba(82, 61, 44, 0.78)");
         ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 30);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "right";
         ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 17);
@@ -5810,21 +7421,21 @@ function computeLayout(width, height) {
       ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
       Core.drawWrappedText(ctx, summaryText, rect.x + rect.w / 2, oy(viewport.y + 30), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 6
       });
 
       game.overlay.rows.forEach((row, index) => {
         const rowRect = { x: viewport.x, y: oy(rowStart + index * (rowHeight + rowGap)), w: scrollMeta.contentWidth, h: rowHeight };
-        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
         Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
         ctx.fillStyle = row.player.color.text;
         ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
@@ -5845,7 +7456,7 @@ function computeLayout(width, height) {
     ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 18));
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + (compact ? 42 : 56), rect.w - (compact ? 36 : 60), compact ? 14 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 2 : 3
     });
@@ -5854,22 +7465,22 @@ function computeLayout(width, height) {
       const rowHeight = 52;
       game.overlay.rows.forEach((row, index) => {
         const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
-        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
         Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
         ctx.fillStyle = row.player.color.text;
         ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
         ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-        ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+        ctx.fillStyle = themed("rgba(82, 61, 44, 0.78)");
         ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 29);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "right";
         ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 16);
@@ -5882,19 +7493,19 @@ function computeLayout(width, height) {
     });
   }
 
-  function renderFrame(now) {
+  function renderFrameBody(now) {
     runtime.now = now;
     runtime.layout = computeLayout(controller.state.width, controller.state.height);
     runtime.targets = [];
     runtime.frontScroll = null;
     runtime.overlayScroll = null;
+    runtime.activeClipRect = null;
     cleanupTransientState();
     if (!game.directorRevealed && game.ui.objectiveTab === "director") game.ui.objectiveTab = "shared";
 
     renderBackground();
     if (game.ui.appScreen !== APP_SCREENS.inGame || frontScreenActive()) {
       renderFrontScreen();
-      requestAnimationFrame(renderFrame);
       return;
     }
     renderGameTopBar(runtime.layout.topBar);
@@ -5910,8 +7521,128 @@ function computeLayout(width, height) {
     renderBottomBar(runtime.layout.bottomBar);
 
     renderOverlay();
+  }
+
+  function isAnimationActive() {
+    if (game.ui.appScreen !== APP_SCREENS.inGame) return false;
+    return !!(game.ui.lastAttempt || getEffectivePreviewCell());
+  }
+
+  if (!HEADLESS) {
+    runtime.savedGameAvailable = !!readSavedGame();
+    applyThemeToPage();
+    setInterval(saveGameToStorage, 5000);
+    window.addEventListener("pagehide", saveGameToStorage);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") saveGameToStorage();
+    });
+  }
+
+  const HUMAN_INTERACTION_OVERLAYS = new Set(["pause-menu", "detailed-rules", "rename-players", "restart-confirm"]);
+
+  function runAiDriver(now) {
+    if (game.ui.appScreen !== APP_SCREENS.inGame) return;
+    const Ai = GLOBAL_ROOT.SmoreAi;
+    if (!Ai || typeof Ai.takeTurn !== "function") return;
+    const player = getPlayer();
+    if (!player || !player.isAi) {
+      runtime.aiNextActAt = 0;
+      return;
+    }
+    if (game.overlay && HUMAN_INTERACTION_OVERLAYS.has(game.overlay.kind)) return;
+    if (!runtime.aiNextActAt) {
+      runtime.aiNextActAt = now + 900;
+      return;
+    }
+    if (now < runtime.aiNextActAt) return;
+    runtime.aiNextActAt = 0;
+    runtime.needsRender = true;
+    try {
+      if (game.overlay?.blocking) {
+        if (game.overlay.kind === "handoff") {
+          closeOverlay();
+        } else if (game.overlay.kind === "round-summary" && game.players.every((entry) => entry.isAi)) {
+          startNextRound();
+        }
+        return;
+      }
+      const strategy = typeof Ai.getStrategy === "function" ? Ai.getStrategy(player.strategyId) : player.strategyId;
+      Ai.takeTurn(GLOBAL_ROOT.SmoreEngine, game, strategy, Math.random);
+    } catch (error) {
+      console.error("AI turn failed; pausing the driver briefly:", error);
+      runtime.aiNextActAt = now + 5000;
+    }
+  }
+
+  function renderFrame(now) {
+    runAiDriver(now);
+    const heartbeatDue = now - runtime.lastRenderAt > 500;
+    if (!runtime.needsRender && !isAnimationActive() && !heartbeatDue) {
+      requestAnimationFrame(renderFrame);
+      return;
+    }
+    runtime.needsRender = false;
+    runtime.lastRenderAt = now;
+    try {
+      renderFrameBody(now);
+    } catch (error) {
+      runtime.renderErrorCount += 1;
+      if (runtime.renderErrorCount <= 3 || runtime.renderErrorCount % 600 === 0) {
+        console.error("Smore to Explore render error (frame kept alive):", error);
+      }
+    }
     requestAnimationFrame(renderFrame);
   }
 
-  requestAnimationFrame(renderFrame);
+  if (!HEADLESS) {
+    requestAnimationFrame(renderFrame);
+  }
+
+  const engine = {
+    HEADLESS,
+    setGame: (next) => { game = next; },
+    getGame: () => game,
+    getPlayer,
+    createGameState,
+    createEvaluationContext,
+    getLandscapePlacementReasons,
+    getCampTilePlacementReasons,
+    getCampTilePlacementEvaluation,
+    getBlockedMarketPurchaseReason,
+    canPlaceCampTileAnywhere,
+    isLandscapePhaseReadyToContinue,
+    countRemainingLandscapeTiles,
+    hasPendingMarketPurchase,
+    getPendingMarketPurchaseEntry,
+    canCancelPendingMarketPurchase,
+    cancelPendingMarketPurchase,
+    isBigMarketItem,
+    getCampDef,
+    getLandscapeDef,
+    getCell,
+    selectLandscapeTile,
+    selectMarketTile,
+    attemptLandscapePlacement,
+    attemptCampPlacement,
+    rotateSelectedBigMarketItem,
+    undoLandscapePlacement,
+    clearSelection,
+    passRemainingLandscapeTiles,
+    passCurrentPlayerForRound,
+    continueLandscapeFlow,
+    endBuildTurnOrScore,
+    scoreRoundForAllPlayers,
+    startNextRound,
+    applyFinalScoring,
+    validateFinishedLandscapePhase,
+    closeOverlay,
+    BOARD_ROWS,
+    BOARD_COLS,
+    CAMP_TILE_DEFS,
+    LANDSCAPE_TILE_DEFS,
+    MARKET_COLUMNS,
+    ROUND_DEFS
+  };
+  GLOBAL_ROOT.SmoreEngine = engine;
+  if (typeof module !== "undefined" && module.exports) module.exports = engine;
 })();

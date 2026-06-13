@@ -1,6 +1,12 @@
 (() => {
   "use strict";
 
+  let rng = Math.random;
+
+  function setRng(fn) {
+    rng = typeof fn === "function" ? fn : Math.random;
+  }
+
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
@@ -16,7 +22,7 @@
   function shuffle(list) {
     const copy = list.slice();
     for (let index = copy.length - 1; index > 0; index -= 1) {
-      const swapIndex = Math.floor(Math.random() * (index + 1));
+      const swapIndex = Math.floor(rng() * (index + 1));
       [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
     }
     return copy;
@@ -26,7 +32,7 @@
     const totalWeight = sum(list, (entry) => Math.max(0, weightSelector(entry)));
     if (!list.length || totalWeight <= 0) return list[0] || null;
 
-    let roll = Math.random() * totalWeight;
+    let roll = rng() * totalWeight;
     for (const entry of list) {
       roll -= Math.max(0, weightSelector(entry));
       if (roll <= 0) return entry;
@@ -110,18 +116,12 @@
       .map((paragraph) => paragraph.split(/\s+/).filter(Boolean));
   }
 
-  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, options = {}) {
+  const wrapLineCache = new Map();
+  const WRAP_CACHE_LIMIT = 600;
+
+  function computeWrappedLines(ctx, text, maxWidth) {
     const paragraphs = splitWords(text);
-    const font = options.font || ctx.font;
-    const align = options.align || "left";
-    const color = options.color || ctx.fillStyle;
-    const maxLines = options.maxLines || Infinity;
-    const paragraphGap = options.paragraphGap ?? Math.round(lineHeight * 0.45);
     const lines = [];
-
-    ctx.save();
-    ctx.font = font;
-
     for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex += 1) {
       const words = paragraphs[paragraphIndex];
       if (!words.length) {
@@ -140,6 +140,26 @@
       }
       lines.push(currentLine);
       if (paragraphIndex < paragraphs.length - 1) lines.push(null);
+    }
+    return lines;
+  }
+
+  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, options = {}) {
+    const font = options.font || ctx.font;
+    const align = options.align || "left";
+    const color = options.color || ctx.fillStyle;
+    const maxLines = options.maxLines || Infinity;
+    const paragraphGap = options.paragraphGap ?? Math.round(lineHeight * 0.45);
+
+    ctx.save();
+    ctx.font = font;
+
+    const cacheKey = `${font}|${Math.round(maxWidth)}|${text}`;
+    let lines = wrapLineCache.get(cacheKey);
+    if (!lines) {
+      lines = computeWrappedLines(ctx, text, maxWidth);
+      if (wrapLineCache.size >= WRAP_CACHE_LIMIT) wrapLineCache.clear();
+      wrapLineCache.set(cacheKey, lines);
     }
 
     let visibleLines = [];
@@ -233,7 +253,14 @@
     }
 
     function handlePointerDown(event) {
-      if (event.pointerType !== "mouse") canvas.setPointerCapture?.(event.pointerId);
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (event.pointerType !== "mouse") {
+        try {
+          canvas.setPointerCapture?.(event.pointerId);
+        } catch (_error) {
+          // inactive pointer id (synthetic events); capture is best-effort
+        }
+      }
       if (onPointerDown) onPointerDown(toCanvasPoint(event), event);
     }
 
@@ -295,7 +322,8 @@
     };
   }
 
-  window.SmoreCore = {
+  const api = {
+    setRng,
     clamp,
     sum,
     unique,
@@ -309,4 +337,8 @@
     drawWrappedText,
     createCanvasController
   };
+
+  const root = typeof globalThis !== "undefined" ? globalThis : window;
+  root.SmoreCore = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
 })();

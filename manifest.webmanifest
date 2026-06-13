@@ -1,0 +1,25 @@
+{
+  "name": "Smore to Explore",
+  "short_name": "Smore",
+  "description": "A cozy pass-and-play campground building game for 2 to 5 players across three summer rounds.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ead6b1",
+  "theme_color": "#ead6b1",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
