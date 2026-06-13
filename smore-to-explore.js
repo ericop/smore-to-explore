@@ -3524,7 +3524,7 @@ function computeLayout(width, height) {
     const stumpWidth = runtime.layout.mode === "mobile-portrait"
       ? Math.min(64, geometry.boardArea.w * 0.14)
       : Math.min(76, geometry.boardArea.w * 0.11);
-    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 42 : 48;
+    const stumpHeight = runtime.layout.mode === "mobile-portrait" ? 50 : 56;
     const rect = {
       x: geometry.boardArea.x + 6,
       y: geometry.boardArea.y + geometry.boardArea.h - stumpHeight - 4,
@@ -3575,8 +3575,9 @@ function computeLayout(width, height) {
       ? "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     const textCenterX = rect.x + rect.w / 2;
-    const line1Y = rect.y + rect.h * 0.39;
-    const line2Y = rect.y + rect.h * 0.62;
+    const line1Y = rect.y + rect.h * 0.36;
+    const line2Y = rect.y + rect.h * 0.61;
+    const line3Y = rect.y + rect.h * 0.81;
     const nameText = fitText(player.name, rect.w - 14, ctx.font);
     ctx.fillText(nameText, textCenterX, line1Y);
     const nameWidth = Math.min(ctx.measureText(nameText).width, rect.w - 14);
@@ -3587,9 +3588,11 @@ function computeLayout(width, height) {
     ctx.moveTo(textCenterX - nameWidth / 2, line1Y + 8);
     ctx.lineTo(textCenterX + nameWidth / 2, line1Y + 8);
     ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
     ctx.font = "700 8px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = themed("rgba(65, 42, 25, 0.88)");
-    ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, rect.w - 10, ctx.font), textCenterX, line2Y);
+    ctx.fillText(fitText(Core.formatMoney(player.money), rect.w - 10, ctx.font), textCenterX, line2Y);
+    ctx.fillText(fitText(`${player.score} pts`, rect.w - 10, ctx.font), textCenterX, line3Y);
     ctx.restore();
   }
 
@@ -3764,18 +3767,20 @@ function computeLayout(width, height) {
     ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     const cx = sign.x + sign.w / 2;
     const nameText = fitText(player.name, sign.w - 10, ctx.font);
-    ctx.fillText(nameText, cx, sign.y + sign.h * 0.34);
+    ctx.fillText(nameText, cx, sign.y + sign.h * 0.26);
     const nameWidth = Math.min(ctx.measureText(nameText).width, sign.w - 10);
     ctx.strokeStyle = player.color.fill;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(cx - nameWidth / 2, sign.y + sign.h * 0.34 + 7);
-    ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.34 + 7);
+    ctx.moveTo(cx - nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.26 + 7);
     ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
     ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = themed("rgba(70, 46, 25, 0.9)");
-    ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.68);
+    ctx.fillText(fitText(Core.formatMoney(player.money), sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.58);
+    ctx.fillText(fitText(`${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.80);
   }
 
   // A campfire with sparks and rising smoke beside a dark plaque that shows the
@@ -3835,18 +3840,20 @@ function computeLayout(width, height) {
     ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     const cx = plaque.x + plaque.w / 2;
     const nameText = fitText(player.name, plaque.w - 10, ctx.font);
-    ctx.fillText(nameText, cx, plaque.y + plaque.h * 0.34);
+    ctx.fillText(nameText, cx, plaque.y + plaque.h * 0.26);
     const nameWidth = Math.min(ctx.measureText(nameText).width, plaque.w - 10);
     ctx.strokeStyle = player.color.fill;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(cx - nameWidth / 2, plaque.y + plaque.h * 0.34 + 7);
-    ctx.lineTo(cx + nameWidth / 2, plaque.y + plaque.h * 0.34 + 7);
+    ctx.moveTo(cx - nameWidth / 2, plaque.y + plaque.h * 0.26 + 7);
+    ctx.lineTo(cx + nameWidth / 2, plaque.y + plaque.h * 0.26 + 7);
     ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
     ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = themed("rgba(255, 231, 194, 0.85)");
-    ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, plaque.w - 6, ctx.font), cx, plaque.y + plaque.h * 0.68);
+    ctx.fillText(fitText(Core.formatMoney(player.money), plaque.w - 6, ctx.font), cx, plaque.y + plaque.h * 0.58);
+    ctx.fillText(fitText(`${player.score} pts`, plaque.w - 6, ctx.font), cx, plaque.y + plaque.h * 0.80);
   }
 
   function drawLogFrame(rect) {
@@ -4799,7 +4806,9 @@ function computeLayout(width, height) {
   }
 
   function drawBoardLabels(geometry) {
-    ctx.fillStyle = themed("rgba(70, 52, 37, 0.72)");
+    // Column letters (A-H) and row numbers: a clearly readable light ink on the
+    // dark night board, the original warm brown otherwise.
+    ctx.fillStyle = theme().invert ? "rgba(202, 214, 238, 0.96)" : themed("rgba(70, 52, 37, 0.72)");
     ctx.font = geometry.cellSize >= 54
       ? "700 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
