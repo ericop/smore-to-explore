@@ -3,9 +3,38 @@
 // scene, board terrain, camp tiles, players, primary buttons, panels) without
 // touching any game logic. The render code reads the active preset's tokens
 // and falls back to the original hardcoded values for anything a preset omits,
-// so a partial preset is always safe.
+// so a partial preset is always safe. Panels stay light in every cartoon
+// preset so the dark UI text keeps its contrast.
 (() => {
   "use strict";
+
+  // Shared bright palettes reused across the cartoon presets.
+  const BRIGHT_CAMP = {
+    rustic_tent_forest: "#e0915a",
+    tent_electric: "#7fd08c",
+    rv_full_hookups: "#67b6e6",
+    group_site: "#f0a85c",
+    cabin: "#ef8a5e",
+    waterfront_site: "#5fc6e6",
+    horse_riding: "#c08a6a",
+    firewood: "#e07a44",
+    pool: "#6fcdf2",
+    bike_rental: "#9bd06a",
+    canoe_rental: "#5fd0c4",
+    event_pavilion: "#f0b85f",
+    hiking_trail: "#86c95f",
+    ice_cream_vending: "#ffb0d0",
+    playground: "#ffae5c",
+    bathrooms: "#c79bf0"
+  };
+  const BRIGHT_PLAYERS = [
+    { fill: "#e07a3a", accent: "#ffe0bd", text: "#fff8f0" },
+    { fill: "#46b27a", accent: "#cdf3d6", text: "#f8fff7" },
+    { fill: "#3f93d6", accent: "#cfe9fb", text: "#f8fcff" },
+    { fill: "#e0588a", accent: "#ffd5e6", text: "#fff9fc" },
+    { fill: "#9466d6", accent: "#ebdcfb", text: "#fffaff" }
+  ];
+  const LIGHT_PANEL = { fill: "rgba(255, 253, 248, 0.96)", stroke: "rgba(120, 92, 64, 0.16)" };
 
   const THEMES = {
     // The original warm naturalistic look, expressed as tokens.
@@ -25,8 +54,7 @@
       shell: { fill: "rgba(255, 250, 244, 0.94)", stroke: "rgba(108, 80, 54, 0.16)" }
     },
 
-    // A bright, cute, cartoon camping look: sunny sky over a green meadow,
-    // saturated friendly tiles, bouncy orange buttons.
+    // Bluey-inspired: a bright sunny sky over a green meadow, the friendly default.
     cartoon: {
       id: "cartoon",
       label: "Critter Camp",
@@ -42,41 +70,64 @@
         hill1: "#a9dd80",
         hill2: "#8fce6e"
       },
-      // Brighter, more saturated terrain (by board role) so the board reads cartoony.
       terrain: { open: "#cdeb9f", forest: "#84cf6f", water: "#93dcf2" },
-      // Brighter camp tile fills keyed by tile id (accent left to the tile def).
-      camp: {
-        rustic_tent_forest: "#e0915a",
-        tent_electric: "#7fd08c",
-        rv_full_hookups: "#67b6e6",
-        group_site: "#f0a85c",
-        cabin: "#ef8a5e",
-        waterfront_site: "#5fc6e6",
-        horse_riding: "#c08a6a",
-        firewood: "#e07a44",
-        pool: "#6fcdf2",
-        bike_rental: "#9bd06a",
-        canoe_rental: "#5fd0c4",
-        event_pavilion: "#f0b85f",
-        hiking_trail: "#86c95f",
-        ice_cream_vending: "#ffb0d0",
-        playground: "#ffae5c",
-        bathrooms: "#c79bf0"
-      },
-      players: [
-        { fill: "#e07a3a", accent: "#ffe0bd", text: "#fff8f0" },
-        { fill: "#46b27a", accent: "#cdf3d6", text: "#f8fff7" },
-        { fill: "#3f93d6", accent: "#cfe9fb", text: "#f8fcff" },
-        { fill: "#e0588a", accent: "#ffd5e6", text: "#fff9fc" },
-        { fill: "#9466d6", accent: "#ebdcfb", text: "#fffaff" }
-      ],
+      camp: BRIGHT_CAMP,
+      players: BRIGHT_PLAYERS,
       buttonPrimary: { fill: "#ff8a3d", stroke: "#e0671c", text: "#fff7f1" },
-      panel: { fill: "rgba(255, 253, 248, 0.96)", stroke: "rgba(120, 92, 64, 0.16)" },
-      shell: { fill: "rgba(255, 253, 248, 0.95)", stroke: "rgba(120, 92, 64, 0.16)" }
+      panel: LIGHT_PANEL,
+      shell: LIGHT_PANEL
+    },
+
+    // Amphibia-inspired: a misty teal wetland, mossy greens, warm coral buttons.
+    frog: {
+      id: "frog",
+      label: "Frog Hollow",
+      pageBg: "linear-gradient(180deg, #bfe6df 0%, #d8efe9 38%, #cfe7a8 72%, #aacf83 100%)",
+      background: {
+        style: "scene",
+        sky: ["#bfe6df", "#d6efe8", "#eaf6f1"],
+        meadow: ["#cfe7a4", "#a7d586", "#86c46e"],
+        horizon: 0.6,
+        sun: "rgba(255, 240, 185, 0.9)",
+        sunRing: "rgba(255, 247, 210, 0.45)",
+        cloud: "rgba(255, 255, 255, 0.85)",
+        hill1: "#8fc97e",
+        hill2: "#74b566"
+      },
+      terrain: { open: "#bfe097", forest: "#5fb86a", water: "#73d2c6" },
+      camp: BRIGHT_CAMP,
+      players: BRIGHT_PLAYERS,
+      buttonPrimary: { fill: "#ef7a52", stroke: "#c85a34", text: "#fff7f1" },
+      panel: LIGHT_PANEL,
+      shell: LIGHT_PANEL
+    },
+
+    // Kiff-inspired: candy-bright, bouncy, pink sky over a lime meadow.
+    candy: {
+      id: "candy",
+      label: "Sunny Bounce",
+      pageBg: "linear-gradient(180deg, #ffd6ea 0%, #ffe9f3 36%, #e2f4a0 72%, #c4ea76 100%)",
+      background: {
+        style: "scene",
+        sky: ["#ffd6ea", "#ffe6f1", "#fff2e8"],
+        meadow: ["#e8f79e", "#cdee74", "#b2e25a"],
+        horizon: 0.62,
+        sun: "rgba(255, 246, 150, 0.95)",
+        sunRing: "rgba(255, 250, 200, 0.6)",
+        cloud: "rgba(255, 255, 255, 0.95)",
+        hill1: "#bce86a",
+        hill2: "#a2dc52"
+      },
+      terrain: { open: "#e0f58c", forest: "#8fe06a", water: "#7fe0f0" },
+      camp: BRIGHT_CAMP,
+      players: BRIGHT_PLAYERS,
+      buttonPrimary: { fill: "#ff5fa2", stroke: "#e03a82", text: "#fff7fb" },
+      panel: LIGHT_PANEL,
+      shell: LIGHT_PANEL
     }
   };
 
-  const THEME_ORDER = ["classic", "cartoon"];
+  const THEME_ORDER = ["classic", "cartoon", "frog", "candy"];
 
   const api = { THEMES, THEME_ORDER };
   const root = typeof globalThis !== "undefined" ? globalThis : window;
