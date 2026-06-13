@@ -19,6 +19,60 @@
     throw new Error("Smore to Explore needs the core helpers, objective data, and the main canvas shell.");
   }
 
+  // Theme tokens (Phase 5 facelift). Pure presentation: the active preset
+  // re-skins high-impact surfaces and any token it omits falls back to the
+  // original hardcoded value, so logic and the headless path are untouched.
+  const THEMES = (GLOBAL_ROOT.SmoreTheme && GLOBAL_ROOT.SmoreTheme.THEMES) || { classic: { id: "classic" } };
+  const THEME_ORDER = (GLOBAL_ROOT.SmoreTheme && GLOBAL_ROOT.SmoreTheme.THEME_ORDER) || ["classic"];
+  const THEME_STORAGE_KEY = "smore-to-explore-theme-v1";
+  let activeThemeId = "classic";
+  function readStoredTheme() {
+    try {
+      if (typeof localStorage === "undefined") return null;
+      const id = localStorage.getItem(THEME_STORAGE_KEY);
+      return id && THEMES[id] ? id : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+  activeThemeId = readStoredTheme() || (THEMES.cartoon ? "cartoon" : "classic");
+  function theme() {
+    return THEMES[activeThemeId] || THEMES.classic || {};
+  }
+  function setActiveTheme(id) {
+    if (!THEMES[id]) return;
+    activeThemeId = id;
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem(THEME_STORAGE_KEY, id);
+    } catch (_error) {
+      // storage unavailable; theme still applies for this session
+    }
+    applyThemeToPage();
+    if (runtime) runtime.needsRender = true;
+  }
+  function cycleTheme() {
+    const order = THEME_ORDER.length ? THEME_ORDER : Object.keys(THEMES);
+    const index = order.indexOf(activeThemeId);
+    setActiveTheme(order[(index + 1) % order.length]);
+  }
+  function applyThemeToPage() {
+    if (HEADLESS || typeof document === "undefined") return;
+    const t = theme();
+    if (t.pageBg && document.documentElement) document.documentElement.style.setProperty("--page-bg", t.pageBg);
+  }
+  // Token accessors: each returns the preset override or the supplied fallback.
+  function themeTerrainColor(typeId, fallback) {
+    const map = theme().terrain || {};
+    return map[typeId] || fallback;
+  }
+  function themeCampColor(typeId, fallback) {
+    const map = theme().camp || {};
+    return map[typeId] || fallback;
+  }
+  function themePlayerColors(fallback) {
+    return theme().players || fallback;
+  }
+
   const BOARD_COLS = 8;
   const BOARD_ROWS = 5;
   const STARTING_BUDGET = 100000;
@@ -746,7 +800,7 @@
     return {
       id: `player-${index + 1}`,
       name: getStoredPlayerName(index),
-      color: PLAYER_COLORS[index % PLAYER_COLORS.length],
+      color: themePlayerColors(PLAYER_COLORS)[index % PLAYER_COLORS.length],
       board: createBoard(),
       money: STARTING_BUDGET,
       score: 0,
@@ -3254,7 +3308,7 @@ function computeLayout(width, height) {
         text: "#fff9f3"
       };
     }
-    if (variant === "primary") return { fill: "#ca6f36", stroke: "#995127", text: "#fff7f1" };
+    if (variant === "primary") return theme().buttonPrimary || { fill: "#ca6f36", stroke: "#995127", text: "#fff7f1" };
     if (variant === "danger") return { fill: "#a95f55", stroke: "#7d3a34", text: "#fff7f6" };
     if (variant === "success") return { fill: "#5f8d65", stroke: "#3e6544", text: "#f7fff8" };
     if (variant === "warning") return { fill: "#d3a24d", stroke: "#9e7331", text: "#fff8ee" };
@@ -3490,19 +3544,97 @@ function computeLayout(width, height) {
   }
 
   function renderBackground() {
-    const gradient = ctx.createLinearGradient(0, 0, 0, runtime.layout.height);
-    gradient.addColorStop(0, "#f7eedf");
-    gradient.addColorStop(0.48, "#efe2c5");
-    gradient.addColorStop(1, "#e2cca1");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
+    const W = runtime.layout.width;
+    const H = runtime.layout.height;
+    const bg = theme().background || { style: "soft", sky: ["#f7eedf", "#efe2c5", "#e2cca1"], orb: "rgba(255,255,255,0.22)" };
 
-    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    if (bg.style === "scene") {
+      renderSceneBackground(W, H, bg);
+      return;
+    }
+
+    const sky = bg.sky || ["#f7eedf", "#efe2c5", "#e2cca1"];
+    const gradient = ctx.createLinearGradient(0, 0, 0, H);
+    gradient.addColorStop(0, sky[0]);
+    gradient.addColorStop(0.48, sky[1] || sky[0]);
+    gradient.addColorStop(1, sky[2] || sky[1] || sky[0]);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = bg.orb || "rgba(255,255,255,0.22)";
     ctx.beginPath();
-    ctx.arc(runtime.layout.width * 0.18, runtime.layout.height * 0.08, runtime.layout.width * 0.18, 0, Math.PI * 2);
+    ctx.arc(W * 0.18, H * 0.08, W * 0.18, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(runtime.layout.width * 0.86, runtime.layout.height * 0.14, runtime.layout.width * 0.12, 0, Math.PI * 2);
+    ctx.arc(W * 0.86, H * 0.14, W * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function renderSceneBackground(W, H, bg) {
+    const horizon = H * (bg.horizon || 0.62);
+    // Sky
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    (bg.sky || ["#a9e4ff", "#cdeeff", "#e7f7ff"]).forEach((color, index, arr) => {
+      sky.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
+    });
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, horizon + 2);
+
+    // Sun with a soft ring, tucked top-right
+    const sunX = W * 0.84;
+    const sunY = H * 0.16;
+    const sunR = Math.max(26, Math.min(W, H) * 0.07);
+    if (bg.sunRing) {
+      ctx.fillStyle = bg.sunRing;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (bg.sun) {
+      ctx.fillStyle = bg.sun;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // A couple of soft rounded clouds
+    if (bg.cloud) {
+      ctx.fillStyle = bg.cloud;
+      drawCloud(W * 0.2, H * 0.12, Math.max(34, W * 0.05));
+      drawCloud(W * 0.56, H * 0.07, Math.max(26, W * 0.04));
+    }
+
+    // Rolling hills along the horizon
+    if (bg.hill1) {
+      ctx.fillStyle = bg.hill1;
+      drawHill(W, horizon, W * 0.26, -W * 0.05);
+      ctx.fillStyle = bg.hill2 || bg.hill1;
+      drawHill(W, horizon + 6, W * 0.2, W * 0.6);
+    }
+
+    // Meadow ground
+    const meadow = ctx.createLinearGradient(0, horizon, 0, H);
+    (bg.meadow || ["#d6f0bb", "#a9dd7e"]).forEach((color, index, arr) => {
+      meadow.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
+    });
+    ctx.fillStyle = meadow;
+    ctx.fillRect(0, horizon, W, H - horizon);
+  }
+
+  function drawCloud(x, y, r) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x + r * 0.9, y + r * 0.1, r * 0.78, 0, Math.PI * 2);
+    ctx.arc(x - r * 0.9, y + r * 0.12, r * 0.7, 0, Math.PI * 2);
+    ctx.arc(x, y + r * 0.4, r * 0.85, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawHill(W, baseY, height, centerX) {
+    ctx.beginPath();
+    ctx.moveTo(centerX - W * 0.55, baseY);
+    ctx.quadraticCurveTo(centerX, baseY - height, centerX + W * 0.55, baseY);
+    ctx.closePath();
     ctx.fill();
   }
 
@@ -4452,7 +4584,12 @@ function computeLayout(width, height) {
 
   function drawLandscapeTileVisual(rect, tile) {
     const info = getLandscapeInfoFromTile(tile);
-    const fill = info.hasForestTag ? "#9fba7d" : info.hasWaterEdge ? "#c4dee2" : "#c8dca3";
+    const terrain = theme().terrain || {};
+    const fill = info.hasForestTag
+      ? (terrain.forest || "#9fba7d")
+      : info.hasWaterEdge
+        ? (terrain.water || "#c4dee2")
+        : (terrain.open || "#c8dca3");
     Core.drawRoundedRect(ctx, rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6, Math.max(8, rect.w * 0.18), fill, "rgba(64, 58, 38, 0.12)", 1.2);
     drawWaterEdges(rect, info);
     drawRoadEdges(rect, info);
@@ -4476,7 +4613,7 @@ function computeLayout(width, height) {
       w: rect.w - insetX * 2,
       h: rect.h - insetY * 2
     };
-    Core.drawRoundedRect(ctx, bodyRect.x, bodyRect.y, bodyRect.w, bodyRect.h, Math.max(8, Math.min(bodyRect.w, bodyRect.h) * 0.16), def.color, stroke, 2);
+    Core.drawRoundedRect(ctx, bodyRect.x, bodyRect.y, bodyRect.w, bodyRect.h, Math.max(8, Math.min(bodyRect.w, bodyRect.h) * 0.16), themeCampColor(campTile.typeId, def.color), stroke, 2);
     if (bigPlacement) {
       ctx.save();
       ctx.strokeStyle = "rgba(255,255,255,0.34)";
@@ -5947,6 +6084,7 @@ function computeLayout(width, height) {
         { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
         { label: "Detailed Rules", onClick: () => openDetailedRulesOverlay("sites"), id: "overlay-detailed-rules" },
         { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
+        { label: `Theme: ${theme().label || "Classic"}`, onClick: cycleTheme, id: "overlay-theme" },
         { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
         { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
       ];
@@ -6000,6 +6138,7 @@ function computeLayout(width, height) {
       { label: "How to Play", onClick: () => { closeOverlay(); openHowToScreen(0); }, id: "overlay-howto" },
       { label: "Detailed Rules", onClick: () => openDetailedRulesOverlay("sites"), id: "overlay-detailed-rules" },
       { label: "Rename Players", onClick: openRenamePlayersOverlay, id: "overlay-rename" },
+      { label: `Theme: ${theme().label || "Classic"}`, onClick: cycleTheme, id: "overlay-theme" },
       { label: "About", onClick: () => { closeOverlay(); openAboutScreen(); }, id: "overlay-about" },
       { label: "Restart", onClick: openRestartConfirmOverlay, variant: "danger", id: "overlay-restart-confirm" }
     ];
@@ -6733,6 +6872,7 @@ function computeLayout(width, height) {
 
   if (!HEADLESS) {
     runtime.savedGameAvailable = !!readSavedGame();
+    applyThemeToPage();
     setInterval(saveGameToStorage, 5000);
     window.addEventListener("pagehide", saveGameToStorage);
     document.addEventListener("visibilitychange", () => {
