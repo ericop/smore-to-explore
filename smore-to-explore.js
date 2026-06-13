@@ -3080,9 +3080,24 @@
     }
 
     const target = findTargetAtPoint(point);
-    runtime.pendingClick = target && target.onClick
-      ? { targetId: target.id, start: point, moved: false, pointerId, at: performance.now() }
-      : null;
+    if (target && target.onClick) {
+      runtime.pendingClick = { targetId: target.id, start: point, moved: false, pointerId, at: performance.now() };
+    } else if (isOverlayBackdropDismiss(point)) {
+      // Tap on the dimmed area outside a dismissible modal closes it.
+      runtime.pendingClick = { dismissOverlay: true, start: point, moved: false, pointerId, at: performance.now() };
+    } else {
+      runtime.pendingClick = null;
+    }
+  }
+
+  // True when a blocking, dismissible overlay (the pause menu) is open and the
+  // point is on the dimmed backdrop outside its panel.
+  function isOverlayBackdropDismiss(point) {
+    return !!(game.overlay
+      && game.overlay.kind === "pause-menu"
+      && runtime.overlayPanelRect
+      && point
+      && !Core.pointInRect(point, runtime.overlayPanelRect));
   }
 
   function handlePointerUp(point, event) {
@@ -3094,6 +3109,11 @@
     runtime.frontScrollDrag = null;
     if (!pending || pending.moved || !point) return;
     if (performance.now() - pending.at > CLICK_MAX_DURATION_MS) return;
+    if (pending.dismissOverlay) {
+      // Confirm the release is still on the backdrop before treating it as Resume.
+      if (isOverlayBackdropDismiss(point)) closeOverlay();
+      return;
+    }
     const target = findTargetAtPoint(point);
     if (target && target.id === pending.targetId && target.onClick) target.onClick();
   }
@@ -5973,12 +5993,18 @@ function computeLayout(width, height) {
   }
 
   function renderOverlay() {
-    if (!game.overlay) return;
+    if (!game.overlay) {
+      runtime.overlayPanelRect = null;
+      return;
+    }
     runtime.overlayScroll = null;
     ctx.fillStyle = "rgba(47, 34, 23, 0.58)";
     ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
 
-    if (game.overlay.kind === "rename-players") return;
+    if (game.overlay.kind === "rename-players") {
+      runtime.overlayPanelRect = null;
+      return;
+    }
 
     const isPortrait = runtime.layout.mode === "mobile-portrait";
     const isMobileOverlay = runtime.layout.mode !== "desktop";
@@ -5991,7 +6017,7 @@ function computeLayout(width, height) {
       : game.overlay.kind === "handoff"
         ? (isPortrait ? 322 : 290)
         : game.overlay.kind === "pause-menu"
-          ? (isPortrait ? 360 : 334)
+          ? (isPortrait ? 360 : 452)
           : game.overlay.kind === "restart-confirm"
             ? (isPortrait ? 270 : 246)
             : game.overlay.kind === "about"
@@ -6021,6 +6047,7 @@ function computeLayout(width, height) {
           h: panelHeight
         };
 
+    runtime.overlayPanelRect = rect;
     drawLogFrame(rect);
     const panelFill = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
     panelFill.addColorStop(0, "rgba(255, 250, 244, 0.98)");
@@ -6134,6 +6161,11 @@ function computeLayout(width, height) {
   function renderHandoffOverlay(rect) {
     const compact = isCompactOverlayRect(rect);
     const player = getPlayer();
+    const aiTurn = !!(player && player.isAi);
+    const readyLabel = aiTurn ? "AI is taking its turn ..." : "Ready";
+    const readyOpts = aiTurn
+      ? { id: "overlay-ready", scope: "overlay", enabled: false }
+      : { id: "overlay-ready", scope: "overlay", variant: "primary" };
     if (compact) {
       const viewport = { x: rect.x + 18, y: rect.y + 12, w: rect.w - 36, h: rect.h - 24 };
       const badgeText = `${getCurrentRound().name} | ${getPhaseLabel()}`;
@@ -6163,11 +6195,7 @@ function computeLayout(width, height) {
         maxLines: 8
       });
 
-      drawButton({ x: rect.x + Math.max(24, (rect.w - 180) / 2), y: oy(buttonTop), w: Math.min(180, rect.w - 48), h: 34 }, "Ready", closeOverlay, {
-        id: "overlay-ready",
-        scope: "overlay",
-        variant: "primary"
-      });
+      drawButton({ x: rect.x + Math.max(24, (rect.w - 200) / 2), y: oy(buttonTop), w: Math.min(200, rect.w - 48), h: 34 }, readyLabel, aiTurn ? undefined : closeOverlay, readyOpts);
 
       endOverlayScrollViewport(viewport, scrollMeta);
       return;
@@ -6204,12 +6232,8 @@ function computeLayout(width, height) {
       maxLines: compact ? 4 : 6
     });
 
-    const buttonWidth = Math.min(rect.w - (compact ? 48 : 172), compact ? 180 : runtime.layout.mode === "mobile-portrait" ? 220 : 280);
-    drawButton({ x: rect.x + (rect.w - buttonWidth) / 2, y: rect.y + rect.h - (compact ? 48 : 74), w: buttonWidth, h: compact ? 34 : 42 }, "Ready", closeOverlay, {
-      id: "overlay-ready",
-      scope: "overlay",
-      variant: "primary"
-    });
+    const buttonWidth = Math.min(rect.w - (compact ? 48 : 172), compact ? 200 : runtime.layout.mode === "mobile-portrait" ? 240 : 300);
+    drawButton({ x: rect.x + (rect.w - buttonWidth) / 2, y: rect.y + rect.h - (compact ? 48 : 74), w: buttonWidth, h: compact ? 34 : 42 }, readyLabel, aiTurn ? undefined : closeOverlay, readyOpts);
   }
 
   function renderPauseMenuOverlay(rect) {
@@ -6487,11 +6511,13 @@ function computeLayout(width, height) {
     const safePage = Core.clamp(game.overlay.page || 0, 0, Math.max(sectionEntries.length - 1, 0));
     const entry = sectionEntries[safePage] || { title: "No entry", subtitle: "Rules", body: "No rules are available for this page yet." };
     const compact = isCompactOverlayRect(rect);
+    // Bottom inset clears the 28px panel corner radius so scrolled text never
+    // spills into the rounded corner notch outside the cream container.
     const viewport = {
       x: rect.x + (compact ? 16 : 24),
       y: rect.y + (compact ? 12 : 16),
       w: rect.w - (compact ? 32 : 48),
-      h: rect.h - (compact ? 24 : 32)
+      h: rect.h - (compact ? 46 : 58)
     };
     const activeTopicId = game.overlay.topic || null;
     const chipLayout = layoutDetailedTopicChips(viewport, compact, activeTopicId);
