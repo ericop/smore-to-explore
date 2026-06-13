@@ -3729,7 +3729,7 @@ function computeLayout(width, height) {
   // money, and points. The cartoon-theme replacement for the bottom-left stump.
   function drawBeaverSign(rect, player) {
     const mobile = runtime.layout.mode === "mobile-portrait";
-    const beaverW = Math.min(21, rect.w * 0.3);
+    const beaverW = Math.min(28, rect.w * 0.36);
     const sign = { x: rect.x + beaverW - 6, y: rect.y + 2, w: rect.w - beaverW + 6, h: rect.h - 4 };
 
     // Beaver, facing the sign
@@ -3739,29 +3739,29 @@ function computeLayout(width, height) {
     ctx.save();
     // flat paddle tail
     ctx.fillStyle = themed("#6c4628");
-    ctx.beginPath(); ctx.ellipse(bx + bw * 0.16, rect.y + rect.h * 0.82, bw * 0.2, rect.h * 0.2, -0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.12, rect.y + rect.h * 0.82, bw * 0.2, rect.h * 0.2, -0.5, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = themed("rgba(40,26,15,0.3)"); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(bx + bw * 0.05, rect.y + rect.h * 0.78); ctx.lineTo(bx + bw * 0.28, rect.y + rect.h * 0.9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx + bw * 0.02, rect.y + rect.h * 0.78); ctx.lineTo(bx + bw * 0.24, rect.y + rect.h * 0.9); ctx.stroke();
     // body
     ctx.fillStyle = themed("#8a5a32");
-    ctx.beginPath(); ctx.ellipse(bx + bw * 0.46, cy, bw * 0.4, rect.h * 0.38, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.4, cy, bw * 0.4, rect.h * 0.38, 0, 0, Math.PI * 2); ctx.fill();
     // head
-    ctx.beginPath(); ctx.arc(bx + bw * 0.52, rect.y + rect.h * 0.34, bw * 0.34, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + bw * 0.42, rect.y + rect.h * 0.34, bw * 0.34, 0, Math.PI * 2); ctx.fill();
     // ears
     ctx.beginPath();
-    ctx.arc(bx + bw * 0.34, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
-    ctx.arc(bx + bw * 0.7, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
+    ctx.arc(bx + bw * 0.24, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
+    ctx.arc(bx + bw * 0.6, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
     ctx.fill();
     // muzzle
     ctx.fillStyle = themed("#cf9f68");
-    ctx.beginPath(); ctx.ellipse(bx + bw * 0.62, rect.y + rect.h * 0.42, bw * 0.2, rect.h * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.52, rect.y + rect.h * 0.42, bw * 0.2, rect.h * 0.12, 0, 0, Math.PI * 2); ctx.fill();
     // tooth
     ctx.fillStyle = themed("#fffdf4");
-    ctx.fillRect(bx + bw * 0.58, rect.y + rect.h * 0.46, bw * 0.08, rect.h * 0.1);
+    ctx.fillRect(bx + bw * 0.48, rect.y + rect.h * 0.46, bw * 0.08, rect.h * 0.1);
     // nose + eye
     ctx.fillStyle = themed("#33210f");
-    ctx.beginPath(); ctx.arc(bx + bw * 0.66, rect.y + rect.h * 0.36, bw * 0.06, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(bx + bw * 0.46, rect.y + rect.h * 0.28, bw * 0.055, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + bw * 0.56, rect.y + rect.h * 0.36, bw * 0.06, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + bw * 0.36, rect.y + rect.h * 0.28, bw * 0.055, 0, Math.PI * 2); ctx.fill();
     // paws gripping the sign edge
     ctx.fillStyle = themed("#74492a");
     ctx.beginPath();
