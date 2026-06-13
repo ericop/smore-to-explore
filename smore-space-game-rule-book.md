@@ -44,34 +44,56 @@ Each player receives 8 new landscape tiles at the start of Mid Summer and 8 more
 - Water-edge expansion pool: `TODO: verify physical count`
 - Scenic and forest expansion pool: `TODO: verify physical count`
 
-### Market Tiles
+### Market Tiles: six finite contractor decks
 
-The digital game refills the market from weighted tile pools instead of depleting a fixed supply. The weights below are useful for a first physical print run, but they are not yet confirmed as final finite counts.
+The contractor market is six finite draw decks, one per column, 96 cards for the whole game. Each column starts with 8 cards dealt face-up (the visible column) and 8 cards held in a face-down reserve deck. When a contractor is hired, that card and every card above it in the column leave the game; the remaining cards slide up and the column tops back up from its reserve deck. When a column's reserve runs out the column simply gets shorter, and when its last visible card is hired that column is sold out for the rest of the game. Decks are never reshuffled or refilled between rounds: the supply is fixed for the whole game, which rewards planning ahead and watching what opponents take.
 
-#### Camp market weights in code
+This is the physical component manifest. Build each column as a 16-card stack, shuffle it, deal 8 face-up.
 
-- Rustic Tent Forest x5 `TODO: verify physical supply`
-- Tent Site with Electric Hookup x5 `TODO: verify physical supply`
-- RV Site with Full Hookups x5 `TODO: verify physical supply`
-- Group Site x5 `TODO: verify physical supply`
-- Cabin x5 `TODO: verify physical supply`
-- Waterfront Site x5 `TODO: verify physical supply`
-- Horse Riding x2 `TODO: verify physical supply`
+#### Amenity Crew deck (16)
 
-#### Amenity market weights in code
+- Bathrooms x5
+- Firewood x4
+- Ice Cream Vending x4
+- Event Pavilion x3
 
-- Firewood x2 `TODO: verify physical supply`
-- Pool x2 `TODO: verify physical supply`
-- Bike Rental x2 `TODO: verify physical supply`
-- Canoe Rental x2 `TODO: verify physical supply`
-- Event Pavilion x2 `TODO: verify physical supply`
-- Hiking Trail x2 `TODO: verify physical supply`
-- Ice Cream Vending x2 `TODO: verify physical supply`
-- Playground x2 `TODO: verify physical supply`
-- Bathrooms x4 `TODO: verify physical supply`
+#### Activity Crew deck (16)
+
+- Pool x4
+- Playground x4
+- Bike Rental x3
+- Canoe Rental x3
+- Hiking Trail x2
+
+#### Camping Sites deck (16)
+
+- Rustic Tent Forest x6
+- Tent Site with Electric Hookup x6
+- Group Site x4
+
+#### Comfort Sites deck (16)
+
+- Cabin x7
+- Tent Site with Electric Hookup x5
+- Rustic Tent Forest x4
+
+#### Premium Sites deck (16)
+
+- RV Site with Full Hookups x7
+- Waterfront Site x5
+- Cabin x4
+
+#### Specialty Sites deck (16)
+
+- Waterfront Site x5
+- Horse Riding x4
+- RV Site with Full Hookups x4
+- Group Site x3
+
+Total copies of each tile across all six decks: Rustic Tent Forest 10, Tent Site with Electric Hookup 11, RV Site with Full Hookups 11, Group Site 7, Cabin 11, Waterfront Site 10, Horse Riding 4, Bathrooms 5, Firewood 4, Pool 4, Playground 4, Bike Rental 3, Canoe Rental 3, Event Pavilion 3, Hiking Trail 2, Ice Cream Vending 4.
 
 > [!IMPORTANT]
-> The digital market behaves like a public display that refills from weighted pools. A printed edition will need a final decision on whether the supply is finite, bag-drawn, or deck-based.
+> The market is a shared public display backed by finite decks that deplete and never refill. There is no reshuffle between rounds, so a contractor that sells out is gone for the game.
 
 ---
 
@@ -104,9 +126,12 @@ The game supports 2 to 5 players. The code uses the same starting resources and 
 7. Fill the shared contractor market:
    - 2 amenity columns
    - 4 camp columns
-   - 8 visible spaces in each column
-8. Decide player order.
-9. The first player begins the Landscape Tile Phase of Early Summer.
+   - 8 visible cards in each column, with each column's 8-card reserve deck facedown beneath it
+8. Decide a starting player. This seat leads the Landscape Tile Phase every round.
+9. The starting player begins the Landscape Tile Phase of Early Summer.
+
+> [!IMPORTANT]
+> The Market Phase (build phase) starting player rotates one seat each summer. Early Summer's market opens with the starting player, Mid Summer's market opens with the next seat clockwise, and Late Summer's with the seat after that. Because the market is a shared finite supply, this keeps the first-buyer advantage from always favoring one seat. Landscape Phases still begin with the chosen starting player every round.
 
 ### Player Count Scaling
 
@@ -849,11 +874,10 @@ Eric wins with 40 points.
 
 ## Rules Needing Confirmation
 
-### 1. Finite physical supply counts
+### 1. Finite market supply (resolved)
 
-- Unclear rule: The digital game refills from weighted pools instead of depleting a fixed supply.
-- Source of uncertainty: `createMarketSlot()` in `smore-to-explore.js` uses weighted random picks from `copies` values rather than removing tiles from a finite deck.
-- Suggested final wording: "The physical market refills from shuffled finite stacks built using the listed weight counts as print counts, unless the publisher specifies a different finite mix."
+- Resolved rule: the market is six finite per-column decks (16 cards each, 96 total) that deplete and never refill or reshuffle. See "Market Tiles: six finite contractor decks" above for the exact composition, which is the print manifest.
+- Implementation: `MARKET_COLUMN_DECKS` in `smore-to-explore.js` builds and shuffles each column deck; bought slots are removed and the column tops up only from its own reserve. No weighted refill remains.
 
 ### 2. Physical expansion landscape tile mix
 
