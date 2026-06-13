@@ -131,7 +131,7 @@
       players: BRIGHT_PLAYERS,
       buttonPrimary: { fill: "#ff5fa2", stroke: "#e03a82", text: "#fff7fb" },
       frameStyle: "birds",
-      playerBadge: "beaver",
+      playerBadge: "fox",
       bird: { body: "#ff8fc0", wing: "#e85fa0", belly: "#fff0f7", crest: "#e05294", rail: "rgba(255,255,255,0.66)" },
       panel: LIGHT_PANEL,
       shell: LIGHT_PANEL

@@ -3540,6 +3540,10 @@ function computeLayout(width, height) {
       drawFrogLilyPad(rect, player);
       return;
     }
+    if (theme().playerBadge === "fox") {
+      drawFoxBadge(rect, player);
+      return;
+    }
     if (theme().playerBadge === "campfire") {
       drawCampfire(rect, player);
       return;
@@ -3882,6 +3886,113 @@ function computeLayout(width, height) {
     // Money and points stack on their own rows so neither gets truncated.
     ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillStyle = themed("rgba(70, 46, 25, 0.9)");
+    ctx.fillText(fitText(Core.formatMoney(player.money), sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.58);
+    ctx.fillText(fitText(`${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.80);
+  }
+
+  // A happy pinkish-orange fox holding a sign with the current player's name,
+  // money, and points. The Sunny Bounce theme's bottom-left badge.
+  function drawFoxBadge(rect, player) {
+    const mobile = runtime.layout.mode === "mobile-portrait";
+    const foxW = Math.min(28, rect.w * 0.36);
+    const sign = { x: rect.x + foxW - 6, y: rect.y + 2, w: rect.w - foxW + 6, h: rect.h - 4 };
+    const fx = rect.x + foxW * 0.44;
+    const coral = "#fb8f6a";
+    const coralDark = "#e86f4f";
+    const cream = "#fff2ec";
+
+    ctx.save();
+    // bushy tail curling up behind the fox on the left, with a cream tip
+    ctx.fillStyle = themed(coral);
+    ctx.beginPath();
+    ctx.ellipse(fx - foxW * 0.36, rect.y + rect.h * 0.66, foxW * 0.2, rect.h * 0.26, -0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = themed(cream);
+    ctx.beginPath();
+    ctx.ellipse(fx - foxW * 0.48, rect.y + rect.h * 0.5, foxW * 0.11, rect.h * 0.1, -0.7, 0, Math.PI * 2);
+    ctx.fill();
+    // ears: two upright triangles with pink inners
+    ctx.fillStyle = themed(coral);
+    ctx.beginPath();
+    ctx.moveTo(fx - foxW * 0.36, rect.y + rect.h * 0.04);
+    ctx.lineTo(fx - foxW * 0.06, rect.y + rect.h * 0.32);
+    ctx.lineTo(fx - foxW * 0.02, rect.y + rect.h * 0.12);
+    ctx.closePath();
+    ctx.moveTo(fx + foxW * 0.36, rect.y + rect.h * 0.04);
+    ctx.lineTo(fx + foxW * 0.06, rect.y + rect.h * 0.32);
+    ctx.lineTo(fx + foxW * 0.02, rect.y + rect.h * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = themed("#ffc2c0");
+    ctx.beginPath();
+    ctx.moveTo(fx - foxW * 0.3, rect.y + rect.h * 0.1);
+    ctx.lineTo(fx - foxW * 0.1, rect.y + rect.h * 0.28);
+    ctx.lineTo(fx - foxW * 0.06, rect.y + rect.h * 0.15);
+    ctx.closePath();
+    ctx.moveTo(fx + foxW * 0.3, rect.y + rect.h * 0.1);
+    ctx.lineTo(fx + foxW * 0.1, rect.y + rect.h * 0.28);
+    ctx.lineTo(fx + foxW * 0.06, rect.y + rect.h * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    // head
+    ctx.fillStyle = themed(coral);
+    ctx.beginPath(); ctx.ellipse(fx, rect.y + rect.h * 0.44, foxW * 0.44, rect.h * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    // cream cheeks + pointed snout (the classic fox face mask)
+    ctx.fillStyle = themed(cream);
+    ctx.beginPath();
+    ctx.moveTo(fx - foxW * 0.42, rect.y + rect.h * 0.4);
+    ctx.quadraticCurveTo(fx - foxW * 0.2, rect.y + rect.h * 0.58, fx, rect.y + rect.h * 0.5);
+    ctx.quadraticCurveTo(fx + foxW * 0.2, rect.y + rect.h * 0.58, fx + foxW * 0.42, rect.y + rect.h * 0.4);
+    ctx.quadraticCurveTo(fx + foxW * 0.18, rect.y + rect.h * 0.74, fx, rect.y + rect.h * 0.72);
+    ctx.quadraticCurveTo(fx - foxW * 0.18, rect.y + rect.h * 0.74, fx - foxW * 0.42, rect.y + rect.h * 0.4);
+    ctx.fill();
+    // eyes
+    ctx.fillStyle = themed("#3a2418");
+    ctx.beginPath();
+    ctx.arc(fx - foxW * 0.19, rect.y + rect.h * 0.42, foxW * 0.07, 0, Math.PI * 2);
+    ctx.arc(fx + foxW * 0.19, rect.y + rect.h * 0.42, foxW * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    // eye sparkles
+    ctx.fillStyle = themed("#fffdf8");
+    ctx.beginPath();
+    ctx.arc(fx - foxW * 0.17, rect.y + rect.h * 0.4, foxW * 0.025, 0, Math.PI * 2);
+    ctx.arc(fx + foxW * 0.21, rect.y + rect.h * 0.4, foxW * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+    // nose
+    ctx.fillStyle = themed("#3a2418");
+    ctx.beginPath(); ctx.arc(fx, rect.y + rect.h * 0.58, foxW * 0.07, 0, Math.PI * 2); ctx.fill();
+    // happy smile
+    ctx.strokeStyle = themed("#3a2418");
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(fx, rect.y + rect.h * 0.63);
+    ctx.quadraticCurveTo(fx - foxW * 0.12, rect.y + rect.h * 0.72, fx - foxW * 0.2, rect.y + rect.h * 0.66);
+    ctx.moveTo(fx, rect.y + rect.h * 0.63);
+    ctx.quadraticCurveTo(fx + foxW * 0.12, rect.y + rect.h * 0.72, fx + foxW * 0.2, rect.y + rect.h * 0.66);
+    ctx.stroke();
+    ctx.restore();
+
+    // Sign board with the player's name / money / points
+    Core.drawRoundedRect(ctx, sign.x, sign.y, sign.w, sign.h, 8, themed("#fff0f4"), themed("#e07aa0"), 2);
+    ctx.fillStyle = themed("#7a3a52");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const cx = sign.x + sign.w / 2;
+    const nameText = fitText(player.name, sign.w - 10, ctx.font);
+    ctx.fillText(nameText, cx, sign.y + sign.h * 0.26);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, sign.w - 10);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
+    ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = themed("rgba(122, 58, 82, 0.9)");
     ctx.fillText(fitText(Core.formatMoney(player.money), sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.58);
     ctx.fillText(fitText(`${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.80);
   }
