@@ -119,6 +119,36 @@
         "Undo is easiest during landscape setup before you continue, so fix a bad road immediately."
       ],
       reminder: "If a move feels awkward, inspect the parcel before tapping. Most rules questions come down to road links, terrain matching, and planning ahead."
+    },
+    {
+      title: "Tricky Tiles: Let The Board Show You",
+      lead: "A few tiles are picky about where they go. You never have to guess: the moment you select a tile, every legal parcel lights up with a green ring and a green dot, and the parcels it cannot use dim out.",
+      bullets: [
+        "Select a landscape or camp tile, then look at the board. Green-ringed parcels are legal right now; dimmed ones are not.",
+        "If nothing lights up, you have nowhere to place that tile yet. Build the terrain it needs first.",
+        "You cannot hire a contractor you have no legal parcel for, so you will never waste money on a tile you cannot place."
+      ],
+      reminder: "When a placement feels blocked, the board is already telling you where the tile can go. Follow the green."
+    },
+    {
+      title: "Tricky Tiles: Waterfront And Water",
+      lead: "Canoe Rental and the Waterfront Site both need a waterfront parcel, which is what your Lakeside landscape tiles become once placed. Same idea, three names you will see: Lakeside terrain, a waterfront parcel, and the Waterfront Site tile that sits on it.",
+      bullets: [
+        "Lay a Lakeside tile to create a waterfront parcel. Canoe Rental must sit on one; the Waterfront Site needs at least one of its two halves on one.",
+        "Select the Canoe or Waterfront Site and the waterfront parcels light up green, so you can see your options before you commit.",
+        "Plan a lakeside spot early if you want these tiles. With only a few Lakeside tiles in a game, waterfront parcels are precious."
+      ],
+      reminder: "Lakeside tile equals waterfront parcel. If the water tiles will not place, you need more Lakeside terrain first."
+    },
+    {
+      title: "Tricky Tiles: Big Items And The Office",
+      lead: "Two more things trip up new groups: the big two-square contractors, and where the Camp Office goes.",
+      bullets: [
+        "Big items (RV Site, Group Site, Waterfront Site, Horse Riding, Event Pavilion) cover two parcels. Use Rotate to swap horizontal and vertical, and both halves must be legal, shown by the green preview.",
+        "The Entrance and Camp Office parcels are reserved: you cannot build camps on them. Place the Office where your road can still grow outward, or later seasons get boxed in.",
+        "The contractor market is finite. Each column is a small deck that runs out and never refills, and the player who opens the market rotates each summer, so watch what others take."
+      ],
+      reminder: "Think a season ahead. Leave room around the Office and grab scarce big items and waterfront parcels before they are gone."
     }
   ];
 
