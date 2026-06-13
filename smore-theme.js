@@ -161,8 +161,10 @@
       buttonPrimary: { fill: "#ff9a3d", stroke: "#e0671c", text: "#fff7f1" },
       frameStyle: "stars",
       playerBadge: "campfire",
-      panel: LIGHT_PANEL,
-      shell: LIGHT_PANEL
+      // Inverted dark UI: panels and text flip via the themed() remap in code.
+      invert: true,
+      panel: { fill: "rgba(21, 30, 53, 0.94)", stroke: "rgba(150, 172, 214, 0.22)" },
+      shell: { fill: "rgba(21, 30, 53, 0.94)", stroke: "rgba(150, 172, 214, 0.22)" }
     }
   };
 

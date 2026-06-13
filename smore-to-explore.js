@@ -73,6 +73,89 @@
     return theme().players || fallback;
   }
 
+  // Dark-mode remap. themed(color) returns its input unchanged for every theme
+  // EXCEPT an inverting one (Night Camp), where the warm panels become dark and
+  // the dark text becomes light. Because non-inverting themes pass through
+  // untouched, the four light themes stay pixel-identical and only night flips.
+  const NIGHT_INK = "#eaf1fc";        // primary headings / body text
+  const NIGHT_INK_MED = "#aebcd8";    // medium-weight labels
+  const NIGHT_SURFACE = "rgba(21, 30, 53, 0.94)";   // panels and bars
+  const NIGHT_SURFACE_DEEP = "rgba(13, 20, 38, 0.96)"; // board area, cells
+  const NIGHT_INK_SOFT_RGB = "200, 214, 240";
+  const NIGHT_LINE_RGB = "150, 172, 214";
+  const NIGHT_EXACT = {
+    "#3d2d20": NIGHT_INK, "#3b2c20": NIGHT_INK, "#3f2d20": NIGHT_INK, "#452f1e": NIGHT_INK,
+    "#4a3524": NIGHT_INK, "#4b3726": NIGHT_INK, "#4a2e1b": NIGHT_INK, "#3a2c20": NIGHT_INK,
+    "#452f1e": NIGHT_INK, "#5a4330": NIGHT_INK_MED, "#5f4731": NIGHT_INK_MED, "#5b4330": NIGHT_INK_MED,
+    "#6c4325": NIGHT_INK_MED, "#5a3a1d": NIGHT_INK_MED, "#6c4825": NIGHT_INK_MED,
+    "rgba(251, 246, 236, 0.92)": NIGHT_SURFACE_DEEP,
+    // Goal/objective scenic card gradient -> a dark night-landscape card (sky,
+    // meadow, path, base) so the card reads as inverted, not a light card on a
+    // dark panel. Incomplete = muted; complete = a touch brighter and greener.
+    "rgba(191, 220, 236, 0.98)": "rgba(38, 56, 94, 0.98)",
+    "rgba(153, 188, 139, 0.98)": "rgba(46, 78, 60, 0.98)",
+    "rgba(210, 176, 132, 0.98)": "rgba(72, 62, 46, 0.98)",
+    "rgba(152, 156, 161, 0.98)": "rgba(40, 48, 64, 0.98)",
+    "rgba(171, 213, 234, 0.98)": "rgba(44, 66, 110, 0.98)",
+    "rgba(138, 184, 127, 0.98)": "rgba(54, 98, 72, 0.98)",
+    "rgba(196, 163, 118, 0.98)": "rgba(86, 76, 56, 0.98)",
+    "rgba(132, 138, 145, 0.98)": "rgba(46, 58, 76, 0.98)",
+    // Goal-card text that now sits on the dark card.
+    "rgba(56, 48, 39, 0.88)": NIGHT_INK,
+    "#2f5342": "#bfe6cf",
+    "#465158": NIGHT_INK_MED,
+    // Market column headers (pale teal/tan pills) -> raised dark pills, and the
+    // sub/empty text + empty-slot surface that ride on the dark panel.
+    "rgba(198, 224, 226, 0.96)": "rgba(34, 62, 76, 0.96)",
+    "rgba(235, 224, 202, 0.96)": "rgba(62, 56, 44, 0.96)",
+    "rgba(75, 55, 38, 0.72)": NIGHT_INK_MED,
+    "rgba(95, 74, 53, 0.6)": NIGHT_INK_MED,
+    "rgba(240, 233, 222, 0.7)": "rgba(26, 36, 60, 0.72)",
+    // Market slot cards: name/price text, the blocked-state surface and its
+    // muted text, the disabled (non-build) text, and the category sub-labels.
+    "#442f20": NIGHT_INK,
+    "rgba(92,65,45,0.58)": NIGHT_INK_MED,
+    "rgba(68,47,32,0.52)": NIGHT_INK_MED,
+    "rgba(240, 231, 225, 0.98)": "rgba(44, 38, 50, 0.96)",
+    "#3f6870": "#7fc3cf",
+    "#7d5a37": "#cbb089",
+    // How-to "Keep in mind" reminder: light-green callout -> dark-green callout.
+    "rgba(233, 243, 224, 0.98)": "rgba(40, 64, 50, 0.96)",
+    "#3f6b47": "#bfe6cf",
+    "#456049": "#cfe7d8",
+    // Feedback/summary status text (success/warning/error) lightened for the
+    // dark action bar and feed; these are text fills only, never button bodies.
+    "#3d6a46": "#7fc99a",
+    "#88622d": "#e0b066",
+    "#8f4338": "#e1897a",
+    // Light pill/chip fills -> dark tinted chips (round-name and rules subtitle
+    // pills in-game, plus the three start-screen hero pills) with light text.
+    "#efe2ca": "#3a3526",
+    "#dfead4": "#2f4030",
+    "#e2d8ef": "#3a3350",
+    "#446038": "#bfe6cf",
+    "#5e4b78": "#d8cdec",
+    // Disabled button fill (e.g. the "-" stepper at min count) -> muted dark.
+    "rgba(223, 214, 201, 0.9)": "rgba(40, 50, 74, 0.7)",
+    // Overlay panel gradient's warm-tan bottom stop (pause menu / rules / how-to).
+    "rgba(236, 222, 202, 0.98)": NIGHT_SURFACE
+  };
+  function themed(color) {
+    if (!theme().invert || typeof color !== "string") return color;
+    if (NIGHT_EXACT[color]) return NIGHT_EXACT[color];
+    // Warm-dark body/label text (several brown families, any alpha) -> soft light
+    // ink. rgba-only and warm, so it never touches hex roads/wood or neutral shadows.
+    let m = color.match(/^rgba\((?:82, 61, 44|74, 53, 36|70, 52, 37|65, 42, 25|70, 46, 25|91, 74, 56|47, 34, 23), ([0-9.]+)\)$/);
+    if (m) return `rgba(${NIGHT_INK_SOFT_RGB}, ${m[1]})`;
+    m = color.match(/^rgba\((?:108, 80, 54|95, 70, 51|64, 58, 38|73, 45, 24|116, 98, 77), ([0-9.]+)\)$/);
+    if (m) return `rgba(${NIGHT_LINE_RGB}, ${Math.min(1, Number(m[1]) + 0.06).toFixed(2)})`;
+    // warm cream surfaces (R247-255, G230-252, B200-249); excludes pure-white highlights (B 255)
+    if (/^rgba\(2(4[7-9]|5[0-5]), 2(3[0-9]|4[0-9]|5[0-2]), 2(0[0-9]|[1-4][0-9]),/.test(color)) {
+      return NIGHT_SURFACE;
+    }
+    return color;
+  }
+
   const BOARD_COLS = 8;
   const BOARD_ROWS = 5;
   const STARTING_BUDGET = 100000;
@@ -3284,8 +3367,8 @@ function computeLayout(width, height) {
   }
 
   function drawPanel(rect, title, subtitle) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(255, 251, 245, 0.94)", "rgba(108, 80, 54, 0.18)", 1);
-    ctx.fillStyle = "#3f2d20";
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, themed("rgba(255, 251, 245, 0.94)"), themed("rgba(108, 80, 54, 0.18)"), 1);
+    ctx.fillStyle = themed("#3f2d20");
     const isPortrait = runtime.layout.mode === "mobile-portrait";
     const stackSubtitle = isPortrait || rect.w < 430;
     ctx.font = isPortrait
@@ -3300,7 +3383,7 @@ function computeLayout(width, height) {
           ? "600 9px 'Avenir Next', 'Trebuchet MS', sans-serif"
           : "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
         align: stackSubtitle ? "left" : "right",
-        color: "rgba(82, 61, 44, 0.72)",
+        color: themed("rgba(82, 61, 44, 0.72)"),
         maxLines: 2
       });
     }
@@ -3316,26 +3399,26 @@ function computeLayout(width, height) {
   function getButtonPalette(variant, enabled, selected) {
     if (!enabled) {
       return {
-        fill: "rgba(223, 214, 201, 0.9)",
-        stroke: "rgba(116, 98, 77, 0.14)",
-        text: "rgba(91, 74, 56, 0.52)"
+        fill: themed("rgba(223, 214, 201, 0.9)"),
+        stroke: themed("rgba(116, 98, 77, 0.14)"),
+        text: themed("rgba(91, 74, 56, 0.52)")
       };
     }
     if (selected) {
       return {
-        fill: "#d38245",
-        stroke: "#a55723",
-        text: "#fff9f3"
+        fill: themed("#d38245"),
+        stroke: themed("#a55723"),
+        text: themed("#fff9f3")
       };
     }
-    if (variant === "primary") return theme().buttonPrimary || { fill: "#ca6f36", stroke: "#995127", text: "#fff7f1" };
-    if (variant === "danger") return { fill: "#a95f55", stroke: "#7d3a34", text: "#fff7f6" };
-    if (variant === "success") return { fill: "#5f8d65", stroke: "#3e6544", text: "#f7fff8" };
-    if (variant === "warning") return { fill: "#d3a24d", stroke: "#9e7331", text: "#fff8ee" };
+    if (variant === "primary") return theme().buttonPrimary || { fill: themed("#ca6f36"), stroke: themed("#995127"), text: themed("#fff7f1") };
+    if (variant === "danger") return { fill: themed("#a95f55"), stroke: themed("#7d3a34"), text: themed("#fff7f6") };
+    if (variant === "success") return { fill: themed("#5f8d65"), stroke: themed("#3e6544"), text: themed("#f7fff8") };
+    if (variant === "warning") return { fill: themed("#d3a24d"), stroke: themed("#9e7331"), text: themed("#fff8ee") };
     return {
-      fill: "rgba(247, 236, 220, 0.98)",
-      stroke: "rgba(108, 80, 54, 0.18)",
-      text: "#4a3524"
+      fill: themed("rgba(247, 236, 220, 0.98)"),
+      stroke: themed("rgba(108, 80, 54, 0.18)"),
+      text: themed("#4a3524")
     };
   }
 
@@ -3358,7 +3441,7 @@ function computeLayout(width, height) {
 
     Core.drawRoundedRect(ctx, rect.x, rect.y + yOffset, rect.w, rect.h, radius, palette.fill, palette.stroke, hovered && enabled ? 2 : 1.5);
     if (hovered && enabled) {
-      Core.drawRoundedRect(ctx, rect.x + 2, rect.y + yOffset + 2, rect.w - 4, rect.h - 4, radius - 2, null, "rgba(255,255,255,0.28)", 1);
+      Core.drawRoundedRect(ctx, rect.x + 2, rect.y + yOffset + 2, rect.w - 4, rect.h - 4, radius - 2, null, themed("rgba(255,255,255,0.28)"), 1);
     }
 
     ctx.fillStyle = palette.text;
@@ -3372,7 +3455,7 @@ function computeLayout(width, height) {
 
   function drawMenuButton(rect, onClick, options = {}) {
     drawButton(rect, "", onClick, options);
-    const stroke = options.selected ? "#fff9f3" : "#4a3524";
+    const stroke = options.selected ? themed("#fff9f3") : themed("#4a3524");
     const left = rect.x + rect.w * 0.28;
     const right = rect.x + rect.w * 0.72;
     const centerY = rect.y + rect.h / 2 + (options.textYOffset ?? 0);
@@ -3388,7 +3471,7 @@ function computeLayout(width, height) {
 
   function drawFullscreenButton(rect, onClick, options = {}) {
     drawButton(rect, "", onClick, options);
-    const stroke = options.selected ? "#fff9f3" : "#4a3524";
+    const stroke = options.selected ? themed("#fff9f3") : themed("#4a3524");
     const inset = rect.w * 0.26;
     const short = rect.w * 0.14;
     const left = rect.x + inset;
@@ -3458,25 +3541,25 @@ function computeLayout(width, height) {
     }
     const topHeight = Math.max(20, rect.h * 0.54);
     const barkFill = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y);
-    barkFill.addColorStop(0, "#7a4d2a");
-    barkFill.addColorStop(0.5, "#8b5d33");
-    barkFill.addColorStop(1, "#6c4326");
+    barkFill.addColorStop(0, themed("#7a4d2a"));
+    barkFill.addColorStop(0.5, themed("#8b5d33"));
+    barkFill.addColorStop(1, themed("#6c4326"));
 
     ctx.save();
-    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + topHeight * 0.84, rect.w - 16, rect.h - topHeight * 0.9, 12, barkFill, "rgba(73, 45, 24, 0.36)", 1.4);
-    Core.drawRoundedRect(ctx, rect.x + 14, rect.y + topHeight * 0.98, 5, rect.h - topHeight - 3, 3, "rgba(168, 118, 73, 0.16)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.52, rect.y + topHeight * 1.02, 4, rect.h - topHeight - 4, 3, "rgba(168, 118, 73, 0.14)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w - 18, rect.y + topHeight * 0.98, 4, rect.h - topHeight - 3, 3, "rgba(168, 118, 73, 0.14)");
+    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + topHeight * 0.84, rect.w - 16, rect.h - topHeight * 0.9, 12, barkFill, themed("rgba(73, 45, 24, 0.36)"), 1.4);
+    Core.drawRoundedRect(ctx, rect.x + 14, rect.y + topHeight * 0.98, 5, rect.h - topHeight - 3, 3, themed("rgba(168, 118, 73, 0.16)"));
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.52, rect.y + topHeight * 1.02, 4, rect.h - topHeight - 4, 3, themed("rgba(168, 118, 73, 0.14)"));
+    Core.drawRoundedRect(ctx, rect.x + rect.w - 18, rect.y + topHeight * 0.98, 4, rect.h - topHeight - 3, 3, themed("rgba(168, 118, 73, 0.14)"));
 
-    ctx.fillStyle = "#d9b383";
+    ctx.fillStyle = themed("#d9b383");
     ctx.beginPath();
     ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w / 2, topHeight, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "#8c5d35";
+    ctx.strokeStyle = themed("#8c5d35");
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.strokeStyle = "rgba(118, 78, 40, 0.45)";
+    ctx.strokeStyle = themed("rgba(118, 78, 40, 0.45)");
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w * 0.34, topHeight * 0.56, 0, 0, Math.PI * 2);
@@ -3485,7 +3568,7 @@ function computeLayout(width, height) {
     ctx.ellipse(rect.x + rect.w / 2, rect.y + topHeight * 0.94, rect.w * 0.19, topHeight * 0.3, 0, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = "#4a2e1b";
+    ctx.fillStyle = themed("#4a2e1b");
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = runtime.layout.mode === "mobile-portrait"
@@ -3505,30 +3588,30 @@ function computeLayout(width, height) {
     ctx.lineTo(textCenterX + nameWidth / 2, line1Y + 8);
     ctx.stroke();
     ctx.font = "700 8px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillStyle = "rgba(65, 42, 25, 0.88)";
+    ctx.fillStyle = themed("rgba(65, 42, 25, 0.88)");
     ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, rect.w - 10, ctx.font), textCenterX, line2Y);
     ctx.restore();
   }
 
   function createObjectiveCardFill(cardRect, complete) {
     const gradient = ctx.createLinearGradient(0, cardRect.y, 0, cardRect.y + cardRect.h);
-    gradient.addColorStop(0, complete ? "rgba(171, 213, 234, 0.98)" : "rgba(191, 220, 236, 0.98)");
-    gradient.addColorStop(0.34, complete ? "rgba(138, 184, 127, 0.98)" : "rgba(153, 188, 139, 0.98)");
-    gradient.addColorStop(0.74, complete ? "rgba(196, 163, 118, 0.98)" : "rgba(210, 176, 132, 0.98)");
-    gradient.addColorStop(1, complete ? "rgba(132, 138, 145, 0.98)" : "rgba(152, 156, 161, 0.98)");
+    gradient.addColorStop(0, complete ? themed("rgba(171, 213, 234, 0.98)") : themed("rgba(191, 220, 236, 0.98)"));
+    gradient.addColorStop(0.34, complete ? themed("rgba(138, 184, 127, 0.98)") : themed("rgba(153, 188, 139, 0.98)"));
+    gradient.addColorStop(0.74, complete ? themed("rgba(196, 163, 118, 0.98)") : themed("rgba(210, 176, 132, 0.98)"));
+    gradient.addColorStop(1, complete ? themed("rgba(132, 138, 145, 0.98)") : themed("rgba(152, 156, 161, 0.98)"));
     return gradient;
   }
 
   function drawLogSlice(x, y, radius) {
     ctx.save();
-    ctx.fillStyle = "#8c5d35";
-    ctx.strokeStyle = "#5f3d23";
+    ctx.fillStyle = themed("#8c5d35");
+    ctx.strokeStyle = themed("#5f3d23");
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.strokeStyle = "rgba(222, 183, 124, 0.75)";
+    ctx.strokeStyle = themed("rgba(222, 183, 124, 0.75)");
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(x, y, radius * 0.56, 0, Math.PI * 2);
@@ -3541,7 +3624,7 @@ function computeLayout(width, height) {
   function drawBird(cx, cy, s, palette) {
     ctx.save();
     // feet
-    ctx.strokeStyle = "#caa24a";
+    ctx.strokeStyle = themed("#caa24a");
     ctx.lineWidth = Math.max(1, s * 0.14);
     ctx.beginPath();
     ctx.moveTo(cx - s * 0.16, cy - s * 0.2); ctx.lineTo(cx - s * 0.16, cy);
@@ -3576,21 +3659,21 @@ function computeLayout(width, height) {
     ctx.lineTo(cx + s * 0.86, cy - s * 2.2);
     ctx.closePath(); ctx.fill();
     // beak
-    ctx.fillStyle = "#f3b24a";
+    ctx.fillStyle = themed("#f3b24a");
     ctx.beginPath();
     ctx.moveTo(cx + s * 1.06, cy - s * 2.0);
     ctx.lineTo(cx + s * 1.6, cy - s * 1.86);
     ctx.lineTo(cx + s * 1.06, cy - s * 1.74);
     ctx.closePath(); ctx.fill();
     // eye
-    ctx.fillStyle = "#21303e";
+    ctx.fillStyle = themed("#21303e");
     ctx.beginPath(); ctx.arc(cx + s * 0.66, cy - s * 2.04, s * 0.13, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
   function drawBirdFrame(rect, bird) {
     // soft rounded outline just outside the modal panel
-    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, bird.rail || "rgba(255,255,255,0.6)", 3);
+    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, bird.rail || themed("rgba(255,255,255,0.6)"), 3);
     // perch a row of birds along the top edge
     const count = Core.clamp(Math.round(rect.w / 160), 3, 5);
     const s = runtime.layout?.mode === "mobile-portrait" ? 7 : 9;
@@ -3604,7 +3687,7 @@ function computeLayout(width, height) {
 
   function drawSparkle(cx, cy, s) {
     ctx.save();
-    ctx.fillStyle = "rgba(255, 246, 205, 0.95)";
+    ctx.fillStyle = themed("rgba(255, 246, 205, 0.95)");
     ctx.beginPath();
     ctx.moveTo(cx, cy - s);
     ctx.quadraticCurveTo(cx + s * 0.2, cy - s * 0.2, cx + s, cy);
@@ -3617,7 +3700,7 @@ function computeLayout(width, height) {
   }
 
   function drawStarFrame(rect) {
-    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, "rgba(255, 240, 200, 0.5)", 3);
+    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, themed("rgba(255, 240, 200, 0.5)"), 3);
     const count = Core.clamp(Math.round(rect.w / 160), 3, 5);
     const base = runtime.layout?.mode === "mobile-portrait" ? 6 : 8;
     const left = rect.x + rect.w * 0.14;
@@ -3641,12 +3724,12 @@ function computeLayout(width, height) {
     const cy = rect.y + rect.h * 0.6;
     ctx.save();
     // flat paddle tail
-    ctx.fillStyle = "#6c4628";
+    ctx.fillStyle = themed("#6c4628");
     ctx.beginPath(); ctx.ellipse(bx + bw * 0.16, rect.y + rect.h * 0.82, bw * 0.2, rect.h * 0.2, -0.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "rgba(40,26,15,0.3)"; ctx.lineWidth = 1;
+    ctx.strokeStyle = themed("rgba(40,26,15,0.3)"); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(bx + bw * 0.05, rect.y + rect.h * 0.78); ctx.lineTo(bx + bw * 0.28, rect.y + rect.h * 0.9); ctx.stroke();
     // body
-    ctx.fillStyle = "#8a5a32";
+    ctx.fillStyle = themed("#8a5a32");
     ctx.beginPath(); ctx.ellipse(bx + bw * 0.46, cy, bw * 0.4, rect.h * 0.38, 0, 0, Math.PI * 2); ctx.fill();
     // head
     ctx.beginPath(); ctx.arc(bx + bw * 0.52, rect.y + rect.h * 0.34, bw * 0.34, 0, Math.PI * 2); ctx.fill();
@@ -3656,17 +3739,17 @@ function computeLayout(width, height) {
     ctx.arc(bx + bw * 0.7, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
     ctx.fill();
     // muzzle
-    ctx.fillStyle = "#cf9f68";
+    ctx.fillStyle = themed("#cf9f68");
     ctx.beginPath(); ctx.ellipse(bx + bw * 0.62, rect.y + rect.h * 0.42, bw * 0.2, rect.h * 0.12, 0, 0, Math.PI * 2); ctx.fill();
     // tooth
-    ctx.fillStyle = "#fffdf4";
+    ctx.fillStyle = themed("#fffdf4");
     ctx.fillRect(bx + bw * 0.58, rect.y + rect.h * 0.46, bw * 0.08, rect.h * 0.1);
     // nose + eye
-    ctx.fillStyle = "#33210f";
+    ctx.fillStyle = themed("#33210f");
     ctx.beginPath(); ctx.arc(bx + bw * 0.66, rect.y + rect.h * 0.36, bw * 0.06, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(bx + bw * 0.46, rect.y + rect.h * 0.28, bw * 0.055, 0, Math.PI * 2); ctx.fill();
     // paws gripping the sign edge
-    ctx.fillStyle = "#74492a";
+    ctx.fillStyle = themed("#74492a");
     ctx.beginPath();
     ctx.arc(sign.x, rect.y + rect.h * 0.52, bw * 0.13, 0, Math.PI * 2);
     ctx.arc(sign.x, rect.y + rect.h * 0.76, bw * 0.13, 0, Math.PI * 2);
@@ -3674,8 +3757,8 @@ function computeLayout(width, height) {
     ctx.restore();
 
     // Sign board with the player's name / money / points
-    Core.drawRoundedRect(ctx, sign.x, sign.y, sign.w, sign.h, 8, "#f6e7c4", "#9a6b3a", 2);
-    ctx.fillStyle = "#5a3a1d";
+    Core.drawRoundedRect(ctx, sign.x, sign.y, sign.w, sign.h, 8, themed("#f6e7c4"), themed("#9a6b3a"), 2);
+    ctx.fillStyle = themed("#5a3a1d");
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -3691,7 +3774,7 @@ function computeLayout(width, height) {
     ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.34 + 7);
     ctx.stroke();
     ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillStyle = "rgba(70, 46, 25, 0.9)";
+    ctx.fillStyle = themed("rgba(70, 46, 25, 0.9)");
     ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.68);
   }
 
@@ -3706,7 +3789,7 @@ function computeLayout(width, height) {
 
     ctx.save();
     // rising smoke wisps (above the badge)
-    ctx.strokeStyle = "rgba(214, 214, 224, 0.26)";
+    ctx.strokeStyle = themed("rgba(214, 214, 224, 0.26)");
     ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     for (let k = 0; k < 2; k += 1) {
@@ -3717,14 +3800,14 @@ function computeLayout(width, height) {
       ctx.stroke();
     }
     // sparks
-    ctx.fillStyle = "rgba(255, 196, 86, 0.95)";
+    ctx.fillStyle = themed("rgba(255, 196, 86, 0.95)");
     [[-6, -4], [5, -8], [0, -14], [8, 2], [-9, 4]].forEach(([dx, dy]) => {
       ctx.beginPath();
       ctx.arc(fx + dx, rect.y + rect.h * 0.3 + dy, 1.1, 0, Math.PI * 2);
       ctx.fill();
     });
     // crossed logs at the base
-    ctx.strokeStyle = "#7a4d2a";
+    ctx.strokeStyle = themed("#7a4d2a");
     ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(fx - fireW * 0.32, baseY); ctx.lineTo(fx + fireW * 0.32, baseY - 5); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(fx + fireW * 0.32, baseY); ctx.lineTo(fx - fireW * 0.32, baseY - 5); ctx.stroke();
@@ -3740,13 +3823,13 @@ function computeLayout(width, height) {
       ctx.closePath();
       ctx.fill();
     };
-    flame(rect.h * 0.5, fireW * 0.34, "#ff7a2e");
-    flame(rect.h * 0.33, fireW * 0.22, "#ffd24a");
+    flame(rect.h * 0.5, fireW * 0.34, themed("#ff7a2e"));
+    flame(rect.h * 0.33, fireW * 0.22, themed("#ffd24a"));
     ctx.restore();
 
     // plaque with the player's name / money / points
-    Core.drawRoundedRect(ctx, plaque.x, plaque.y, plaque.w, plaque.h, 8, "#2c2238", "rgba(255, 220, 150, 0.4)", 1.5);
-    ctx.fillStyle = "#ffe7c2";
+    Core.drawRoundedRect(ctx, plaque.x, plaque.y, plaque.w, plaque.h, 8, themed("#2c2238"), themed("rgba(255, 220, 150, 0.4)"), 1.5);
+    ctx.fillStyle = themed("#ffe7c2");
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -3762,7 +3845,7 @@ function computeLayout(width, height) {
     ctx.lineTo(cx + nameWidth / 2, plaque.y + plaque.h * 0.34 + 7);
     ctx.stroke();
     ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
-    ctx.fillStyle = "rgba(255, 231, 194, 0.85)";
+    ctx.fillStyle = themed("rgba(255, 231, 194, 0.85)");
     ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, plaque.w - 6, ctx.font), cx, plaque.y + plaque.h * 0.68);
   }
 
@@ -3779,10 +3862,10 @@ function computeLayout(width, height) {
     const radius = runtime.layout?.mode === "mobile-portrait" ? 7 : 9;
     const spacing = radius * 1.95;
     const railThickness = radius * 1.8;
-    Core.drawRoundedRect(ctx, rect.x - railThickness * 0.8, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, "rgba(122, 80, 45, 0.96)");
-    Core.drawRoundedRect(ctx, rect.x + rect.w - railThickness * 0.2, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, "rgba(122, 80, 45, 0.96)");
-    Core.drawRoundedRect(ctx, rect.x + 12, rect.y - railThickness * 0.8, rect.w - 24, railThickness, railThickness / 2, "rgba(122, 80, 45, 0.96)");
-    Core.drawRoundedRect(ctx, rect.x + 12, rect.y + rect.h - railThickness * 0.2, rect.w - 24, railThickness, railThickness / 2, "rgba(122, 80, 45, 0.96)");
+    Core.drawRoundedRect(ctx, rect.x - railThickness * 0.8, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, themed("rgba(122, 80, 45, 0.96)"));
+    Core.drawRoundedRect(ctx, rect.x + rect.w - railThickness * 0.2, rect.y + 12, railThickness, rect.h - 24, railThickness / 2, themed("rgba(122, 80, 45, 0.96)"));
+    Core.drawRoundedRect(ctx, rect.x + 12, rect.y - railThickness * 0.8, rect.w - 24, railThickness, railThickness / 2, themed("rgba(122, 80, 45, 0.96)"));
+    Core.drawRoundedRect(ctx, rect.x + 12, rect.y + rect.h - railThickness * 0.2, rect.w - 24, railThickness, railThickness / 2, themed("rgba(122, 80, 45, 0.96)"));
 
     for (let x = rect.x + 18; x <= rect.x + rect.w - 18; x += spacing) {
       drawLogSlice(x, rect.y - 4, radius);
@@ -3813,7 +3896,7 @@ function computeLayout(width, height) {
   function renderBackground() {
     const W = runtime.layout.width;
     const H = runtime.layout.height;
-    const bg = theme().background || { style: "soft", sky: ["#f7eedf", "#efe2c5", "#e2cca1"], orb: "rgba(255,255,255,0.22)" };
+    const bg = theme().background || { style: "soft", sky: [themed("#f7eedf"), themed("#efe2c5"), themed("#e2cca1")], orb: themed("rgba(255,255,255,0.22)") };
 
     if (bg.style === "scene") {
       renderSceneBackground(W, H, bg);
@@ -3824,7 +3907,7 @@ function computeLayout(width, height) {
       return;
     }
 
-    const sky = bg.sky || ["#f7eedf", "#efe2c5", "#e2cca1"];
+    const sky = bg.sky || [themed("#f7eedf"), themed("#efe2c5"), themed("#e2cca1")];
     const gradient = ctx.createLinearGradient(0, 0, 0, H);
     gradient.addColorStop(0, sky[0]);
     gradient.addColorStop(0.48, sky[1] || sky[0]);
@@ -3832,7 +3915,7 @@ function computeLayout(width, height) {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = bg.orb || "rgba(255,255,255,0.22)";
+    ctx.fillStyle = bg.orb || themed("rgba(255,255,255,0.22)");
     ctx.beginPath();
     ctx.arc(W * 0.18, H * 0.08, W * 0.18, 0, Math.PI * 2);
     ctx.fill();
@@ -3845,7 +3928,7 @@ function computeLayout(width, height) {
     const horizon = H * (bg.horizon || 0.62);
     // Sky
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    (bg.sky || ["#a9e4ff", "#cdeeff", "#e7f7ff"]).forEach((color, index, arr) => {
+    (bg.sky || [themed("#a9e4ff"), themed("#cdeeff"), themed("#e7f7ff")]).forEach((color, index, arr) => {
       sky.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
     });
     ctx.fillStyle = sky;
@@ -3885,7 +3968,7 @@ function computeLayout(width, height) {
 
     // Meadow ground
     const meadow = ctx.createLinearGradient(0, horizon, 0, H);
-    (bg.meadow || ["#d6f0bb", "#a9dd7e"]).forEach((color, index, arr) => {
+    (bg.meadow || [themed("#d6f0bb"), themed("#a9dd7e")]).forEach((color, index, arr) => {
       meadow.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
     });
     ctx.fillStyle = meadow;
@@ -3930,7 +4013,7 @@ function computeLayout(width, height) {
     const horizon = H * (bg.horizon || 0.64);
     // night sky
     const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    (bg.sky || ["#15213f", "#243a63", "#34526b"]).forEach((color, index, arr) => {
+    (bg.sky || [themed("#15213f"), themed("#243a63"), themed("#34526b")]).forEach((color, index, arr) => {
       sky.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
     });
     ctx.fillStyle = sky;
@@ -3958,7 +4041,7 @@ function computeLayout(width, height) {
       ctx.fillStyle = bg.moon;
       ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2); ctx.fill();
       // carve the crescent by overpainting with the sky
-      ctx.fillStyle = bg.sky ? bg.sky[0] : "#15213f";
+      ctx.fillStyle = bg.sky ? bg.sky[0] : themed("#15213f");
       ctx.beginPath(); ctx.arc(moonX + moonR * 0.5, moonY - moonR * 0.25, moonR * 0.92, 0, Math.PI * 2); ctx.fill();
     }
     // dark hills along the horizon
@@ -3970,7 +4053,7 @@ function computeLayout(width, height) {
     }
     // dark ground
     const ground = ctx.createLinearGradient(0, horizon, 0, H);
-    (bg.ground || ["#2f4d3b", "#264033"]).forEach((color, index, arr) => {
+    (bg.ground || [themed("#2f4d3b"), themed("#264033")]).forEach((color, index, arr) => {
       ground.addColorStop(arr.length === 1 ? 0 : index / (arr.length - 1), color);
     });
     ctx.fillStyle = ground;
@@ -3987,16 +4070,16 @@ function computeLayout(width, height) {
   }
 
   function renderShellSurface(rect, options = {}) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, options.radius || 8, options.fill || "rgba(255, 250, 244, 0.94)", options.stroke || "rgba(108, 80, 54, 0.16)", options.lineWidth || 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, options.radius || 8, options.fill || themed("rgba(255, 250, 244, 0.94)"), options.stroke || themed("rgba(108, 80, 54, 0.16)"), options.lineWidth || 1);
   }
 
   function renderGameTopBar(rect) {
     const player = getPlayer();
     const compact = runtime.layout.mode !== "desktop";
     const short = isVeryShortViewport();
-    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.95)" });
+    renderShellSurface(rect, { radius: 10, fill: themed("rgba(255, 252, 247, 0.95)") });
 
-    ctx.fillStyle = "#3b2c20";
+    ctx.fillStyle = themed("#3b2c20");
     ctx.font = compact ? "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -4038,29 +4121,29 @@ function computeLayout(width, height) {
 
     const roundText = game.players.length ? getCurrentRound().name : "Pass-and-Play";
     if (short) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.76)");
       ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(`${roundText} | ${getPhaseLabel()}`, rect.x + 12, rect.y + 27);
     } else {
       const pillY = rect.y + (compact ? 30 : 34);
-      const roundFill = "rgba(239, 226, 202, 0.96)";
-      const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
-      const roundWidth = drawPill(rect.x + 12, pillY, roundText, roundFill, "#5f4731", {
+      const roundFill = themed("rgba(239, 226, 202, 0.96)");
+      const phaseFill = game.phase === "build" ? themed("#d77837") : game.phase === "setupLandscape" ? themed("#7c9c63") : themed("#8e6a9f");
+      const roundWidth = drawPill(rect.x + 12, pillY, roundText, roundFill, themed("#5f4731"), {
         height: compact ? 18 : 20,
         paddingX: 10,
         radius: 8,
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
-      const phaseWidth = drawPill(rect.x + 16 + roundWidth, pillY, getPhaseLabel(), phaseFill, "#fff9f3", {
+      const phaseWidth = drawPill(rect.x + 16 + roundWidth, pillY, getPhaseLabel(), phaseFill, themed("#fff9f3"), {
         height: compact ? 18 : 20,
         paddingX: 10,
         radius: 8,
         font: "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
       if (player) {
-        drawPill(rect.x + 20 + roundWidth + phaseWidth, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
+        drawPill(rect.x + 20 + roundWidth + phaseWidth, pillY, getTurnReadyLabel(player), themed("rgba(233, 223, 208, 0.98)"), themed("#5b4330"), {
           height: compact ? 18 : 20,
           paddingX: 10,
           radius: 8,
@@ -4071,7 +4154,7 @@ function computeLayout(width, height) {
   }
 
   function renderShellSceneTabs(rect) {
-    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.92)" });
+    renderShellSurface(rect, { radius: 10, fill: themed("rgba(255, 252, 247, 0.92)") });
     const tabs = getShellScenes();
     const gap = 4;
     const width = (rect.w - 8 - gap * (tabs.length - 1)) / tabs.length;
@@ -4092,8 +4175,8 @@ function computeLayout(width, height) {
 
   function renderPlayersDrawer(rect) {
     if (!rect || game.players.length <= 1) return;
-    renderShellSurface(rect, { radius: 10, fill: "rgba(255, 252, 247, 0.92)" });
-    ctx.fillStyle = "#4a3524";
+    renderShellSurface(rect, { radius: 10, fill: themed("rgba(255, 252, 247, 0.92)") });
+    ctx.fillStyle = themed("#4a3524");
     ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -4110,10 +4193,10 @@ function computeLayout(width, height) {
       const row = Math.floor(index / columns);
       const rowRect = { x: content.x + col * (itemWidth + gap), y: content.y + row * (rowHeight + gap), w: itemWidth, h: rowHeight };
       const active = index === game.currentPlayerIndex;
-      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 8, active ? "rgba(255, 238, 219, 0.98)" : "rgba(249, 243, 235, 0.98)", active ? "#cc7a3f" : "rgba(108,80,54,0.12)", active ? 1.2 : 1);
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 8, active ? themed("rgba(255, 238, 219, 0.98)") : themed("rgba(249, 243, 235, 0.98)"), active ? themed("#cc7a3f") : themed("rgba(108,80,54,0.12)"), active ? 1.2 : 1);
       ctx.fillStyle = entry.color.fill;
       ctx.fillRect(rowRect.x, rowRect.y, 4, rowRect.h);
-      ctx.fillStyle = "#4a3524";
+      ctx.fillStyle = themed("#4a3524");
       ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -4129,20 +4212,20 @@ function computeLayout(width, height) {
     const content = drawPanel(rect, "Turn Focus", player ? `${player.name} | ${getPhaseLabel()}` : "Setup");
     const summary = getBottomSummary();
     const noteRect = { x: content.x, y: content.y, w: content.w, h: Math.min(76, content.h) };
-    Core.drawRoundedRect(ctx, noteRect.x, noteRect.y, noteRect.w, noteRect.h, 10, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
-    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    Core.drawRoundedRect(ctx, noteRect.x, noteRect.y, noteRect.w, noteRect.h, 10, themed("rgba(248, 241, 231, 0.98)"), themed("rgba(108,80,54,0.12)"), 1);
+    ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : summary.tone === "warning" ? themed("#88622d") : themed("#4a3524");
     ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(fitText(summary.title, noteRect.w - 20, ctx.font), noteRect.x + 10, noteRect.y + 8);
     Core.drawWrappedText(ctx, summary.body, noteRect.x + 10, noteRect.y + 26, noteRect.w - 20, 13, {
       font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       maxLines: 3
     });
 
     const hintsY = noteRect.y + noteRect.h + 10;
-    ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+    ctx.fillStyle = themed("rgba(82, 61, 44, 0.76)");
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillText("Use the scene tabs to switch focus.", content.x, hintsY);
     ctx.fillText(runtime.layout.mode === "desktop"
@@ -4198,7 +4281,7 @@ function computeLayout(width, height) {
     const menuX = rect.x + rect.w - pad - menuWidth;
     const fullscreenX = menuX - 8 - fullWidth;
 
-    ctx.fillStyle = "#3b2c20";
+    ctx.fillStyle = themed("#3b2c20");
     ctx.font = titleFont;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -4234,26 +4317,26 @@ function computeLayout(width, height) {
     if (!player) {
       Core.drawWrappedText(ctx, "Pass one phone around the table and build each campground one turn at a time.", rect.x + pad, rect.y + 48, rect.w - pad * 2 - menuWidth - fullWidth - 16, 14, {
         font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.8)",
+        color: themed("rgba(82, 61, 44, 0.8)"),
         maxLines: 2
       });
       return;
     }
 
     const roundName = getCurrentRound().name;
-    const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
+    const phaseFill = game.phase === "build" ? themed("#d77837") : game.phase === "setupLandscape" ? themed("#7c9c63") : themed("#8e6a9f");
     const pillY = rect.y + 42;
-    const roundWidth = drawPill(rect.x + pad, pillY, roundName, "#efe2ca", "#5f4731", {
+    const roundWidth = drawPill(rect.x + pad, pillY, roundName, themed("#efe2ca"), themed("#5f4731"), {
       height: 24,
       paddingX: 12,
       font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
-    const phaseWidth = drawPill(rect.x + pad + roundWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+    const phaseWidth = drawPill(rect.x + pad + roundWidth + 8, pillY, getPhaseLabel(), phaseFill, themed("#fffaf6"), {
       height: 24,
       paddingX: 12,
       font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
-    drawPill(rect.x + pad + roundWidth + phaseWidth + 16, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
+    drawPill(rect.x + pad + roundWidth + phaseWidth + 16, pillY, getTurnReadyLabel(player), themed("rgba(233, 223, 208, 0.98)"), themed("#5b4330"), {
       height: 24,
       paddingX: 12,
       font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -4265,8 +4348,8 @@ function computeLayout(width, height) {
       w: rect.w - pad * 2,
       h: 54
     };
-    Core.drawRoundedRect(ctx, heroRect.x, heroRect.y, heroRect.w, heroRect.h, 20, player.color.fill, "rgba(0,0,0,0.08)", 1.5);
-    Core.drawRoundedRect(ctx, heroRect.x + 1, heroRect.y + 1, heroRect.w - 2, heroRect.h - 2, 19, null, "rgba(255,255,255,0.22)", 1);
+    Core.drawRoundedRect(ctx, heroRect.x, heroRect.y, heroRect.w, heroRect.h, 20, player.color.fill, themed("rgba(0,0,0,0.08)"), 1.5);
+    Core.drawRoundedRect(ctx, heroRect.x + 1, heroRect.y + 1, heroRect.w - 2, heroRect.h - 2, 19, null, themed("rgba(255,255,255,0.22)"), 1);
 
     ctx.fillStyle = player.color.text;
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -4285,7 +4368,7 @@ function computeLayout(width, height) {
     const others = game.players.filter((_, index) => index !== game.currentPlayerIndex);
     if (!others.length) return;
 
-    ctx.fillStyle = "rgba(74, 53, 36, 0.76)";
+    ctx.fillStyle = themed("rgba(74, 53, 36, 0.76)");
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -4305,9 +4388,9 @@ function computeLayout(width, height) {
         w: chipWidth,
         h: chipHeight
       };
-      Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 14, "rgba(248, 240, 228, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 14, themed("rgba(248, 240, 228, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
       Core.drawRoundedRect(ctx, chipRect.x + 6, chipRect.y + 6, 6, chipRect.h - 12, 3, entry.color.fill);
-      ctx.fillStyle = "#4a3524";
+      ctx.fillStyle = themed("#4a3524");
       ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -4318,14 +4401,14 @@ function computeLayout(width, height) {
 
   function renderTopBar(rect) {
     const player = getPlayer();
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 26, "rgba(255, 250, 243, 0.97)", "rgba(108, 80, 54, 0.16)", 1.5);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 26, themed("rgba(255, 250, 243, 0.97)"), themed("rgba(108, 80, 54, 0.16)"), 1.5);
 
     if (runtime.layout.mode === "mobile-portrait") {
       renderPortraitTopBar(rect, player);
       return;
     }
 
-    ctx.fillStyle = "#3b2c20";
+    ctx.fillStyle = themed("#3b2c20");
     ctx.font = runtime.layout.mode === "mobile-portrait"
       ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -4333,21 +4416,21 @@ function computeLayout(width, height) {
     ctx.textBaseline = "top";
     ctx.fillText("Smore to Explore", rect.x + 18, rect.y + 14);
 
-    const phaseFill = game.phase === "build" ? "#d77837" : game.phase === "setupLandscape" ? "#7c9c63" : "#8e6a9f";
+    const phaseFill = game.phase === "build" ? themed("#d77837") : game.phase === "setupLandscape" ? themed("#7c9c63") : themed("#8e6a9f");
     const roundName = game.players.length ? getCurrentRound().name : "Campground Pass-and-Play";
     const pillY = rect.y + 54;
-    const roundPillWidth = drawPill(rect.x + 18, pillY, roundName, "#efe2ca", "#5f4731", {
+    const roundPillWidth = drawPill(rect.x + 18, pillY, roundName, themed("#efe2ca"), themed("#5f4731"), {
       height: 26,
       paddingX: 13,
       font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
-    const phasePillWidth = drawPill(rect.x + 18 + roundPillWidth + 8, pillY, getPhaseLabel(), phaseFill, "#fffaf6", {
+    const phasePillWidth = drawPill(rect.x + 18 + roundPillWidth + 8, pillY, getPhaseLabel(), phaseFill, themed("#fffaf6"), {
       height: 26,
       paddingX: 13,
       font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
     if (player) {
-      drawPill(rect.x + 18 + roundPillWidth + phasePillWidth + 16, pillY, getTurnReadyLabel(player), "rgba(233, 223, 208, 0.98)", "#5b4330", {
+      drawPill(rect.x + 18 + roundPillWidth + phasePillWidth + 16, pillY, getTurnReadyLabel(player), themed("rgba(233, 223, 208, 0.98)"), themed("#5b4330"), {
         height: 26,
         paddingX: 13,
         font: "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -4405,9 +4488,9 @@ function computeLayout(width, height) {
         h: rosterRect.h
       };
       const active = index === game.currentPlayerIndex;
-      const fill = active ? entry.color.fill : "rgba(243, 232, 216, 0.96)";
-      const stroke = active ? "rgba(0,0,0,0.08)" : "rgba(108,80,54,0.14)";
-      const text = active ? entry.color.text : "#5b4330";
+      const fill = active ? entry.color.fill : themed("rgba(243, 232, 216, 0.96)");
+      const stroke = active ? themed("rgba(0,0,0,0.08)") : themed("rgba(108,80,54,0.14)");
+      const text = active ? entry.color.text : themed("#5b4330");
       Core.drawRoundedRect(ctx, chipRect.x, chipRect.y, chipRect.w, chipRect.h, 20, fill, stroke, active ? 1.6 : 1);
       if (!active) {
         Core.drawRoundedRect(ctx, chipRect.x + 6, chipRect.y + 6, 8, chipRect.h - 12, 4, entry.color.fill, null, 0);
@@ -4559,7 +4642,7 @@ function computeLayout(width, height) {
 
   function drawActionGrid(rect, actions) {
     if (!actions.length) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.64)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.64)");
       ctx.font = "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -4594,14 +4677,14 @@ function computeLayout(width, height) {
   }
 
   function drawSelectionTray(rect, summary) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
     const previewRect = { x: rect.x + 8, y: rect.y + 8, w: 44, h: 44 };
     if (game.ui.selection.source === "landscape") {
       drawLandscapeTileVisual(previewRect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
     } else if (game.ui.selection.source === "market") {
       drawCampTileVisual(previewRect, { typeId: game.ui.selection.typeId });
     }
-    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : "#4a3524";
+    ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : themed("#4a3524");
     ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -4610,14 +4693,14 @@ function computeLayout(width, height) {
     ctx.fillText(fitText(summary.title, textWidth, ctx.font), textX, rect.y + 10);
     Core.drawWrappedText(ctx, summary.body, textX, rect.y + 24, textWidth, 12, {
       font: "600 10px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       maxLines: 2
     });
   }
 
   function renderBottomBar(rect) {
     const player = getPlayer();
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(255, 248, 239, 0.97)", "rgba(108, 80, 54, 0.16)", 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, themed("rgba(255, 248, 239, 0.97)"), themed("rgba(108, 80, 54, 0.16)"), 1);
     const summary = getBottomSummary();
     const actions = getBottomActions(player);
 
@@ -4630,15 +4713,15 @@ function computeLayout(width, height) {
         actionRect = { x: inner.x, y: trayRect.y + trayRect.h + 8, w: inner.w, h: rect.y + rect.h - (trayRect.y + trayRect.h + 18) };
       } else {
         const summaryRect = { x: inner.x, y: inner.y, w: inner.w, h: 42 };
-        Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 8, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-        ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+        Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 8, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
+        ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : summary.tone === "warning" ? themed("#88622d") : themed("#4a3524");
         ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.fillText(fitText(summary.title, summaryRect.w - 20, ctx.font), summaryRect.x + 10, summaryRect.y + 8);
         Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 22, summaryRect.w - 20, 11, {
           font: "600 9px 'Avenir Next', 'Trebuchet MS', sans-serif",
-          color: "rgba(82, 61, 44, 0.86)",
+          color: themed("rgba(82, 61, 44, 0.86)"),
           maxLines: 1
         });
         actionRect = { x: inner.x, y: summaryRect.y + summaryRect.h + 8, w: inner.w, h: rect.y + rect.h - (summaryRect.y + summaryRect.h + 18) };
@@ -4652,22 +4735,22 @@ function computeLayout(width, height) {
     const summaryRect = { x: rect.x + 10, y: rect.y + 10, w: rect.w * summaryRatio, h: rect.h - 20 };
     const buttonRect = { x: summaryRect.x + summaryRect.w + gap, y: rect.y + 10, w: rect.w - summaryRect.w - gap - 20, h: rect.h - 20 };
 
-    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 10, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    Core.drawRoundedRect(ctx, summaryRect.x, summaryRect.y, summaryRect.w, summaryRect.h, 10, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
+    ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : summary.tone === "warning" ? themed("#88622d") : themed("#4a3524");
     ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(summary.title, summaryRect.x + 10, summaryRect.y + 8);
     Core.drawWrappedText(ctx, summary.body, summaryRect.x + 10, summaryRect.y + 23, summaryRect.w - 20, 13, {
       font: "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.86)",
+      color: themed("rgba(82, 61, 44, 0.86)"),
       maxLines: 2
     });
     drawActionGrid(buttonRect, actions);
   }
 
   function renderPortraitTabBar(rect) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, "rgba(255,249,240,0.95)", "rgba(108,80,54,0.16)", 1.2);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, themed("rgba(255,249,240,0.95)"), themed("rgba(108,80,54,0.16)"), 1.2);
     const tabs = [
       { id: "board", label: "Board" },
       { id: "market", label: "Market" },
@@ -4694,7 +4777,7 @@ function computeLayout(width, height) {
   }
 
   function renderSegmentTabs(rect, tabs, activeId, onSelect, scopePrefix) {
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, "rgba(249, 242, 232, 0.96)", "rgba(108,80,54,0.14)", 1);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 8, themed("rgba(249, 242, 232, 0.96)"), themed("rgba(108,80,54,0.14)"), 1);
     const gap = runtime.layout.mode === "mobile-portrait" ? 5 : 4;
     const width = (rect.w - gap * (tabs.length - 1) - 8) / tabs.length;
     tabs.forEach((tab, index) => {
@@ -4716,7 +4799,7 @@ function computeLayout(width, height) {
   }
 
   function drawBoardLabels(geometry) {
-    ctx.fillStyle = "rgba(70, 52, 37, 0.72)";
+    ctx.fillStyle = themed("rgba(70, 52, 37, 0.72)");
     ctx.font = geometry.cellSize >= 54
       ? "700 15px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -4734,7 +4817,7 @@ function computeLayout(width, height) {
   }
 
   function drawWaterEdges(rect, info) {
-    const fill = "rgba(103, 167, 200, 0.92)";
+    const fill = themed("rgba(103, 167, 200, 0.92)");
     const thickness = Math.max(8, rect.w * 0.14);
     for (const side of SIDES) {
       if (info.edges[side] !== "water") continue;
@@ -4782,12 +4865,12 @@ function computeLayout(width, height) {
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#8f5f37";
+    ctx.strokeStyle = themed("#8f5f37");
     ctx.lineWidth = outerWidth;
     ctx.beginPath();
     pathBuilder();
     ctx.stroke();
-    ctx.strokeStyle = "#d8b27a";
+    ctx.strokeStyle = themed("#d8b27a");
     ctx.lineWidth = innerWidth;
     ctx.beginPath();
     pathBuilder();
@@ -4854,7 +4937,7 @@ function computeLayout(width, height) {
     }
     for (const side of SIDES) {
       if (info.edges[side] !== "entrance") continue;
-      ctx.strokeStyle = "#874721";
+      ctx.strokeStyle = themed("#874721");
       ctx.lineWidth = Math.max(3, rect.w * 0.06);
       ctx.beginPath();
       const offset = Math.max(10, rect.w * 0.18);
@@ -4880,8 +4963,8 @@ function computeLayout(width, height) {
   }
 
   function drawCornerBadge(rect, text) {
-    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w * 0.42, 18, 9, "rgba(255,255,255,0.74)");
-    ctx.fillStyle = "#5a4430";
+    Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w * 0.42, 18, 9, themed("rgba(255,255,255,0.74)"));
+    ctx.fillStyle = themed("#5a4430");
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -4889,7 +4972,7 @@ function computeLayout(width, height) {
   }
 
   function drawMiniBadge(rect, text, fill, textColor) {
-    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.18, rect.y + rect.h - 24, rect.w * 0.64, 18, 9, fill, "rgba(0,0,0,0.08)", 1);
+    Core.drawRoundedRect(ctx, rect.x + rect.w * 0.18, rect.y + rect.h - 24, rect.w * 0.64, 18, 9, fill, themed("rgba(0,0,0,0.08)"), 1);
     ctx.fillStyle = textColor;
     ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
@@ -4902,7 +4985,7 @@ function computeLayout(width, height) {
     const strokeWidth = Math.max(5, rect.w * 0.11);
     ctx.save();
     ctx.lineCap = "round";
-    ctx.strokeStyle = "rgba(255, 245, 240, 0.95)";
+    ctx.strokeStyle = themed("rgba(255, 245, 240, 0.95)");
     ctx.lineWidth = strokeWidth + 3;
     ctx.beginPath();
     ctx.moveTo(rect.x + inset, rect.y + inset);
@@ -4910,7 +4993,7 @@ function computeLayout(width, height) {
     ctx.moveTo(rect.x + rect.w - inset, rect.y + inset);
     ctx.lineTo(rect.x + inset, rect.y + rect.h - inset);
     ctx.stroke();
-    ctx.strokeStyle = "rgba(195, 47, 47, 0.94)";
+    ctx.strokeStyle = themed("rgba(195, 47, 47, 0.94)");
     ctx.lineWidth = strokeWidth;
     ctx.beginPath();
     ctx.moveTo(rect.x + inset, rect.y + inset);
@@ -4925,16 +5008,16 @@ function computeLayout(width, height) {
     const info = getLandscapeInfoFromTile(tile);
     const terrain = theme().terrain || {};
     const fill = info.hasForestTag
-      ? (terrain.forest || "#9fba7d")
+      ? (terrain.forest || themed("#9fba7d"))
       : info.hasWaterEdge
-        ? (terrain.water || "#c4dee2")
-        : (terrain.open || "#c8dca3");
-    Core.drawRoundedRect(ctx, rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6, Math.max(8, rect.w * 0.18), fill, "rgba(64, 58, 38, 0.12)", 1.2);
+        ? (terrain.water || themed("#c4dee2"))
+        : (terrain.open || themed("#c8dca3"));
+    Core.drawRoundedRect(ctx, rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6, Math.max(8, rect.w * 0.18), fill, themed("rgba(64, 58, 38, 0.12)"), 1.2);
     drawWaterEdges(rect, info);
     drawRoadEdges(rect, info);
     if (rect.w >= 58) {
-      if (info.isOffice) drawMiniBadge(rect, "Office", "#fff0bf", "#7e5f2f");
-      else if (info.isEntrance) drawMiniBadge(rect, "Gate", "#ffe2be", "#8d5227");
+      if (info.isOffice) drawMiniBadge(rect, "Office", themed("#fff0bf"), themed("#7e5f2f"));
+      else if (info.isEntrance) drawMiniBadge(rect, "Gate", themed("#ffe2be"), themed("#8d5227"));
       else if (info.hasForestTag) drawCornerBadge(rect, "Forest");
       else if (info.hasWaterEdge) drawCornerBadge(rect, "Lake");
     }
@@ -4942,7 +5025,7 @@ function computeLayout(width, height) {
 
   function drawCampTileVisual(rect, campTile) {
     const def = getCampDef(campTile.typeId);
-    const stroke = def.tags.includes("premium") ? "rgba(255, 236, 175, 0.94)" : "rgba(64, 45, 31, 0.16)";
+    const stroke = def.tags.includes("premium") ? themed("rgba(255, 236, 175, 0.94)") : themed("rgba(64, 45, 31, 0.16)");
     const bigPlacement = Array.isArray(campTile.occupiedCells) && campTile.occupiedCells.length > 1;
     const insetX = bigPlacement ? rect.w * 0.08 : rect.w * 0.18;
     const insetY = bigPlacement ? rect.h * 0.12 : rect.h * 0.18;
@@ -4955,7 +5038,7 @@ function computeLayout(width, height) {
     Core.drawRoundedRect(ctx, bodyRect.x, bodyRect.y, bodyRect.w, bodyRect.h, Math.max(8, Math.min(bodyRect.w, bodyRect.h) * 0.16), themeCampColor(campTile.typeId, def.color), stroke, 2);
     if (bigPlacement) {
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.34)";
+      ctx.strokeStyle = themed("rgba(255,255,255,0.34)");
       ctx.lineWidth = Math.max(2, Math.min(bodyRect.w, bodyRect.h) * 0.04);
       ctx.beginPath();
       if (campTile.orientation === BIG_MARKET_ITEM_ORIENTATION.vertical) {
@@ -4968,14 +5051,14 @@ function computeLayout(width, height) {
       ctx.stroke();
       ctx.restore();
     }
-    ctx.fillStyle = "#fffdf8";
+    ctx.fillStyle = themed("#fffdf8");
     ctx.font = Math.max(rect.w, rect.h) >= 58 ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     Core.drawWrappedText(ctx, def.shortLabel, rect.x + rect.w / 2, rect.y + rect.h * (bigPlacement ? 0.36 : 0.31), rect.w * (bigPlacement ? 0.72 : 0.52), Math.max(rect.w, rect.h) >= 58 ? 12 : 10, {
       font: ctx.font,
       align: "center",
-      color: "#fffdf8",
+      color: themed("#fffdf8"),
       maxLines: 2
     });
   }
@@ -5061,9 +5144,9 @@ function computeLayout(width, height) {
       data: { row, col }
     });
 
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.max(10, rect.w * 0.16), "rgba(251, 246, 236, 0.92)", "rgba(95, 70, 51, 0.12)", 1.4);
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.max(10, rect.w * 0.16), themed("rgba(251, 246, 236, 0.92)"), themed("rgba(95, 70, 51, 0.12)"), 1.4);
     if (!cell.landscapeTile) {
-      ctx.strokeStyle = "rgba(95, 70, 51, 0.2)";
+      ctx.strokeStyle = themed("rgba(95, 70, 51, 0.2)");
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 4]);
       ctx.strokeRect(rect.x + 10, rect.y + 10, rect.w - 20, rect.h - 20);
@@ -5078,10 +5161,10 @@ function computeLayout(width, height) {
         // Bright emerald ring + white inner line so legal parcels read clearly
         // against the sage road/scenic terrain, plus a corner pip. Works for
         // empty landscape targets and developed market targets alike.
-        Core.drawRoundedRect(ctx, rect.x + 2.5, rect.y + 2.5, rect.w - 5, rect.h - 5, radius, "rgba(60, 190, 110, 0.16)", "rgba(31, 150, 70, 0.95)", 2.6);
-        Core.drawRoundedRect(ctx, rect.x + 4.5, rect.y + 4.5, rect.w - 9, rect.h - 9, radius - 2, null, "rgba(255, 255, 255, 0.5)", 1);
+        Core.drawRoundedRect(ctx, rect.x + 2.5, rect.y + 2.5, rect.w - 5, rect.h - 5, radius, themed("rgba(60, 190, 110, 0.16)"), themed("rgba(31, 150, 70, 0.95)"), 2.6);
+        Core.drawRoundedRect(ctx, rect.x + 4.5, rect.y + 4.5, rect.w - 9, rect.h - 9, radius - 2, null, themed("rgba(255, 255, 255, 0.5)"), 1);
         const pipR = Math.max(3, rect.w * 0.08);
-        ctx.fillStyle = "rgba(28, 150, 70, 0.95)";
+        ctx.fillStyle = themed("rgba(28, 150, 70, 0.95)");
         ctx.beginPath();
         ctx.arc(rect.x + rect.w - pipR - 5, rect.y + pipR + 5, pipR, 0, Math.PI * 2);
         ctx.fill();
@@ -5089,15 +5172,15 @@ function computeLayout(width, height) {
         // During a market selection, dim developed parcels that cannot take the
         // current tile so the legal ones stand out (the spotlight that answers
         // "where can this go"). Occupied parcels get their camp tile drawn on top.
-        Core.drawRoundedRect(ctx, rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, radius, "rgba(60, 48, 36, 0.32)", null);
+        Core.drawRoundedRect(ctx, rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, radius, themed("rgba(60, 48, 36, 0.32)"), null);
       }
     }
     if (hovered) Core.drawRoundedRect(ctx, rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, Math.max(8, rect.w * 0.14), null, `rgba(215, 118, 56, ${pulse})`, 2);
-    if (inspected) Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, Math.max(8, rect.w * 0.14), null, "rgba(56, 108, 69, 0.58)", 2);
+    if (inspected) Core.drawRoundedRect(ctx, rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, Math.max(8, rect.w * 0.14), null, themed("rgba(56, 108, 69, 0.58)"), 2);
     if (lastAttempt) {
       const invalid = game.ui.lastAttempt.reasons.length > 0;
-      const color = invalid ? "rgba(185, 75, 60, 0.72)" : "rgba(56, 120, 77, 0.72)";
-      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), invalid ? "rgba(185,75,60,0.14)" : "rgba(56,120,77,0.14)", color, 2);
+      const color = invalid ? themed("rgba(185, 75, 60, 0.72)") : themed("rgba(56, 120, 77, 0.72)");
+      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), invalid ? themed("rgba(185,75,60,0.14)") : themed("rgba(56,120,77,0.14)"), color, 2);
       if (invalid && game.ui.selection.source === "landscape") drawInvalidPlacementX(rect);
     }
   }
@@ -5112,7 +5195,7 @@ function computeLayout(width, height) {
       ctx.globalAlpha = reasons.length ? 0.5 : 0.8;
       drawLandscapeTileVisual(rect, { typeId: game.ui.selection.typeId, rotation: game.ui.selection.rotation });
       ctx.restore();
-      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
+      Core.drawRoundedRect(ctx, rect.x + 8, rect.y + 8, rect.w - 16, rect.h - 16, Math.max(8, rect.w * 0.14), null, reasons.length ? themed("rgba(185,75,60,0.78)") : themed("rgba(56,120,77,0.78)"), 2);
       if (reasons.length) drawInvalidPlacementX(rect);
       return;
     }
@@ -5133,13 +5216,13 @@ function computeLayout(width, height) {
     }
     placement.cells.forEach((targetCell) => {
       const targetRect = getCellRect(geometry, targetCell.row, targetCell.col);
-      Core.drawRoundedRect(ctx, targetRect.x + 8, targetRect.y + 8, targetRect.w - 16, targetRect.h - 16, Math.max(8, targetRect.w * 0.14), null, reasons.length ? "rgba(185,75,60,0.78)" : "rgba(56,120,77,0.78)", 2);
+      Core.drawRoundedRect(ctx, targetRect.x + 8, targetRect.y + 8, targetRect.w - 16, targetRect.h - 16, Math.max(8, targetRect.w * 0.14), null, reasons.length ? themed("rgba(185,75,60,0.78)") : themed("rgba(56,120,77,0.78)"), 2);
     });
   }
 
   function renderLandscapeRackCards(player, content) {
     if (!player.landscapeInventory.length) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.72)");
       ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -5160,7 +5243,7 @@ function computeLayout(width, height) {
       const cardRect = { x: content.x + col * (cardWidth + gap), y: content.y + row * (cardHeight + gap), w: cardWidth, h: cardHeight };
       const selected = game.ui.selection.source === "landscape" && game.ui.selection.typeId === entry.typeId;
       registerTarget(cardRect, () => selectLandscapeTile(entry.typeId), { id: `landscape-${entry.typeId}`, kind: "landscape-card" });
-      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, selected ? "rgba(255, 229, 197, 0.98)" : "rgba(250, 242, 230, 0.98)", selected ? "#cc7a3f" : "rgba(108,80,54,0.16)", selected ? 2 : 1.2);
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, selected ? themed("rgba(255, 229, 197, 0.98)") : themed("rgba(250, 242, 230, 0.98)"), selected ? themed("#cc7a3f") : themed("rgba(108,80,54,0.16)"), selected ? 2 : 1.2);
       const previewSize = Math.max(44, Math.min(cardRect.h - 12, runtime.layout.mode === "mobile-portrait" ? 56 : 68));
       const miniRect = {
         x: cardRect.x + 8,
@@ -5170,7 +5253,7 @@ function computeLayout(width, height) {
       };
       drawLandscapeTileVisual(miniRect, { typeId: entry.typeId, rotation: selected ? game.ui.selection.rotation : 0 });
       const def = getLandscapeDef(entry.typeId);
-      ctx.fillStyle = "#452f1e";
+      ctx.fillStyle = themed("#452f1e");
       ctx.font = runtime.layout.mode === "mobile-portrait"
         ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
         : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -5179,12 +5262,12 @@ function computeLayout(width, height) {
       const textX = miniRect.x + miniRect.w + 12;
       const inlineLabel = `${def.name} x${entry.count}`;
       ctx.fillText(fitText(inlineLabel, cardRect.w - (textX - cardRect.x) - 10, ctx.font), textX, cardRect.y + 12);
-      ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.78)");
       ctx.font = runtime.layout.mode === "mobile-portrait"
         ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
         : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       if (selected) {
-        ctx.fillStyle = "#b9642a";
+        ctx.fillStyle = themed("#b9642a");
         ctx.fillText(`Selected | ${game.ui.selection.rotation * 90} deg`, textX, cardRect.y + (runtime.layout.mode === "mobile-portrait" ? 30 : 34));
       }
     });
@@ -5258,7 +5341,7 @@ function computeLayout(width, height) {
     const slotStartIndex = game.ui.marketSlotPage * slotsPerPage;
 
     const headerHeight = isPortrait ? 68 : 34;
-    ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+    ctx.fillStyle = themed("rgba(82, 61, 44, 0.76)");
     ctx.font = isPortrait
       ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -5294,8 +5377,8 @@ function computeLayout(width, height) {
 
     visibleColumns.forEach((column, visibleIndex) => {
       const colRect = { x: bodyRect.x + visibleIndex * (colWidth + colGap), y: bodyRect.y, w: colWidth, h: bodyRect.h };
-      Core.drawRoundedRect(ctx, colRect.x, colRect.y, colRect.w, rowHeight, 16, column.category === "amenity" ? "rgba(198, 224, 226, 0.96)" : "rgba(235, 224, 202, 0.96)", "rgba(108,80,54,0.16)", 1);
-      ctx.fillStyle = "#4b3726";
+      Core.drawRoundedRect(ctx, colRect.x, colRect.y, colRect.w, rowHeight, 16, column.category === "amenity" ? themed("rgba(198, 224, 226, 0.96)") : themed("rgba(235, 224, 202, 0.96)"), themed("rgba(108,80,54,0.16)"), 1);
+      ctx.fillStyle = themed("#4b3726");
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       const deckCount = column.deck ? column.deck.length : 0;
@@ -5307,7 +5390,7 @@ function computeLayout(width, height) {
           : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.fillText(fitText(column.label, colRect.w - 16, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 - 7);
         ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
-        ctx.fillStyle = "rgba(75, 55, 38, 0.72)";
+        ctx.fillStyle = themed("rgba(75, 55, 38, 0.72)");
         ctx.fillText(deckCount ? `${deckCount} more in deck` : "Last cards out", colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 + 9);
       } else {
         ctx.font = "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
@@ -5317,8 +5400,8 @@ function computeLayout(width, height) {
 
       if (!column.slots.length) {
         const emptyRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap, w: colRect.w, h: rowHeight };
-        Core.drawRoundedRect(ctx, emptyRect.x, emptyRect.y, emptyRect.w, emptyRect.h, 16, "rgba(240, 233, 222, 0.7)", "rgba(108,80,54,0.12)", 1);
-        ctx.fillStyle = "rgba(95, 74, 53, 0.6)";
+        Core.drawRoundedRect(ctx, emptyRect.x, emptyRect.y, emptyRect.w, emptyRect.h, 16, themed("rgba(240, 233, 222, 0.7)"), themed("rgba(108,80,54,0.12)"), 1);
+        ctx.fillStyle = themed("rgba(95, 74, 53, 0.6)");
         ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.fillText("Sold out for this game", emptyRect.x + emptyRect.w / 2, emptyRect.y + emptyRect.h / 2);
       }
@@ -5345,8 +5428,8 @@ function computeLayout(width, height) {
           slotRect.w,
           slotRect.h,
           16,
-          blockedPurchase ? "rgba(240, 231, 225, 0.98)" : selected ? "rgba(255, 232, 204, 0.98)" : queued ? "rgba(255, 243, 223, 0.98)" : "rgba(250, 243, 233, 0.98)",
-          blockedPurchase ? "rgba(143,67,56,0.28)" : selected ? "#cc7a3f" : queued ? "rgba(204,122,63,0.42)" : "rgba(108,80,54,0.16)",
+          blockedPurchase ? themed("rgba(240, 231, 225, 0.98)") : selected ? themed("rgba(255, 232, 204, 0.98)") : queued ? themed("rgba(255, 243, 223, 0.98)") : themed("rgba(250, 243, 233, 0.98)"),
+          blockedPurchase ? themed("rgba(143,67,56,0.28)") : selected ? themed("#cc7a3f") : queued ? themed("rgba(204,122,63,0.42)") : themed("rgba(108,80,54,0.16)"),
           selected ? 2 : queued ? 1.5 : 1.1
         );
         const iconSize = Math.max(16, slotRect.h - 10);
@@ -5356,7 +5439,7 @@ function computeLayout(width, height) {
         drawCampTileVisual(miniRect, { typeId: def.id });
         ctx.restore();
         const compact = slotRect.h < 54 || slotRect.w < 150;
-        ctx.fillStyle = !buildOpen ? "rgba(68,47,32,0.52)" : blockedPurchase ? "rgba(92,65,45,0.58)" : "#442f20";
+        ctx.fillStyle = !buildOpen ? themed("rgba(68,47,32,0.52)") : blockedPurchase ? themed("rgba(92,65,45,0.58)") : themed("#442f20");
         const textX = miniRect.x + miniRect.w + 8;
         const priceX = slotRect.x + slotRect.w - 10;
         if (compact) {
@@ -5371,7 +5454,7 @@ function computeLayout(width, height) {
           ctx.fillText("$10k", priceX, slotRect.y + slotRect.h / 2 + 0.5);
           if (blockedPurchase) {
             ctx.textAlign = "left";
-            ctx.fillStyle = "#8f4338";
+            ctx.fillStyle = themed("#8f4338");
             ctx.fillText(marketBlockedShortLabel(blockedPurchaseReason), textX, slotRect.y + slotRect.h - 10);
           }
         } else {
@@ -5380,14 +5463,14 @@ function computeLayout(width, height) {
           ctx.textBaseline = "top";
           ctx.fillText(fitText(def.name, slotRect.w - miniRect.w - 28, ctx.font), textX, slotRect.y + 7);
           ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
-          ctx.fillStyle = blockedPurchase ? "#8f4338" : column.category === "amenity" ? "#3f6870" : "#7d5a37";
+          ctx.fillStyle = blockedPurchase ? themed("#8f4338") : column.category === "amenity" ? themed("#3f6870") : themed("#7d5a37");
           ctx.fillText(blockedPurchase ? marketBlockedShortLabel(blockedPurchaseReason) : column.category === "amenity" ? "Amenity" : "Camp", textX, slotRect.y + slotRect.h - 16);
-          ctx.fillStyle = !buildOpen ? "rgba(68,47,32,0.52)" : blockedPurchase ? "rgba(92,65,45,0.58)" : "#442f20";
+          ctx.fillStyle = !buildOpen ? themed("rgba(68,47,32,0.52)") : blockedPurchase ? themed("rgba(92,65,45,0.58)") : themed("#442f20");
           ctx.textAlign = "right";
           ctx.fillText("$10k", priceX, slotRect.y + 7);
         }
         if (queued) {
-          ctx.fillStyle = selected ? "#b7632c" : "rgba(183,99,44,0.76)";
+          ctx.fillStyle = selected ? themed("#b7632c") : themed("rgba(183,99,44,0.76)");
           ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
           ctx.textAlign = "right";
           ctx.textBaseline = "bottom";
@@ -5399,7 +5482,7 @@ function computeLayout(width, height) {
 
   function renderObjectiveCards(player, objectives, rect, variant, page, cardsPerPage) {
     if (!objectives.length) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.72)");
       ctx.font = "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -5416,7 +5499,7 @@ function computeLayout(width, height) {
       const cardRect = { x: rect.x, y: rect.y + index * (cardHeight + gap), w: rect.w, h: cardHeight };
       const complete = entry.result.points >= entry.objective.points;
       const fill = createObjectiveCardFill(cardRect, complete);
-      const stroke = complete ? "rgba(63, 104, 73, 0.54)" : "rgba(84, 77, 68, 0.26)";
+      const stroke = complete ? themed("rgba(63, 104, 73, 0.54)") : themed("rgba(84, 77, 68, 0.26)");
       const inset = runtime.layout.mode === "mobile-portrait" ? 10 : 14;
       const titleFont = runtime.layout.mode === "mobile-portrait"
         ? "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -5432,9 +5515,9 @@ function computeLayout(width, height) {
       const detailLineHeight = runtime.layout.mode === "mobile-portrait" ? 13 : 15;
       const footerHeight = runtime.layout.mode === "desktop" ? 42 : 48;
       Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 16, fill, stroke, 1.1);
-      Core.drawRoundedRect(ctx, cardRect.x + 4, cardRect.y + 4, cardRect.w - 8, Math.max(34, cardRect.h * 0.26), 14, "rgba(255, 255, 255, 0.10)");
+      Core.drawRoundedRect(ctx, cardRect.x + 4, cardRect.y + 4, cardRect.w - 8, Math.max(34, cardRect.h * 0.26), 14, themed("rgba(255, 255, 255, 0.10)"));
       const footerBandY = cardRect.y + cardRect.h - footerHeight - 4;
-      Core.drawRoundedRect(ctx, cardRect.x + 6, footerBandY, cardRect.w - 12, footerHeight - 6, 14, "rgba(90, 98, 105, 0.20)");
+      Core.drawRoundedRect(ctx, cardRect.x + 6, footerBandY, cardRect.w - 12, footerHeight - 6, 14, themed("rgba(90, 98, 105, 0.20)"));
       const pillText = `${entry.result.points}/${entry.objective.points}`;
       const pillWidth = (() => {
         ctx.save();
@@ -5446,10 +5529,10 @@ function computeLayout(width, height) {
       const titleWidth = Math.max(116, cardRect.w - pillWidth - inset * 2 - 10);
       Core.drawWrappedText(ctx, entry.objective.name, cardRect.x + inset, cardRect.y + inset, titleWidth, titleLineHeight, {
         font: titleFont,
-        color: "#452f1e",
+        color: themed("#452f1e"),
         maxLines: 2
       });
-      drawPill(cardRect.x + cardRect.w - pillWidth - inset, cardRect.y + inset, pillText, complete ? "#496f4f" : variant === "director" ? "#607789" : "#7b6852", "#fff9f3", {
+      drawPill(cardRect.x + cardRect.w - pillWidth - inset, cardRect.y + inset, pillText, complete ? themed("#496f4f") : variant === "director" ? themed("#607789") : themed("#7b6852"), themed("#fff9f3"), {
         paddingX: 12,
         height: runtime.layout.mode === "mobile-portrait" ? 26 : 30,
         font: "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
@@ -5459,11 +5542,11 @@ function computeLayout(width, height) {
       const footerY = cardRect.y + cardRect.h - footerHeight;
       Core.drawWrappedText(ctx, entry.objective.description, cardRect.x + inset, descriptionY, cardRect.w - inset * 2, bodyLineHeight, {
         font: bodyFont,
-        color: "rgba(56, 48, 39, 0.88)",
+        color: themed("rgba(56, 48, 39, 0.88)"),
         maxLines: runtime.layout.mode === "desktop" ? 3 : 5
       });
 
-      ctx.strokeStyle = "rgba(82, 90, 96, 0.24)";
+      ctx.strokeStyle = themed("rgba(82, 90, 96, 0.24)");
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(cardRect.x + inset, footerY - 8);
@@ -5472,7 +5555,7 @@ function computeLayout(width, height) {
 
       Core.drawWrappedText(ctx, entry.result.detail, cardRect.x + inset, footerY, cardRect.w - inset * 2, detailLineHeight, {
         font: detailFont,
-        color: complete ? "#2f5342" : "#465158",
+        color: complete ? themed("#2f5342") : themed("#465158"),
         maxLines: runtime.layout.mode === "mobile-portrait" ? 2 : 2
       });
     });
@@ -5499,7 +5582,7 @@ function computeLayout(width, height) {
     const pagerY = content.y + 40;
     if (totalPages > 1) {
       const indicatorText = `Showing ${game.ui.objectivePages[tabKey] * cardsPerPage + 1}-${Math.min(objectives.length, (game.ui.objectivePages[tabKey] + 1) * cardsPerPage)} of ${objectives.length}`;
-      ctx.fillStyle = "rgba(82, 61, 44, 0.72)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.72)");
       ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -5538,23 +5621,23 @@ function computeLayout(width, height) {
     const rowHeight = 52;
     standings.forEach((entry, index) => {
       const rowRect = { x: content.x, y: content.y + index * (rowHeight + 8), w: content.w, h: rowHeight };
-      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(249, 241, 229, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, themed("rgba(249, 241, 229, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
       Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, entry.color.fill);
       ctx.fillStyle = entry.color.text;
       ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
-      ctx.fillStyle = "#432e1e";
+      ctx.fillStyle = themed("#432e1e");
       ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(fitText(entry.name, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
       ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.fillStyle = "rgba(82, 61, 44, 0.76)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.76)");
       const status = game.phase === "build" && entry.passedThisRound ? " | passed this round" : "";
       ctx.fillText(`${Core.formatMoney(entry.money)} | ${entry.roundCampPlacements[game.roundIndex]} placed this round${status}`, rowRect.x + 56, rowRect.y + 29);
-      ctx.fillStyle = "#432e1e";
+      ctx.fillStyle = themed("#432e1e");
       ctx.font = "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(`${entry.score} pts`, rowRect.x + rowRect.w - 14, rowRect.y + 16);
@@ -5565,15 +5648,15 @@ function computeLayout(width, height) {
     const player = getPlayer();
     const content = drawPanel(rect, "Current Focus", player ? `${player.name} | ${getPhaseLabel()}` : "Setup");
     const summary = getBottomSummary();
-    Core.drawRoundedRect(ctx, content.x, content.y, content.w, content.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
-    ctx.fillStyle = summary.tone === "error" ? "#8f4338" : summary.tone === "success" ? "#3d6a46" : summary.tone === "warning" ? "#88622d" : "#4a3524";
+    Core.drawRoundedRect(ctx, content.x, content.y, content.w, content.h, 18, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
+    ctx.fillStyle = summary.tone === "error" ? themed("#8f4338") : summary.tone === "success" ? themed("#3d6a46") : summary.tone === "warning" ? themed("#88622d") : themed("#4a3524");
     ctx.font = "800 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(summary.title, content.x + 12, content.y + 10);
     Core.drawWrappedText(ctx, summary.body, content.x + 12, content.y + 30, content.w - 24, 15, {
       font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       maxLines: 4
     });
   }
@@ -5638,8 +5721,8 @@ function computeLayout(width, height) {
     const thumbY = trackRect.y + (scrollMeta.scrollY / scrollMeta.maxScroll) * travel;
     const thumbRect = { x: trackRect.x, y: thumbY, w: trackRect.w, h: thumbHeight };
 
-    Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, "rgba(108,80,54,0.1)");
-    Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, "rgba(202, 111, 54, 0.72)");
+    Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, themed("rgba(108,80,54,0.1)"));
+    Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, themed("rgba(202, 111, 54, 0.72)"));
 
     runtime.overlayScroll = {
       kind: "overlay",
@@ -5661,14 +5744,14 @@ function computeLayout(width, height) {
 
     visibleRows.forEach((row, index) => {
       const rowRect = { x: rect.x + 18, y: startY + index * (rowHeight + rowGap), w: rect.w - 36, h: rowHeight };
-      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+      Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
       Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
       ctx.fillStyle = row.player.color.text;
       ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
-      ctx.fillStyle = "#432e1e";
+      ctx.fillStyle = themed("#432e1e");
       ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
@@ -5677,7 +5760,7 @@ function computeLayout(width, height) {
     });
 
     if (rows.length > visibleRows.length) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.74)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.74)");
       ctx.font = "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -5731,10 +5814,10 @@ function computeLayout(width, height) {
     const subtitleLines = short ? 2 : compact ? 3 : 2;
     const bodyTop = shell.y + (subtitle ? (short ? 88 : 120) : (short ? 64 : 82));
     const bodyBottomInset = subtitle ? (short ? 96 : 142) : (short ? 78 : 104);
-    Core.drawRoundedRect(ctx, shell.x, shell.y, shell.w, shell.h, 30, "rgba(255, 248, 239, 0.97)", "rgba(108,80,54,0.18)", 1.6);
-    Core.drawRoundedRect(ctx, shell.x + 1, shell.y + 1, shell.w - 2, shell.h - 2, 29, null, "rgba(255,255,255,0.22)", 1);
+    Core.drawRoundedRect(ctx, shell.x, shell.y, shell.w, shell.h, 30, themed("rgba(255, 248, 239, 0.97)"), themed("rgba(108,80,54,0.18)"), 1.6);
+    Core.drawRoundedRect(ctx, shell.x + 1, shell.y + 1, shell.w - 2, shell.h - 2, 29, null, themed("rgba(255,255,255,0.22)"), 1);
 
-    ctx.fillStyle = "rgba(233, 213, 184, 0.45)";
+    ctx.fillStyle = themed("rgba(233, 213, 184, 0.45)");
     ctx.beginPath();
     ctx.arc(shell.x + shell.w * 0.15, shell.y + shell.h * 0.14, Math.min(shell.w, shell.h) * 0.12, 0, Math.PI * 2);
     ctx.fill();
@@ -5742,7 +5825,7 @@ function computeLayout(width, height) {
     ctx.arc(shell.x + shell.w * 0.84, shell.y + shell.h * 0.18, Math.min(shell.w, shell.h) * 0.09, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#3d2d20";
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = titleFont;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -5751,7 +5834,7 @@ function computeLayout(width, height) {
     if (subtitle) {
       Core.drawWrappedText(ctx, subtitle, shell.x + 22, subtitleY, Math.min(shell.w - 44, runtime.layout.mode === "desktop" ? 620 : shell.w - 44), subtitleLineHeight, {
         font: subtitleFont,
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         maxLines: subtitleLines
       });
     }
@@ -5776,9 +5859,9 @@ function computeLayout(width, height) {
 
   function renderHeroPillRow(body) {
     const pills = [
-      { text: "2-5 Players", fill: "#efe2ca", textColor: "#5f4731" },
-      { text: "Pass-and-Play", fill: "#dfead4", textColor: "#446038" },
-      { text: "3 Summer Rounds", fill: "#e2d8ef", textColor: "#5e4b78" }
+      { text: "2-5 Players", fill: themed("#efe2ca"), textColor: themed("#5f4731") },
+      { text: "Pass-and-Play", fill: themed("#dfead4"), textColor: themed("#446038") },
+      { text: "3 Summer Rounds", fill: themed("#e2d8ef"), textColor: themed("#5e4b78") }
     ];
     let x = body.x;
     let y = body.y;
@@ -5813,7 +5896,7 @@ function computeLayout(width, height) {
     if (!short) {
       const introMetrics = Core.drawWrappedText(ctx, GAME_INTRO, body.x, body.y + pillHeight + 16, Math.min(body.w, compact ? body.w : 560), compact ? 18 : 20, {
         font: compact ? "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 16px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.86)",
+        color: themed("rgba(82, 61, 44, 0.86)"),
         maxLines: 2
       });
       introHeight = introMetrics.height + (compact ? 30 : 36);
@@ -5846,8 +5929,8 @@ function computeLayout(width, height) {
     const buttonW = compact ? 52 : 58;
     const countMid = short ? 44 : compact ? 54 : 58;
 
-    Core.drawRoundedRect(ctx, pickerRect.x, pickerRect.y, pickerRect.w, pickerRect.h, 22, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
-    ctx.fillStyle = "#4a3524";
+    Core.drawRoundedRect(ctx, pickerRect.x, pickerRect.y, pickerRect.w, pickerRect.h, 22, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+    ctx.fillStyle = themed("#4a3524");
     ctx.font = compact ? "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -5921,7 +6004,7 @@ function computeLayout(width, height) {
     const menuBottom = flowY + secondaryH + (secondarySideBySide ? 0 : secondaryH + actionGap + 4);
     const footerY = shell.y + shell.h - 20;
     if (footerY - 10 > menuBottom) {
-      ctx.fillStyle = "rgba(82, 61, 44, 0.7)";
+      ctx.fillStyle = themed("rgba(82, 61, 44, 0.7)");
       ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -5996,7 +6079,7 @@ function computeLayout(width, height) {
     ctx.clip();
     ctx.translate(0, -scrollY);
 
-    ctx.fillStyle = "#5a4330";
+    ctx.fillStyle = themed("#5a4330");
     ctx.font = compact ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
@@ -6006,49 +6089,49 @@ function computeLayout(width, height) {
     HOW_TO_STEPS.forEach((_, index) => {
       const active = index === game.ui.howToStep;
       const dotX = viewport.x + contentWidth - 12 - (HOW_TO_STEPS.length - 1 - index) * (compact ? 14 : 16);
-      ctx.fillStyle = active ? "#ca6f36" : "rgba(108,80,54,0.22)";
+      ctx.fillStyle = active ? themed("#ca6f36") : themed("rgba(108,80,54,0.22)");
       ctx.beginPath();
       ctx.arc(dotX, dotsY + 6, active ? 5 : 4, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    ctx.fillStyle = "#3d2d20";
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = compact ? "800 22px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.fillText(step.title, viewport.x, viewport.y + metrics.titleTop);
     Core.drawWrappedText(ctx, step.lead, viewport.x, viewport.y + metrics.leadTop, contentWidth, metrics.leadLineHeight, {
       font: metrics.leadFont,
-      color: "rgba(82, 61, 44, 0.86)",
+      color: themed("rgba(82, 61, 44, 0.86)"),
       maxLines: compact ? 6 : 4
     });
 
     let cursorY = viewport.y + metrics.leadTop + metrics.leadHeight + 16;
     step.bullets.forEach((bullet, index) => {
       const cardRect = { x: viewport.x, y: cursorY, w: contentWidth, h: metrics.bulletHeights[index] };
-      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
-      Core.drawRoundedRect(ctx, cardRect.x + 10, cardRect.y + 10, metrics.bulletBadgeSize, metrics.bulletBadgeSize, metrics.bulletBadgeSize / 2, "rgba(202, 111, 54, 0.16)");
-      ctx.fillStyle = "#b7632c";
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 18, themed("rgba(248, 241, 231, 0.98)"), themed("rgba(108,80,54,0.12)"), 1);
+      Core.drawRoundedRect(ctx, cardRect.x + 10, cardRect.y + 10, metrics.bulletBadgeSize, metrics.bulletBadgeSize, metrics.bulletBadgeSize / 2, themed("rgba(202, 111, 54, 0.16)"));
+      ctx.fillStyle = themed("#b7632c");
       ctx.font = "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(index + 1), cardRect.x + 10 + metrics.bulletBadgeSize / 2, cardRect.y + 10 + metrics.bulletBadgeSize / 2);
       Core.drawWrappedText(ctx, bullet, cardRect.x + 44, cardRect.y + metrics.bulletPadY, cardRect.w - 56, metrics.bulletLineHeight, {
         font: metrics.bulletFont,
-        color: "#4a3524",
+        color: themed("#4a3524"),
         maxLines: 4
       });
       cursorY += cardRect.h + metrics.bulletGap;
     });
 
     const reminderRect = { x: viewport.x, y: cursorY + 2, w: contentWidth, h: metrics.reminderHeight };
-    Core.drawRoundedRect(ctx, reminderRect.x, reminderRect.y, reminderRect.w, reminderRect.h, 18, "rgba(233, 243, 224, 0.98)", "rgba(95, 141, 101, 0.22)", 1.1);
-    ctx.fillStyle = "#3f6b47";
+    Core.drawRoundedRect(ctx, reminderRect.x, reminderRect.y, reminderRect.w, reminderRect.h, 18, themed("rgba(233, 243, 224, 0.98)"), themed("rgba(95, 141, 101, 0.22)"), 1.1);
+    ctx.fillStyle = themed("#3f6b47");
     ctx.font = compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText("Keep in mind", reminderRect.x + 12, reminderRect.y + metrics.reminderPadY);
     Core.drawWrappedText(ctx, step.reminder, reminderRect.x + 12, reminderRect.y + metrics.reminderPadY + 20, reminderRect.w - 24, metrics.reminderLineHeight, {
       font: metrics.reminderFont,
-      color: "#456049",
+      color: themed("#456049"),
       maxLines: 4
     });
 
@@ -6061,8 +6144,8 @@ function computeLayout(width, height) {
       const thumbY = trackRect.y + (scrollY / maxScroll) * Math.max(0, trackRect.h - thumbHeight);
       const thumbRect = { x: trackRect.x, y: thumbY, w: trackRect.w, h: thumbHeight };
 
-      Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, "rgba(108,80,54,0.1)");
-      Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, "rgba(202, 111, 54, 0.72)");
+      Core.drawRoundedRect(ctx, trackRect.x, trackRect.y, trackRect.w, trackRect.h, 999, themed("rgba(108,80,54,0.1)"));
+      Core.drawRoundedRect(ctx, thumbRect.x, thumbRect.y, thumbRect.w, thumbRect.h, 999, themed("rgba(202, 111, 54, 0.72)"));
 
       runtime.frontScroll = {
         kind: "howto",
@@ -6144,15 +6227,15 @@ function computeLayout(width, height) {
     const cardHeight = compact ? 92 : 100;
     cards.forEach((card, index) => {
       const rect = { x: body.x, y: body.y + index * (cardHeight + cardGap), w: body.w, h: cardHeight };
-      Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, "rgba(248, 241, 231, 0.98)", "rgba(108,80,54,0.12)", 1);
-      ctx.fillStyle = "#3d2d20";
+      Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 20, themed("rgba(248, 241, 231, 0.98)"), themed("rgba(108,80,54,0.12)"), 1);
+      ctx.fillStyle = themed("#3d2d20");
       ctx.font = compact ? "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 17px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(card.title, rect.x + 14, rect.y + 12);
       Core.drawWrappedText(ctx, card.text, rect.x + 14, rect.y + 38, rect.w - 28, compact ? 16 : 18, {
         font: compact ? "600 13px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.86)",
+        color: themed("rgba(82, 61, 44, 0.86)"),
         maxLines: compact ? 3 : 3
       });
     });
@@ -6182,7 +6265,7 @@ function computeLayout(width, height) {
       return;
     }
     runtime.overlayScroll = null;
-    ctx.fillStyle = "rgba(47, 34, 23, 0.58)";
+    ctx.fillStyle = themed("rgba(47, 34, 23, 0.58)");
     ctx.fillRect(0, 0, runtime.layout.width, runtime.layout.height);
 
     if (game.overlay.kind === "rename-players") {
@@ -6234,11 +6317,11 @@ function computeLayout(width, height) {
     runtime.overlayPanelRect = rect;
     drawLogFrame(rect);
     const panelFill = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
-    panelFill.addColorStop(0, "rgba(255, 250, 244, 0.98)");
-    panelFill.addColorStop(0.5, "rgba(248, 238, 223, 0.98)");
-    panelFill.addColorStop(1, "rgba(236, 222, 202, 0.98)");
-    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 28, panelFill, "rgba(108,80,54,0.20)", 1.8);
-    ctx.fillStyle = "#3d2d20";
+    panelFill.addColorStop(0, themed("rgba(255, 250, 244, 0.98)"));
+    panelFill.addColorStop(0.5, themed("rgba(248, 238, 223, 0.98)"));
+    panelFill.addColorStop(1, themed("rgba(236, 222, 202, 0.98)"));
+    Core.drawRoundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 28, panelFill, themed("rgba(108,80,54,0.20)"), 1.8);
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -6283,7 +6366,7 @@ function computeLayout(width, height) {
     ctx.fillText("Smore to Explore", rect.x + rect.w / 2, titleY);
     const introMetrics = Core.drawWrappedText(ctx, "Build the best campground over three summer rounds as each player shapes a separate board on the same device. Draft from the shared contractor market, chase seasonal goals, and pass the game to the next player after each turn.", rect.x + rect.w / 2, introY, rect.w - horizontalInset * 2, isPortrait ? 17 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.86)",
+      color: themed("rgba(82, 61, 44, 0.86)"),
       align: "center",
       maxLines: compact ? 3 : (isPortrait ? 4 : 3)
     });
@@ -6302,8 +6385,8 @@ function computeLayout(width, height) {
       w: rowW - buttonWidth - rowGap,
       h: rowHeight
     };
-    Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
-    ctx.fillStyle = "#4a3524";
+    Core.drawRoundedRect(ctx, chooserRect.x, chooserRect.y, chooserRect.w, chooserRect.h, 20, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+    ctx.fillStyle = themed("#4a3524");
     ctx.font = compact ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -6322,7 +6405,7 @@ function computeLayout(width, height) {
       scope: "overlay",
       enabled: game.ui.configuredPlayerCount < 5
     });
-    ctx.fillStyle = "#4a3524";
+    ctx.fillStyle = themed("#4a3524");
     ctx.font = compact ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 28px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -6365,8 +6448,8 @@ function computeLayout(width, height) {
 
       ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
       const badgeRect = { x: rect.x + 32, y: oy(viewport.y + 34), w: rect.w - 64, h: 30 };
-      Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, "rgba(222, 162, 102, 0.20)", "rgba(177, 111, 54, 0.34)", 1.4);
-      ctx.fillStyle = "#6c4325";
+      Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, themed("rgba(222, 162, 102, 0.20)"), themed("rgba(177, 111, 54, 0.34)"), 1.4);
+      ctx.fillStyle = themed("#6c4325");
       ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -6374,7 +6457,7 @@ function computeLayout(width, height) {
 
       Core.drawWrappedText(ctx, linesText, rect.x + rect.w / 2, oy(viewport.y + 76), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 8
       });
@@ -6398,8 +6481,8 @@ function computeLayout(width, height) {
       : Math.min(rect.w - 120, Math.max(250, ctx.measureText(badgeText).width + 48));
     ctx.restore();
     const badgeRect = { x: rect.x + (rect.w - badgeWidth) / 2, y: rect.y + (compact ? 46 : 68), w: badgeWidth, h: compact ? 30 : 44 };
-    Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, "rgba(222, 162, 102, 0.20)", "rgba(177, 111, 54, 0.34)", 1.4);
-    ctx.fillStyle = "#6c4325";
+    Core.drawRoundedRect(ctx, badgeRect.x, badgeRect.y, badgeRect.w, badgeRect.h, 22, themed("rgba(222, 162, 102, 0.20)"), themed("rgba(177, 111, 54, 0.34)"), 1.4);
+    ctx.fillStyle = themed("#6c4325");
     ctx.font = compact
       ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
       : runtime.layout.mode === "mobile-portrait"
@@ -6411,7 +6494,7 @@ function computeLayout(width, height) {
 
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n\n"), rect.x + rect.w / 2, rect.y + (compact ? 86 : 132), rect.w - (compact ? 40 : 72), compact ? 14 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 4 : 6
     });
@@ -6450,7 +6533,7 @@ function computeLayout(width, height) {
       ctx.fillText("Pause Menu", rect.x + rect.w / 2, oy(viewport.y + 2));
       Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(viewport.y + 34), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 4
       });
@@ -6478,7 +6561,7 @@ function computeLayout(width, height) {
     ctx.fillText("Pause Menu", rect.x + rect.w / 2, rect.y + 20);
     Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, rect.y + 62, rect.w - 72, 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: 3
     });
@@ -6607,7 +6690,7 @@ function computeLayout(width, height) {
     const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
     const oy = (value) => value - scrollMeta.scrollY;
 
-    ctx.fillStyle = "#3d2d20";
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = compact ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -6615,7 +6698,7 @@ function computeLayout(width, height) {
 
     drawDetailedTopicChips(viewport, oy(chipTopY), chipLayout);
 
-    ctx.fillStyle = "rgba(82, 61, 44, 0.86)";
+    ctx.fillStyle = themed("rgba(82, 61, 44, 0.86)");
     ctx.font = compact ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -6627,8 +6710,8 @@ function computeLayout(width, height) {
     let cursorY = listTop;
     if (!cards.length) {
       const emptyRect = { x: viewport.x, y: oy(cursorY), w: scrollMeta.contentWidth, h: compact ? 60 : 72 };
-      Core.drawRoundedRect(ctx, emptyRect.x, emptyRect.y, emptyRect.w, emptyRect.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
-      ctx.fillStyle = "rgba(74, 53, 36, 0.86)";
+      Core.drawRoundedRect(ctx, emptyRect.x, emptyRect.y, emptyRect.w, emptyRect.h, 18, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+      ctx.fillStyle = themed("rgba(74, 53, 36, 0.86)");
       ctx.font = bodyFont;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -6637,20 +6720,20 @@ function computeLayout(width, height) {
 
     cards.forEach((card) => {
       const cardRect = { x: viewport.x, y: oy(cursorY), w: scrollMeta.contentWidth, h: card.height };
-      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 20, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
       Core.drawWrappedText(ctx, card.entry.title, cardRect.x + cardPaddingX, cardRect.y + 14, cardRect.w - cardPaddingX * 2, titleLineHeight, {
         font: titleFont,
-        color: "#3d2d20",
+        color: themed("#3d2d20"),
         align: "left"
       });
-      drawPill(cardRect.x + cardPaddingX, cardRect.y + 16 + card.titleHeight, card.entry.sectionLabel, "#efe2ca", "#5f4731", {
+      drawPill(cardRect.x + cardPaddingX, cardRect.y + 16 + card.titleHeight, card.entry.sectionLabel, themed("#efe2ca"), themed("#5f4731"), {
         height: compact ? 20 : 22,
         paddingX: compact ? 10 : 12,
         font: compact ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
       });
       Core.drawWrappedText(ctx, card.entry.body, cardRect.x + cardPaddingX, cardRect.y + 16 + card.titleHeight + 24 + 12, cardRect.w - cardPaddingX * 2, bodyLineHeight, {
         font: bodyFont,
-        color: "rgba(74, 53, 36, 0.92)",
+        color: themed("rgba(74, 53, 36, 0.92)"),
         align: "left"
       });
       cursorY += card.height + cardGap;
@@ -6769,14 +6852,14 @@ function computeLayout(width, height) {
 
     game.overlay.page = safePage;
 
-    ctx.fillStyle = "#3d2d20";
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = titleFont;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText("Detailed Rules", rect.x + rect.w / 2, oy(viewport.y));
     Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(introTop), scrollMeta.contentWidth, introLineHeight, {
       font: introFont,
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center"
     });
 
@@ -6816,28 +6899,28 @@ function computeLayout(width, height) {
       });
     }
 
-    Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 24, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
-    ctx.fillStyle = "#3d2d20";
+    Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 24, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1.2);
+    ctx.fillStyle = themed("#3d2d20");
     ctx.font = compact ? "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     Core.drawWrappedText(ctx, entry.title, cardRect.x + cardPaddingX, cardRect.y + 18, cardRect.w - cardPaddingX * 2, cardTitleLineHeight, {
       font: compact ? "800 18px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 21px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "#3d2d20",
+      color: themed("#3d2d20"),
       align: "left"
     });
-    drawPill(cardRect.x + cardPaddingX, cardRect.y + 24 + entryTitleHeight, entry.subtitle, "#efe2ca", "#5f4731", {
+    drawPill(cardRect.x + cardPaddingX, cardRect.y + 24 + entryTitleHeight, entry.subtitle, themed("#efe2ca"), themed("#5f4731"), {
       height: compact ? 22 : 24,
       paddingX: compact ? 10 : 12,
       font: compact ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
     });
     Core.drawWrappedText(ctx, entry.body, cardRect.x + cardPaddingX, cardRect.y + 56 + entryTitleHeight, cardRect.w - cardPaddingX * 2, bodyLineHeight, {
       font: bodyFont,
-      color: "rgba(74, 53, 36, 0.92)",
+      color: themed("rgba(74, 53, 36, 0.92)"),
       align: "left"
     });
 
-    ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+    ctx.fillStyle = themed("rgba(82, 61, 44, 0.78)");
     ctx.font = compact ? "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -6908,7 +6991,7 @@ function computeLayout(width, height) {
       ctx.fillText("Restart game?", rect.x + rect.w / 2, oy(viewport.y + 4));
       Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, oy(viewport.y + 38), scrollMeta.contentWidth, 16, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 6
       });
@@ -6928,7 +7011,7 @@ function computeLayout(width, height) {
     ctx.fillText("Restart game?", rect.x + rect.w / 2, rect.y + (compact ? 16 : 24));
     Core.drawWrappedText(ctx, "Are you sure? This will clear the current campground boards and return to the start screen.", rect.x + rect.w / 2, rect.y + (compact ? 50 : 78), rect.w - (compact ? 40 : 72), compact ? 16 : 20, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 3 : 4
     });
@@ -6974,7 +7057,7 @@ function computeLayout(width, height) {
       ctx.fillText("About", rect.x + rect.w / 2, oy(viewport.y + 2));
       Core.drawWrappedText(ctx, text, rect.x + rect.w / 2, oy(viewport.y + 34), scrollMeta.contentWidth, 16, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 10
       });
@@ -6990,7 +7073,7 @@ function computeLayout(width, height) {
     ctx.fillText("About", rect.x + rect.w / 2, rect.y + (compact ? 14 : 22));
     Core.drawWrappedText(ctx, "This game was made by EOP and his wife with the help of Codex to test out a board game idea in the browser. Hope you enjoy testing it with them ;)", rect.x + rect.w / 2, rect.y + (compact ? 48 : 78), rect.w - (compact ? 40 : 72), compact ? 16 : 22, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 15px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 6 : 7
     });
@@ -7022,21 +7105,21 @@ function computeLayout(width, height) {
       ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
       Core.drawWrappedText(ctx, summaryText, rect.x + rect.w / 2, oy(viewport.y + 30), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 6
       });
 
       game.overlay.rows.forEach((row, index) => {
         const rowRect = { x: viewport.x, y: oy(rowStart + index * (rowHeight + rowGap)), w: scrollMeta.contentWidth, h: rowHeight };
-        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
         Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
         ctx.fillStyle = row.player.color.text;
         ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
@@ -7057,7 +7140,7 @@ function computeLayout(width, height) {
     ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 20));
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + (compact ? 42 : 60), rect.w - (compact ? 36 : 64), compact ? 14 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 2 : 3
     });
@@ -7066,22 +7149,22 @@ function computeLayout(width, height) {
       const rowHeight = 54;
       game.overlay.rows.forEach((row, index) => {
         const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
-        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
         Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
         ctx.fillStyle = row.player.color.text;
         ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
         ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-        ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+        ctx.fillStyle = themed("rgba(82, 61, 44, 0.78)");
         ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 30);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "right";
         ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 17);
@@ -7115,21 +7198,21 @@ function computeLayout(width, height) {
       ctx.fillText(game.overlay.title, rect.x + rect.w / 2, oy(viewport.y + 2));
       Core.drawWrappedText(ctx, summaryText, rect.x + rect.w / 2, oy(viewport.y + 30), scrollMeta.contentWidth, 14, {
         font: "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif",
-        color: "rgba(82, 61, 44, 0.84)",
+        color: themed("rgba(82, 61, 44, 0.84)"),
         align: "center",
         maxLines: 6
       });
 
       game.overlay.rows.forEach((row, index) => {
         const rowRect = { x: viewport.x, y: oy(rowStart + index * (rowHeight + rowGap)), w: scrollMeta.contentWidth, h: rowHeight };
-        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 12, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
         Core.drawRoundedRect(ctx, rowRect.x + 6, rowRect.y + 6, 22, rowRect.h - 12, 8, row.player.color.fill);
         ctx.fillStyle = row.player.color.text;
         ctx.font = "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(index + 1), rowRect.x + 17, rowRect.y + rowRect.h / 2);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.fillText(fitText(row.left, rowRect.w - 110, ctx.font), rowRect.x + 36, rowRect.y + 10);
@@ -7150,7 +7233,7 @@ function computeLayout(width, height) {
     ctx.fillText(game.overlay.title, rect.x + rect.w / 2, rect.y + (compact ? 14 : 18));
     Core.drawWrappedText(ctx, game.overlay.lines.join("\n"), rect.x + rect.w / 2, rect.y + (compact ? 42 : 56), rect.w - (compact ? 36 : 60), compact ? 14 : 18, {
       font: compact ? "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 14px 'Avenir Next', 'Trebuchet MS', sans-serif",
-      color: "rgba(82, 61, 44, 0.84)",
+      color: themed("rgba(82, 61, 44, 0.84)"),
       align: "center",
       maxLines: compact ? 2 : 3
     });
@@ -7159,22 +7242,22 @@ function computeLayout(width, height) {
       const rowHeight = 52;
       game.overlay.rows.forEach((row, index) => {
         const rowRect = { x: rect.x + 26, y: rowsY + index * (rowHeight + 8), w: rect.w - 52, h: rowHeight };
-        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1);
+        Core.drawRoundedRect(ctx, rowRect.x, rowRect.y, rowRect.w, rowRect.h, 16, themed("rgba(247, 239, 227, 0.98)"), themed("rgba(108,80,54,0.14)"), 1);
         Core.drawRoundedRect(ctx, rowRect.x + 8, rowRect.y + 8, 36, rowRect.h - 16, 12, row.player.color.fill);
         ctx.fillStyle = row.player.color.text;
         ctx.font = "800 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(index + 1), rowRect.x + 26, rowRect.y + rowRect.h / 2);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "700 14px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.fillText(fitText(row.left, rowRect.w - 150, ctx.font), rowRect.x + 56, rowRect.y + 10);
         ctx.font = "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif";
-        ctx.fillStyle = "rgba(82, 61, 44, 0.78)";
+        ctx.fillStyle = themed("rgba(82, 61, 44, 0.78)");
         ctx.fillText(row.detail, rowRect.x + 56, rowRect.y + 29);
-        ctx.fillStyle = "#432e1e";
+        ctx.fillStyle = themed("#432e1e");
         ctx.font = "800 15px 'Avenir Next', 'Trebuchet MS', sans-serif";
         ctx.textAlign = "right";
         ctx.fillText(row.right, rowRect.x + rowRect.w - 14, rowRect.y + 16);
