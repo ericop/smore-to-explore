@@ -5702,11 +5702,18 @@ function computeLayout(width, height) {
   function drawFrontScreenShell(title, subtitle = "", options = {}) {
     const compact = isFrontScreenCompact();
     const short = isVeryShortViewport();
+    // On roomy (desktop) viewports the shell becomes a centered card so the
+    // themed background scene (night sky, meadow, stars) shows around it.
+    // Mobile and short layouts stay full-bleed to keep room for content.
+    const pad = runtime.layout.pad;
+    const fullBleed = compact;
+    const shellW = fullBleed ? runtime.layout.width - pad * 2 : Math.min(runtime.layout.width - pad * 2, 900);
+    const shellH = fullBleed ? runtime.layout.height - pad * 2 : Math.min(runtime.layout.height - pad * 2, 660);
     const shell = {
-      x: runtime.layout.pad,
-      y: runtime.layout.pad,
-      w: runtime.layout.width - runtime.layout.pad * 2,
-      h: runtime.layout.height - runtime.layout.pad * 2
+      x: Math.round((runtime.layout.width - shellW) / 2),
+      y: fullBleed ? pad : Math.round((runtime.layout.height - shellH) / 2),
+      w: shellW,
+      h: shellH
     };
     const titleY = shell.y + (short ? 14 : 20);
     const titleFont = options.titleFont || (short
