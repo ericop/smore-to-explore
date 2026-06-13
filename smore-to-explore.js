@@ -3428,6 +3428,10 @@ function computeLayout(width, height) {
       w: stumpWidth,
       h: stumpHeight
     };
+    if (theme().playerBadge === "beaver") {
+      drawBeaverSign(rect, player);
+      return;
+    }
     const topHeight = Math.max(20, rect.h * 0.54);
     const barkFill = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y);
     barkFill.addColorStop(0, "#7a4d2a");
@@ -3508,7 +3512,145 @@ function computeLayout(width, height) {
     ctx.restore();
   }
 
+  // A small perched songbird (blue-jay silhouette) used to dress modal frames
+  // in the cartoon themes. (cx, cy) is the perch point under its feet.
+  function drawBird(cx, cy, s, palette) {
+    ctx.save();
+    // feet
+    ctx.strokeStyle = "#caa24a";
+    ctx.lineWidth = Math.max(1, s * 0.14);
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.16, cy - s * 0.2); ctx.lineTo(cx - s * 0.16, cy);
+    ctx.moveTo(cx + s * 0.16, cy - s * 0.2); ctx.lineTo(cx + s * 0.16, cy);
+    ctx.stroke();
+    // tail
+    ctx.fillStyle = palette.wing;
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.2, cy - s * 1.0);
+    ctx.lineTo(cx - s * 1.35, cy - s * 1.45);
+    ctx.lineTo(cx - s * 0.2, cy - s * 0.45);
+    ctx.closePath(); ctx.fill();
+    // body
+    ctx.fillStyle = palette.body;
+    ctx.beginPath(); ctx.ellipse(cx, cy - s * 1.05, s * 0.72, s * 0.98, 0, 0, Math.PI * 2); ctx.fill();
+    // belly
+    ctx.fillStyle = palette.belly;
+    ctx.beginPath(); ctx.ellipse(cx + s * 0.22, cy - s * 0.82, s * 0.38, s * 0.58, 0, 0, Math.PI * 2); ctx.fill();
+    // wing
+    ctx.fillStyle = palette.wing;
+    ctx.beginPath(); ctx.ellipse(cx - s * 0.12, cy - s * 1.12, s * 0.4, s * 0.62, -0.35, 0, Math.PI * 2); ctx.fill();
+    // head
+    ctx.fillStyle = palette.body;
+    ctx.beginPath(); ctx.arc(cx + s * 0.52, cy - s * 1.98, s * 0.6, 0, Math.PI * 2); ctx.fill();
+    // crest
+    ctx.fillStyle = palette.crest;
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 0.2, cy - s * 2.35);
+    ctx.lineTo(cx + s * 0.42, cy - s * 2.95);
+    ctx.lineTo(cx + s * 0.56, cy - s * 2.32);
+    ctx.lineTo(cx + s * 0.74, cy - s * 2.8);
+    ctx.lineTo(cx + s * 0.86, cy - s * 2.2);
+    ctx.closePath(); ctx.fill();
+    // beak
+    ctx.fillStyle = "#f3b24a";
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 1.06, cy - s * 2.0);
+    ctx.lineTo(cx + s * 1.6, cy - s * 1.86);
+    ctx.lineTo(cx + s * 1.06, cy - s * 1.74);
+    ctx.closePath(); ctx.fill();
+    // eye
+    ctx.fillStyle = "#21303e";
+    ctx.beginPath(); ctx.arc(cx + s * 0.66, cy - s * 2.04, s * 0.13, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBirdFrame(rect, bird) {
+    // soft rounded outline just outside the modal panel
+    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, bird.rail || "rgba(255,255,255,0.6)", 3);
+    // perch a row of birds along the top edge
+    const count = Core.clamp(Math.round(rect.w / 160), 3, 5);
+    const s = runtime.layout?.mode === "mobile-portrait" ? 7 : 9;
+    const left = rect.x + rect.w * 0.14;
+    const span = rect.w * 0.72;
+    for (let i = 0; i < count; i += 1) {
+      const x = left + (count === 1 ? span / 2 : span * (i / (count - 1)));
+      drawBird(x, rect.y - 1, s, bird);
+    }
+  }
+
+  // A little beaver holding a wooden sign that shows the current player's name,
+  // money, and points. The cartoon-theme replacement for the bottom-left stump.
+  function drawBeaverSign(rect, player) {
+    const mobile = runtime.layout.mode === "mobile-portrait";
+    const beaverW = Math.min(21, rect.w * 0.3);
+    const sign = { x: rect.x + beaverW - 6, y: rect.y + 2, w: rect.w - beaverW + 6, h: rect.h - 4 };
+
+    // Beaver, facing the sign
+    const bx = rect.x;
+    const bw = beaverW + 8;
+    const cy = rect.y + rect.h * 0.6;
+    ctx.save();
+    // flat paddle tail
+    ctx.fillStyle = "#6c4628";
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.16, rect.y + rect.h * 0.82, bw * 0.2, rect.h * 0.2, -0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(40,26,15,0.3)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(bx + bw * 0.05, rect.y + rect.h * 0.78); ctx.lineTo(bx + bw * 0.28, rect.y + rect.h * 0.9); ctx.stroke();
+    // body
+    ctx.fillStyle = "#8a5a32";
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.46, cy, bw * 0.4, rect.h * 0.38, 0, 0, Math.PI * 2); ctx.fill();
+    // head
+    ctx.beginPath(); ctx.arc(bx + bw * 0.52, rect.y + rect.h * 0.34, bw * 0.34, 0, Math.PI * 2); ctx.fill();
+    // ears
+    ctx.beginPath();
+    ctx.arc(bx + bw * 0.34, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
+    ctx.arc(bx + bw * 0.7, rect.y + rect.h * 0.14, bw * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    // muzzle
+    ctx.fillStyle = "#cf9f68";
+    ctx.beginPath(); ctx.ellipse(bx + bw * 0.62, rect.y + rect.h * 0.42, bw * 0.2, rect.h * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    // tooth
+    ctx.fillStyle = "#fffdf4";
+    ctx.fillRect(bx + bw * 0.58, rect.y + rect.h * 0.46, bw * 0.08, rect.h * 0.1);
+    // nose + eye
+    ctx.fillStyle = "#33210f";
+    ctx.beginPath(); ctx.arc(bx + bw * 0.66, rect.y + rect.h * 0.36, bw * 0.06, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx + bw * 0.46, rect.y + rect.h * 0.28, bw * 0.055, 0, Math.PI * 2); ctx.fill();
+    // paws gripping the sign edge
+    ctx.fillStyle = "#74492a";
+    ctx.beginPath();
+    ctx.arc(sign.x, rect.y + rect.h * 0.52, bw * 0.13, 0, Math.PI * 2);
+    ctx.arc(sign.x, rect.y + rect.h * 0.76, bw * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Sign board with the player's name / money / points
+    Core.drawRoundedRect(ctx, sign.x, sign.y, sign.w, sign.h, 8, "#f6e7c4", "#9a6b3a", 2);
+    ctx.fillStyle = "#5a3a1d";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const cx = sign.x + sign.w / 2;
+    const nameText = fitText(player.name, sign.w - 10, ctx.font);
+    ctx.fillText(nameText, cx, sign.y + sign.h * 0.34);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, sign.w - 10);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - nameWidth / 2, sign.y + sign.h * 0.34 + 7);
+    ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.34 + 7);
+    ctx.stroke();
+    ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = "rgba(70, 46, 25, 0.9)";
+    ctx.fillText(fitText(`${Core.formatMoney(player.money)} | ${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.68);
+  }
+
   function drawLogFrame(rect) {
+    const decor = theme();
+    if (decor.frameStyle === "birds" && decor.bird) {
+      drawBirdFrame(rect, decor.bird);
+      return;
+    }
     const radius = runtime.layout?.mode === "mobile-portrait" ? 7 : 9;
     const spacing = radius * 1.95;
     const railThickness = radius * 1.8;

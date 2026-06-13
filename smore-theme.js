@@ -50,6 +50,8 @@
       camp: {},
       players: null,
       buttonPrimary: { fill: "#ca6f36", stroke: "#995127", text: "#fff7f1" },
+      frameStyle: "logs",
+      playerBadge: "stump",
       panel: { fill: "rgba(255, 251, 245, 0.94)", stroke: "rgba(108, 80, 54, 0.18)" },
       shell: { fill: "rgba(255, 250, 244, 0.94)", stroke: "rgba(108, 80, 54, 0.16)" }
     },
@@ -74,6 +76,9 @@
       camp: BRIGHT_CAMP,
       players: BRIGHT_PLAYERS,
       buttonPrimary: { fill: "#ff8a3d", stroke: "#e0671c", text: "#fff7f1" },
+      frameStyle: "birds",
+      playerBadge: "beaver",
+      bird: { body: "#4f86c6", wing: "#39699f", belly: "#eef5fc", crest: "#3a5f93", rail: "rgba(255,255,255,0.62)" },
       panel: LIGHT_PANEL,
       shell: LIGHT_PANEL
     },
@@ -98,6 +103,9 @@
       camp: BRIGHT_CAMP,
       players: BRIGHT_PLAYERS,
       buttonPrimary: { fill: "#ef7a52", stroke: "#c85a34", text: "#fff7f1" },
+      frameStyle: "birds",
+      playerBadge: "beaver",
+      bird: { body: "#48b39a", wing: "#2f8a76", belly: "#eafaf4", crest: "#2f7d6b", rail: "rgba(255,255,255,0.6)" },
       panel: LIGHT_PANEL,
       shell: LIGHT_PANEL
     },
@@ -122,6 +130,9 @@
       camp: BRIGHT_CAMP,
       players: BRIGHT_PLAYERS,
       buttonPrimary: { fill: "#ff5fa2", stroke: "#e03a82", text: "#fff7fb" },
+      frameStyle: "birds",
+      playerBadge: "beaver",
+      bird: { body: "#ff8fc0", wing: "#e85fa0", belly: "#fff0f7", crest: "#e05294", rail: "rgba(255,255,255,0.66)" },
       panel: LIGHT_PANEL,
       shell: LIGHT_PANEL
     }
