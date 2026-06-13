@@ -3536,6 +3536,10 @@ function computeLayout(width, height) {
       drawBeaverSign(rect, player);
       return;
     }
+    if (theme().playerBadge === "frog") {
+      drawFrogLilyPad(rect, player);
+      return;
+    }
     if (theme().playerBadge === "campfire") {
       drawCampfire(rect, player);
       return;
@@ -3760,6 +3764,102 @@ function computeLayout(width, height) {
     ctx.arc(sign.x, rect.y + rect.h * 0.52, bw * 0.13, 0, Math.PI * 2);
     ctx.arc(sign.x, rect.y + rect.h * 0.76, bw * 0.13, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+
+    // Sign board with the player's name / money / points
+    Core.drawRoundedRect(ctx, sign.x, sign.y, sign.w, sign.h, 8, themed("#f6e7c4"), themed("#9a6b3a"), 2);
+    ctx.fillStyle = themed("#5a3a1d");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = mobile ? "800 9px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const cx = sign.x + sign.w / 2;
+    const nameText = fitText(player.name, sign.w - 10, ctx.font);
+    ctx.fillText(nameText, cx, sign.y + sign.h * 0.26);
+    const nameWidth = Math.min(ctx.measureText(nameText).width, sign.w - 10);
+    ctx.strokeStyle = player.color.fill;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx - nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.lineTo(cx + nameWidth / 2, sign.y + sign.h * 0.26 + 7);
+    ctx.stroke();
+    // Money and points stack on their own rows so neither gets truncated.
+    ctx.font = "700 7px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = themed("rgba(70, 46, 25, 0.9)");
+    ctx.fillText(fitText(Core.formatMoney(player.money), sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.58);
+    ctx.fillText(fitText(`${player.score} pts`, sign.w - 6, ctx.font), cx, sign.y + sign.h * 0.80);
+  }
+
+  // A little frog perched on a lily pad beside a sign with the current player's
+  // name, money, and points. The Frog Hollow theme's bottom-left badge.
+  function drawFrogLilyPad(rect, player) {
+    const mobile = runtime.layout.mode === "mobile-portrait";
+    const frogW = Math.min(28, rect.w * 0.36);
+    const sign = { x: rect.x + frogW - 6, y: rect.y + 2, w: rect.w - frogW + 6, h: rect.h - 4 };
+    const fx = rect.x + frogW * 0.42;
+
+    ctx.save();
+    // lily pad: a flat green leaf peeking out under and left of the frog, with
+    // a wedge notch and radial veins so it reads as a lily pad.
+    const padCx = fx - frogW * 0.12;
+    const padCy = rect.y + rect.h * 0.84;
+    const padRx = frogW * 0.66;
+    const padRy = rect.h * 0.17;
+    ctx.fillStyle = themed("#46985a");
+    ctx.beginPath();
+    ctx.ellipse(padCx, padCy, padRx, padRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = themed("#36794a");
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.strokeStyle = themed("rgba(20, 58, 33, 0.3)");
+    ctx.lineWidth = 1;
+    [-0.5, 0.1, 0.7].forEach((a) => {
+      ctx.beginPath();
+      ctx.moveTo(padCx, padCy);
+      ctx.lineTo(padCx + Math.cos(a) * padRx * 0.85, padCy + Math.sin(a) * padRy * 0.85);
+      ctx.stroke();
+    });
+    // back legs tucked beside the body
+    ctx.fillStyle = themed("#56b069");
+    ctx.beginPath();
+    ctx.ellipse(fx - frogW * 0.4, rect.y + rect.h * 0.64, frogW * 0.17, rect.h * 0.12, 0.6, 0, Math.PI * 2);
+    ctx.ellipse(fx + frogW * 0.4, rect.y + rect.h * 0.64, frogW * 0.17, rect.h * 0.12, -0.6, 0, Math.PI * 2);
+    ctx.fill();
+    // body
+    ctx.fillStyle = themed("#5fbf72");
+    ctx.beginPath(); ctx.ellipse(fx, rect.y + rect.h * 0.52, frogW * 0.42, rect.h * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    // pale belly
+    ctx.fillStyle = themed("#d4eeb2");
+    ctx.beginPath(); ctx.ellipse(fx, rect.y + rect.h * 0.58, frogW * 0.26, rect.h * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+    // eye bumps on top of the head
+    ctx.fillStyle = themed("#5fbf72");
+    ctx.beginPath();
+    ctx.arc(fx - frogW * 0.23, rect.y + rect.h * 0.3, frogW * 0.2, 0, Math.PI * 2);
+    ctx.arc(fx + frogW * 0.23, rect.y + rect.h * 0.3, frogW * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // eye whites
+    ctx.fillStyle = themed("#fffdf4");
+    ctx.beginPath();
+    ctx.arc(fx - frogW * 0.23, rect.y + rect.h * 0.28, frogW * 0.1, 0, Math.PI * 2);
+    ctx.arc(fx + frogW * 0.23, rect.y + rect.h * 0.28, frogW * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    // pupils
+    ctx.fillStyle = themed("#1c2a1a");
+    ctx.beginPath();
+    ctx.arc(fx - frogW * 0.21, rect.y + rect.h * 0.29, frogW * 0.05, 0, Math.PI * 2);
+    ctx.arc(fx + frogW * 0.25, rect.y + rect.h * 0.29, frogW * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    // wide smile
+    ctx.strokeStyle = themed("#1c2a1a");
+    ctx.lineWidth = 1.3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(fx, rect.y + rect.h * 0.44, frogW * 0.24, 0.12 * Math.PI, 0.88 * Math.PI);
+    ctx.stroke();
+    // front foot reaching the sign
+    ctx.fillStyle = themed("#4f9e5f");
+    ctx.beginPath(); ctx.arc(sign.x, rect.y + rect.h * 0.64, frogW * 0.12, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
     // Sign board with the player's name / money / points

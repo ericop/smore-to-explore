@@ -104,7 +104,7 @@
       players: BRIGHT_PLAYERS,
       buttonPrimary: { fill: "#ef7a52", stroke: "#c85a34", text: "#fff7f1" },
       frameStyle: "birds",
-      playerBadge: "beaver",
+      playerBadge: "frog",
       bird: { body: "#48b39a", wing: "#2f8a76", belly: "#eafaf4", crest: "#2f7d6b", rail: "rgba(255,255,255,0.6)" },
       panel: LIGHT_PANEL,
       shell: LIGHT_PANEL
