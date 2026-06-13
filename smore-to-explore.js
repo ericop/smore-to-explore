@@ -3902,14 +3902,14 @@ function computeLayout(width, height) {
     const cream = "#fff2ec";
 
     ctx.save();
-    // bushy tail curling up behind the fox on the left, with a cream tip
+    // bushy tail sweeping up and to the left, with a cream tip at the far end
     ctx.fillStyle = themed(coral);
     ctx.beginPath();
-    ctx.ellipse(fx - foxW * 0.36, rect.y + rect.h * 0.66, foxW * 0.2, rect.h * 0.26, -0.7, 0, Math.PI * 2);
+    ctx.ellipse(fx - foxW * 0.34, rect.y + rect.h * 0.52, rect.h * 0.28, foxW * 0.2, Math.PI / 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = themed(cream);
     ctx.beginPath();
-    ctx.ellipse(fx - foxW * 0.48, rect.y + rect.h * 0.5, foxW * 0.11, rect.h * 0.1, -0.7, 0, Math.PI * 2);
+    ctx.ellipse(fx - foxW * 0.56, rect.y + rect.h * 0.3, foxW * 0.16, foxW * 0.11, Math.PI / 4, 0, Math.PI * 2);
     ctx.fill();
     // ears: two upright triangles with pink inners
     ctx.fillStyle = themed(coral);
