@@ -440,7 +440,10 @@
         const typeId = slots[depth].typeId;
         const placements = enumerateCampPlacements(engine, game, hypoPlayer, typeId);
         if (!placements.length) {
-          recordZeroLegal(typeId);
+          // Only depth 0 reflects the real board; deeper depths are crowded by
+          // this turn's own speculative placements, so they would inflate the
+          // placement-difficulty telemetry with hypothetical-only events.
+          if (depth === 0) recordZeroLegal(typeId);
           break;
         }
 

@@ -2154,6 +2154,19 @@
     });
     nextCampPlacementId = Math.max(nextCampPlacementId, maxPlacementId + 1);
 
+    // Migrate pre-finite-deck saves: their market columns have visible slots but
+    // no draw deck, so without this the market would never refill after a buy.
+    // Rebuild each column's deck from its manifest minus the cards still visible.
+    (game.market?.columns || []).forEach((column) => {
+      if (Array.isArray(column.deck)) return;
+      const remaining = buildColumnDeck(column.id);
+      (column.slots || []).forEach((slot) => {
+        const index = remaining.findIndex((card) => card.typeId === slot.typeId);
+        if (index >= 0) remaining.splice(index, 1);
+      });
+      column.deck = remaining;
+    });
+
     if (game.phase === "build" && game.turn.marketPurchaseStack.length > game.turn.marketPurchaseIndex) {
       const pendingEntry = game.turn.marketPurchaseStack[game.turn.marketPurchaseIndex];
       game.ui.selection = {
@@ -4657,16 +4670,24 @@ function computeLayout(width, height) {
       const colRect = { x: bodyRect.x + visibleIndex * (colWidth + colGap), y: bodyRect.y, w: colWidth, h: bodyRect.h };
       Core.drawRoundedRect(ctx, colRect.x, colRect.y, colRect.w, rowHeight, 16, column.category === "amenity" ? "rgba(198, 224, 226, 0.96)" : "rgba(235, 224, 202, 0.96)", "rgba(108,80,54,0.16)", 1);
       ctx.fillStyle = "#4b3726";
-      ctx.font = isPortrait
-        ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
-        : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(fitText(column.label, colRect.w - 16, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 - 7);
-      ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
-      ctx.fillStyle = "rgba(75, 55, 38, 0.72)";
       const deckCount = column.deck ? column.deck.length : 0;
-      ctx.fillText(deckCount ? `${deckCount} more in deck` : "Last cards out", colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 + 9);
+      // Two stacked lines only when the header pill is tall enough; otherwise a
+      // single "Label (N)" line so short-landscape phones do not overlap row 1.
+      if (rowHeight >= 30) {
+        ctx.font = isPortrait
+          ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+          : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.fillText(fitText(column.label, colRect.w - 16, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 - 7);
+        ctx.font = "700 9px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        ctx.fillStyle = "rgba(75, 55, 38, 0.72)";
+        ctx.fillText(deckCount ? `${deckCount} more in deck` : "Last cards out", colRect.x + colRect.w / 2, colRect.y + rowHeight / 2 + 9);
+      } else {
+        ctx.font = "800 10px 'Avenir Next', 'Trebuchet MS', sans-serif";
+        const compactLabel = deckCount ? `${column.label} (${deckCount})` : `${column.label} (last)`;
+        ctx.fillText(fitText(compactLabel, colRect.w - 12, ctx.font), colRect.x + colRect.w / 2, colRect.y + rowHeight / 2);
+      }
 
       if (!column.slots.length) {
         const emptyRect = { x: colRect.x, y: colRect.y + rowHeight + rowGap, w: colRect.w, h: rowHeight };

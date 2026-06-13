@@ -101,6 +101,14 @@ Goal: convert the market to finite per-column draw decks, then tune the game to 
 
 Done when: a batch report meets the fairness targets, with a documented before/after for each accepted knob change.
 
+### Phase 2 status
+
+- **Finite decks shipped.** `MARKET_COLUMN_DECKS` (96 cards game-wide, themed columns) replaces infinite refill: cards leave the game when bought, columns slide up and top up from their deck, decks persist across rounds (no re-roll), headers show cards remaining, sold-out columns say so. Saves carry decks; pre-deck saves degrade gracefully.
+- **Two AI defects the harness exposed were fixed before tuning could be trusted:** the landscape-floor early stop plus independent per-entry stack valuation made 41 percent of AI seats buy nothing all game (sparse boards, whole-column sweeps). The AI now lays its full landscape hand and values stacks sequentially on an evolving hypothetical board (depth cap 4): zero-buy seats went 33/80 to 0/80, buy depths spread across 1 to 4.
+- **First structural balance fix:** the shared finite market gave the build-phase opener a 60/40 seat advantage in 2p mirrors; the build starter now rotates each round (50.7/49.3 on the same seeds). A tabletop edition should adopt the same rule (start-player token passes each season).
+- **Baseline fairness (100-game 5p, all five strategies):** premium 16.3, spread 20.8, objective 24.0, roads 13.0, balanced 25.8 percent win rates; acceptable spread for intentionally distinct personalities. Economy is active (mean money left 59k to 81k of 200k).
+- **Open tuning items for the next pass:** randomize seat assignment per game in the harness (fixed-seat matchups confound seat and strategy); goal-by-goal completion tuning should wait for Phase 3 human signals (AI play undercounts terrain-planning goals); roads strategy weights could use a nudge; confirm 5p deck pressure feels like scarcity rather than starvation in playtests.
+
 ## Phase 3: Playtesting, browser, 2 to 5 players, about ten games
 
 Goal: validate real-UI UX, fun (the Kingdomino/Patchwork bar: is laying out the campground satisfying?), and "you cannot get stuck or uncompetitive from one early bad choice." This complements the statistical pass by catching soft-locks, confusing flow, and feel.
