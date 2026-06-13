@@ -160,6 +160,13 @@ Goal: a radical cute-animal cartoon look, camping- and nature-true, with zero lo
 
 Done when: `/verify-ui-dev-browser` visual QA and screenshots pass on mobile and desktop, and seeded-sim results are identical before and after.
 
+### Phase 5 status: complete
+
+- **Theme-token layer shipped** (`smore-theme.js`): presets expose tokens for the high-impact surfaces (background scene, board terrain by role, camp tile fills, player colors, primary button, panels). The render code reads the active preset and falls back to the original hardcoded value for any omitted token, so partial presets are safe and new presets are trivial to add.
+- **"Critter Camp" cartoon preset is the default:** a sunny blue-sky-over-meadow scene with sun, clouds, and hills, plus brighter saturated tiles and a bouncier orange button. **"Classic Camp"** keeps the original look. A pause-menu **Theme** toggle swaps between them and persists to localStorage.
+- **Logic frozen, proven:** the only wiring points are color/background reads. The seeded headless sim is byte-identical before and after (2p seed-1000 = 30.01/37.54/15.06; 3p seed-5000 = 32.13/42.32/8.98), exactly the regression guard this phase calls for. Verified on desktop and a 375px phone.
+- **Scope note / future extension:** this is a swappable palette-and-scene reskin via the token layer, not bespoke per-tile character art. The token infrastructure is the durable part; richer cartoon art (animal mascots, illustrated tiles) is now a low-risk follow-up that only adds new tokens/draw branches, with the seeded sim as a permanent guard that art changes never touch logic.
+
 ---
 
 ## Overall success bar
