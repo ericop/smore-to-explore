@@ -145,12 +145,14 @@
         id: "early-03",
         round: "early",
         name: "Organized Check-In",
-        description: "Score for Camp Office connected efficiently to the Entrance by road.",
+        description: "Score for keeping the Camp Office within 3 road steps of the Entrance.",
         points: 4,
         evaluate: (context, self) => {
-          return context.officeDistance > 0 && context.officeDistance <= 5
+          return context.officeDistance > 0 && context.officeDistance <= 3
             ? passed(self.points, `Entrance reaches the Camp Office in ${context.officeDistance} road steps.`)
-            : failed("The Camp Office needs a short, direct road link from the Entrance.");
+            : failed(context.officeDistance > 3
+              ? `The Camp Office is ${context.officeDistance} road steps from the Entrance. Keep it within 3 for a tidy check-in.`
+              : "The Camp Office needs a short, direct road link from the Entrance.");
         }
       }),
       makeObjective({
