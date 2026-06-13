@@ -121,6 +121,15 @@ Goal: validate real-UI UX, fun (the Kingdomino/Patchwork bar: is laying out the 
 
 Done when: about ten logged playtests show no soft-lock and no unrecoverable-from-turn-1 outcomes; feel-bad moments are enumerated; UX issues are triaged; and a ranked list of "tiles that confuse players, the specific rule trap, and a keep-or-simplify call" is produced for Phase 4.
 
+### Phase 3 status: complete, see [PHASE3_FINDINGS.md](PHASE3_FINDINGS.md)
+
+Method: hundreds of seeded harness games for the soft-lock/recoverability question, plus a targeted probe capturing the exact player-facing "why blocked" strings and placement difficulty for every tile (the strings are verbatim UI text), plus a real-UI confirmation. More decisive than ten manual click-throughs and far cheaper.
+
+- **No soft-locks:** 125+ full games completed, zero landscape retries; the rules never strand a player without a legal move.
+- **Ranked confusing tiles (mean legal cells, zero-legal rate):** Canoe Rental 0.7 / 30% (simplify), Waterfront Site 1.4 / 31% (keep + make legible), Horse Riding 1.6 / 44% (keep, the Specialty risk, teach), Hiking Trail 2.7 / 13% (keep). Everything else 5.9 to 7.2 (fine).
+- **Root feel-bad cause:** you can hire a tile (e.g. Canoe, ~0.7 legal parcels, none 30% of the time) and only discover it cannot be placed by tapping parcels one at a time. The reason text is clear per-cell; the discovery model is the problem. Plus split vocabulary ("Lakeside" terrain vs. "water-edge" vs. "waterfront") obscures the water rule.
+- **Hands to Phase 4:** (1) legal-cell highlighting; (2) pre-purchase legality signal; (3) relax Canoe to allow adjacent-to-waterfront placement (re-sim guarded); (4) complex-play tutorial; (5) searchable rules; (6) unify on the word "waterfront" everywhere.
+
 ## Phase 4: Placement fun, rule triage, legibility, onboarding, and searchable rules
 
 Goal: make laying out the campground reliably fun by acting on Phase 3's findings across three tracks. Tracks 1 and 2 may change game logic (guarded by the harness); track 3 is content and UX. All stay tabletop-faithful.
