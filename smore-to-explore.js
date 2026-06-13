@@ -85,6 +85,7 @@
   const NIGHT_LINE_RGB = "150, 172, 214";
   const NIGHT_EXACT = {
     "#3d2d20": NIGHT_INK, "#3b2c20": NIGHT_INK, "#3f2d20": NIGHT_INK, "#452f1e": NIGHT_INK,
+    "#432e1e": NIGHT_INK,
     "#4a3524": NIGHT_INK, "#4b3726": NIGHT_INK, "#4a2e1b": NIGHT_INK, "#3a2c20": NIGHT_INK,
     "#452f1e": NIGHT_INK, "#5a4330": NIGHT_INK_MED, "#5f4731": NIGHT_INK_MED, "#5b4330": NIGHT_INK_MED,
     "#6c4325": NIGHT_INK_MED, "#5a3a1d": NIGHT_INK_MED, "#6c4825": NIGHT_INK_MED,
@@ -3690,7 +3691,9 @@ function computeLayout(width, height) {
 
   function drawSparkle(cx, cy, s) {
     ctx.save();
-    ctx.fillStyle = themed("rgba(255, 246, 205, 0.95)");
+    // Decorative stars stay bright gold; not run through themed() so the night
+    // invert does not turn them dark (they are drawn on dark surfaces).
+    ctx.fillStyle = "rgba(255, 246, 205, 0.95)";
     ctx.beginPath();
     ctx.moveTo(cx, cy - s);
     ctx.quadraticCurveTo(cx + s * 0.2, cy - s * 0.2, cx + s, cy);
@@ -3703,7 +3706,7 @@ function computeLayout(width, height) {
   }
 
   function drawStarFrame(rect) {
-    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, themed("rgba(255, 240, 200, 0.5)"), 3);
+    Core.drawRoundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 32, null, "rgba(255, 240, 200, 0.5)", 3);
     const count = Core.clamp(Math.round(rect.w / 160), 3, 5);
     const base = runtime.layout?.mode === "mobile-portrait" ? 6 : 8;
     const left = rect.x + rect.w * 0.14;
