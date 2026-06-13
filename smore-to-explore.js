@@ -2255,7 +2255,7 @@
     };
   }
 
-  function openDetailedRulesOverlay(section = "sites", goalRound = "early", page = 0) {
+  function openDetailedRulesOverlay(section = "sites", goalRound = "early", page = 0, topic = null) {
     nameEditor?.close();
     resetOverlayScroll();
     game.overlay = {
@@ -2263,7 +2263,9 @@
       blocking: true,
       section,
       goalRound,
-      page
+      page,
+      topic: topic || null,
+      topicPage: 0
     };
   }
 
@@ -2293,6 +2295,56 @@
             : "Late Summer"}`,
       body: entry.body
     }));
+  }
+
+  const GOAL_ROUND_LABELS = {
+    early: "Early Summer",
+    mid: "Mid Summer",
+    late: "Late Summer",
+    director: "Camp Director"
+  };
+
+  // Topic chips filter the detailed rules across every section (sites, amenities, goals).
+  // Each chip matches an entry when any of its match words appear in the entry name or body.
+  // This is the canvas-only filter we shipped instead of an HTML text box: no DOM positioning
+  // math over the scaled canvas, robust hit-testing, and it answers the common "where can X go"
+  // questions in one tap. See the final notes for the rationale.
+  const DETAILED_RULE_TOPICS = [
+    { id: "waterfront", label: "Water / Waterfront", words: ["waterfront", "lakeside", "canoe", "water edge", "water-edge"] },
+    { id: "roads", label: "Roads", words: ["road", "dead end", "dead-end", "hub", "loop", "intersection", "longest route"] },
+    { id: "big-items", label: "Big 2-square items", words: ["2 campground squares", "two-square", "big market item", "rotate", "both halves"] },
+    { id: "office-entrance", label: "Office & Entrance", words: ["camp office", "entrance", "reserved"] },
+    { id: "scoring", label: "Scoring & goals", words: ["points", "score", "director", "bonus", "premium"] }
+  ];
+
+  function getTopicById(topicId) {
+    return DETAILED_RULE_TOPICS.find((topic) => topic.id === topicId) || null;
+  }
+
+  // Flatten every detailed-rules entry across all sections so a topic filter can span them.
+  function getAllDetailedRuleEntries() {
+    const entries = [];
+    getDetailedRuleSectionEntries("sites").forEach((entry) => {
+      entries.push({ ...entry, section: "sites", sectionLabel: "Site" });
+    });
+    getDetailedRuleSectionEntries("amenities").forEach((entry) => {
+      entries.push({ ...entry, section: "amenities", sectionLabel: "Amenity" });
+    });
+    ["early", "mid", "late", "director"].forEach((round) => {
+      getDetailedRuleSectionEntries("goals", round).forEach((entry) => {
+        entries.push({ ...entry, section: "goals", goalRound: round, sectionLabel: GOAL_ROUND_LABELS[round] });
+      });
+    });
+    return entries;
+  }
+
+  function filterDetailedRuleEntriesByTopic(topicId) {
+    const topic = getTopicById(topicId);
+    if (!topic) return [];
+    return getAllDetailedRuleEntries().filter((entry) => {
+      const haystack = `${entry.title} ${entry.body}`.toLowerCase();
+      return topic.words.some((word) => haystack.includes(word));
+    });
   }
 
   function openRenamePlayersOverlay() {
@@ -5938,6 +5990,185 @@ function computeLayout(width, height) {
     });
   }
 
+  // Lay out the topic-filter chips (wrapping rows) and return the rows plus total height.
+  // Pure layout: the caller draws and registers the click targets so it controls scroll offset.
+  function layoutDetailedTopicChips(viewport, compact, activeTopicId) {
+    const chipHeight = compact ? 26 : 30;
+    const chipGap = compact ? 6 : 8;
+    const rowGap = compact ? 6 : 8;
+    const chipFont = compact ? "800 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const paddingX = compact ? 12 : 14;
+    const chips = [{ id: null, label: "All rules" }].concat(DETAILED_RULE_TOPICS);
+    ctx.save();
+    ctx.font = chipFont;
+    const measured = chips.map((chip) => ({
+      chip,
+      width: Math.ceil(ctx.measureText(chip.label).width) + paddingX * 2
+    }));
+    ctx.restore();
+
+    const rows = [];
+    let row = [];
+    let rowWidth = 0;
+    measured.forEach((item) => {
+      const next = rowWidth === 0 ? item.width : rowWidth + chipGap + item.width;
+      if (rowWidth > 0 && next > viewport.w) {
+        rows.push(row);
+        row = [item];
+        rowWidth = item.width;
+      } else {
+        row.push(item);
+        rowWidth = next;
+      }
+    });
+    if (row.length) rows.push(row);
+
+    const totalHeight = rows.length * chipHeight + Math.max(0, rows.length - 1) * rowGap;
+    return { rows, chipHeight, chipGap, rowGap, chipFont, totalHeight, activeTopicId };
+  }
+
+  function drawDetailedTopicChips(viewport, topY, layout) {
+    let y = topY;
+    layout.rows.forEach((rowItems) => {
+      let x = viewport.x;
+      rowItems.forEach((item) => {
+        const selected = (item.chip.id || null) === (layout.activeTopicId || null);
+        drawButton({ x, y, w: item.width, h: layout.chipHeight }, item.chip.label, () => {
+          const section = game.overlay.section || "sites";
+          const goalRound = game.overlay.goalRound || "early";
+          openDetailedRulesOverlay(section, goalRound, game.overlay.page || 0, item.chip.id || null);
+        }, {
+          id: `overlay-detailed-topic-${item.chip.id || "all"}`,
+          scope: "overlay",
+          variant: selected ? "primary" : undefined,
+          selected,
+          font: layout.chipFont,
+          radius: 999
+        });
+        x += item.width + layout.chipGap;
+      });
+      y += layout.chipHeight + layout.rowGap;
+    });
+  }
+
+  // Filtered list view: one topic active, results span sites, amenities, and goals.
+  function renderDetailedRulesFilteredView(rect, viewport, compact, topicId, chipLayout, chipTopY) {
+    const topic = getTopicById(topicId);
+    const results = filterDetailedRuleEntriesByTopic(topicId);
+    const layoutWidth = viewport.w - 16;
+    const cardPaddingX = compact ? 14 : 18;
+    const cardGap = compact ? 10 : 12;
+    const titleFont = compact ? "800 16px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 19px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const titleLineHeight = compact ? 19 : 22;
+    const bodyFont = compact ? "600 11px 'Avenir Next', 'Trebuchet MS', sans-serif" : "600 12px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    const bodyLineHeight = compact ? 14 : 15;
+    const buttonHeight = compact ? 32 : 38;
+    const bottomGap = compact ? 8 : 12;
+
+    const countY = chipTopY + chipLayout.totalHeight + (compact ? 14 : 18);
+    const listTop = countY + (compact ? 22 : 26);
+
+    // Measure each result card.
+    const cards = results.map((entry) => {
+      const titleHeight = measureWrappedTextHeight(entry.title, layoutWidth - cardPaddingX * 2, titleLineHeight, { font: titleFont });
+      const bodyHeight = measureWrappedTextHeight(entry.body, layoutWidth - cardPaddingX * 2, bodyLineHeight, { font: bodyFont });
+      const height = 16 + titleHeight + 24 + 12 + bodyHeight + 16;
+      return { entry, titleHeight, bodyHeight, height };
+    });
+
+    let cardsHeight = 0;
+    cards.forEach((card, index) => {
+      cardsHeight += card.height + (index < cards.length - 1 ? cardGap : 0);
+    });
+    if (!cards.length) cardsHeight = compact ? 60 : 72;
+
+    const buttonY = listTop + cardsHeight + (compact ? 14 : 18);
+    const navHeight = compact ? buttonHeight * 2 + 8 : buttonHeight;
+    const contentHeight = (buttonY - viewport.y) + navHeight + bottomGap;
+    const scrollMeta = beginOverlayScrollViewport(viewport, contentHeight);
+    const oy = (value) => value - scrollMeta.scrollY;
+
+    ctx.fillStyle = "#3d2d20";
+    ctx.font = compact ? "800 20px 'Avenir Next', 'Trebuchet MS', sans-serif" : "800 26px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("Detailed Rules", rect.x + rect.w / 2, oy(viewport.y));
+
+    drawDetailedTopicChips(viewport, oy(chipTopY), chipLayout);
+
+    ctx.fillStyle = "rgba(82, 61, 44, 0.86)";
+    ctx.font = compact ? "700 12px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 13px 'Avenir Next', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const countLabel = results.length === 1
+      ? `1 match for "${topic ? topic.label : topicId}"`
+      : `${results.length} matches for "${topic ? topic.label : topicId}"`;
+    ctx.fillText(countLabel, rect.x + rect.w / 2, oy(countY));
+
+    let cursorY = listTop;
+    if (!cards.length) {
+      const emptyRect = { x: viewport.x, y: oy(cursorY), w: scrollMeta.contentWidth, h: compact ? 60 : 72 };
+      Core.drawRoundedRect(ctx, emptyRect.x, emptyRect.y, emptyRect.w, emptyRect.h, 18, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
+      ctx.fillStyle = "rgba(74, 53, 36, 0.86)";
+      ctx.font = bodyFont;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("No rules matched this topic.", emptyRect.x + emptyRect.w / 2, emptyRect.y + emptyRect.h / 2);
+    }
+
+    cards.forEach((card) => {
+      const cardRect = { x: viewport.x, y: oy(cursorY), w: scrollMeta.contentWidth, h: card.height };
+      Core.drawRoundedRect(ctx, cardRect.x, cardRect.y, cardRect.w, cardRect.h, 20, "rgba(247, 239, 227, 0.98)", "rgba(108,80,54,0.14)", 1.2);
+      Core.drawWrappedText(ctx, card.entry.title, cardRect.x + cardPaddingX, cardRect.y + 14, cardRect.w - cardPaddingX * 2, titleLineHeight, {
+        font: titleFont,
+        color: "#3d2d20",
+        align: "left"
+      });
+      drawPill(cardRect.x + cardPaddingX, cardRect.y + 16 + card.titleHeight, card.entry.sectionLabel, "#efe2ca", "#5f4731", {
+        height: compact ? 20 : 22,
+        paddingX: compact ? 10 : 12,
+        font: compact ? "700 10px 'Avenir Next', 'Trebuchet MS', sans-serif" : "700 11px 'Avenir Next', 'Trebuchet MS', sans-serif"
+      });
+      Core.drawWrappedText(ctx, card.entry.body, cardRect.x + cardPaddingX, cardRect.y + 16 + card.titleHeight + 24 + 12, cardRect.w - cardPaddingX * 2, bodyLineHeight, {
+        font: bodyFont,
+        color: "rgba(74, 53, 36, 0.92)",
+        align: "left"
+      });
+      cursorY += card.height + cardGap;
+    });
+
+    if (compact) {
+      const stackedWidth = rect.w - 48;
+      drawButton({ x: rect.x + 24, y: oy(buttonY), w: stackedWidth, h: buttonHeight }, "Back", openPauseMenu, {
+        id: "overlay-detailed-back",
+        scope: "overlay"
+      });
+      drawButton({ x: rect.x + 24, y: oy(buttonY + buttonHeight + 8), w: stackedWidth, h: buttonHeight }, "Clear filter", () => {
+        openDetailedRulesOverlay(game.overlay.section || "sites", game.overlay.goalRound || "early", game.overlay.page || 0, null);
+      }, {
+        id: "overlay-detailed-clear",
+        scope: "overlay",
+        variant: "primary"
+      });
+    } else {
+      const navGap = 16;
+      const navWidth = Math.max(132, Math.floor((rect.w - 48 * 2 - navGap) / 2));
+      drawButton({ x: rect.x + 24, y: oy(buttonY), w: navWidth, h: buttonHeight }, "Back", openPauseMenu, {
+        id: "overlay-detailed-back",
+        scope: "overlay"
+      });
+      drawButton({ x: rect.x + rect.w - navWidth - 24, y: oy(buttonY), w: navWidth, h: buttonHeight }, "Clear filter", () => {
+        openDetailedRulesOverlay(game.overlay.section || "sites", game.overlay.goalRound || "early", game.overlay.page || 0, null);
+      }, {
+        id: "overlay-detailed-clear",
+        scope: "overlay",
+        variant: "primary"
+      });
+    }
+
+    endOverlayScrollViewport(viewport, scrollMeta);
+  }
+
   function renderDetailedRulesOverlay(rect) {
     const section = game.overlay.section || "sites";
     const goalRound = game.overlay.goalRound || "early";
@@ -5951,6 +6182,16 @@ function computeLayout(width, height) {
       w: rect.w - (compact ? 32 : 48),
       h: rect.h - (compact ? 24 : 32)
     };
+    const activeTopicId = game.overlay.topic || null;
+    const chipLayout = layoutDetailedTopicChips(viewport, compact, activeTopicId);
+    // Filtered view has no intro paragraph, so its chips sit just under the title.
+    const filteredChipTopY = viewport.y + (compact ? 30 : 40);
+
+    if (activeTopicId) {
+      renderDetailedRulesFilteredView(rect, viewport, compact, activeTopicId, chipLayout, filteredChipTopY);
+      return;
+    }
+
     const layoutWidth = viewport.w - 16;
     const introText = section === "sites"
       ? "Each site page explains how that market item scores, which goals it can satisfy, and what the code is actually checking. Big market items in the site group are RV Site with Full Hookups, Group Site, and Waterfront Site."
@@ -5985,7 +6226,10 @@ function computeLayout(width, height) {
     const bodyHeight = measureWrappedTextHeight(entry.body, layoutWidth - cardPaddingX * 2, bodyLineHeight, {
       font: bodyFont
     });
-    const sectionTabsY = viewport.y + (compact ? 62 : 80) + introHeight;
+    // Normal view layout chain: title -> intro -> topic chips -> section tabs.
+    const introTop = viewport.y + (compact ? 32 : 42);
+    const chipsTopNormal = introTop + introHeight + (compact ? 10 : 12);
+    const sectionTabsY = chipsTopNormal + chipLayout.totalHeight + (compact ? 10 : 12);
     const goalTabsY = sectionTabsY + tabHeight + 12;
     const cardY = section === "goals" ? goalTabsY + tabHeight + 12 : sectionTabsY + tabHeight + 12;
     const cardHeight = 24 + entryTitleHeight + 32 + 20 + bodyHeight + 20;
@@ -6009,11 +6253,13 @@ function computeLayout(width, height) {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText("Detailed Rules", rect.x + rect.w / 2, oy(viewport.y));
-    Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(viewport.y + (compact ? 32 : 42)), scrollMeta.contentWidth, introLineHeight, {
+    Core.drawWrappedText(ctx, introText, rect.x + rect.w / 2, oy(introTop), scrollMeta.contentWidth, introLineHeight, {
       font: introFont,
       color: "rgba(82, 61, 44, 0.84)",
       align: "center"
     });
+
+    drawDetailedTopicChips(viewport, oy(chipsTopNormal), chipLayout);
 
     ["sites", "amenities", "goals"].forEach((tabId, index) => {
       drawButton({
