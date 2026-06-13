@@ -142,6 +142,12 @@ Goal: make laying out the campground reliably fun by acting on Phase 3's finding
 
 Done when: each Phase 3 feel-bad moment is resolved (simplified, or made legible and taught); legal-cell highlighting and a clear "why blocked" are in; a new player can complete the complex-play tutorial; the rules reference is searchable and answers the water/waterfront and office-placement questions in a couple of taps; the printable rulebook still matches; and the post-change sim still meets the fairness targets.
 
+### Phase 4 status
+
+- **Track 1 (rule triage) done:** the feel-bad water trap is closed without changing the spatial rule. You can no longer hire any contractor (Canoe, Waterfront, etc.) with no legal parcel; the purchase block now covers every tile, not just big two-square items, with tile-specific messages. Water vocabulary unified to "waterfront parcel (a Lakeside tile)" across every rule statement, tile text, and message. Re-sim confirmed all seeded games still complete with zero retries; the AI got strictly better (no longer buys-then-cancels dead cards).
+- **Track 2 (placement legibility) done:** selecting any landscape or market tile lights up every legal parcel with a bright emerald ring + corner pip and dims the parcels that cannot take it (the "where can this go" spotlight). Works in both phases; a Canoe lights its one Lake parcel, a Cabin lights every road parcel and dims the reserved Office/Gate. Reuses the placement oracles, memoized by selection + board signature. The existing ghost preview, two-tap touch confirm, and plain-language "why blocked" tray text remain.
+- **Track 3 (onboarding) in progress:** searchable Detailed Rules reference + a "Tricky Tiles / complex play" tutorial, building on the now-accurate finite-deck and waterfront content. (Note: the legal-cell highlighting already provides most of the "learn by doing," so the tutorial is reinforcement.)
+
 ## Phase 5: Swappable cartoon facelift (logic frozen)
 
 Goal: a radical cute-animal cartoon look, camping- and nature-true, with zero logic change. It must still read as a board game (tiles, draw-deck cards, goal cards, board), not a video game: the art is the components' skin.
